@@ -73,11 +73,13 @@ Every fighter has exactly these 10 moves, in this index order. Inputs: A = light
 | 2 | Down light | Down + A | Ground |
 | 3 | Up light | Up + A | Both |
 | 4 | Neutral air | A in air | Air |
-| 5 | Side heavy | B, or Side + B | Ground |
+| 5 | Side heavy | B, or Side + B | Both (plain B in the air is also side heavy) |
 | 6 | Recovery (up heavy) | Up + B, once per airtime | Both |
 | 7 | Down heavy | Down + B | Ground |
 | 8 | Down air | Down + A in air | Air |
-| 9 | Ground pound | B in air | Air, ends on landing |
+| 9 | Ground pound | Down + B in air | Air, ends on landing |
+
+Known sim issue: the ground pound's downward `iy` is clipped by the fall speed cap on the same frame (2100 becomes 1050, or 1700 when fast falling). Moves with `endOnLand` should be exempt from the cap.
 
 ## 7. Move data format (matches the live prototype `sim.js`)
 
