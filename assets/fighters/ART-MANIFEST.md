@@ -23,3 +23,11 @@ Style anchor: every fighter's model sheet was generated with Saif's sheet (`e15d
 ## Costs (credits)
 
 Nano Banana Pro 2k image: 2. FLUX 3 2k image: 3. AutoSprite sheet: 2 turbo, 3 pro.
+
+## Stage: Dune Island (`assets/stages/dune-island/`)
+
+| File | Higgsfield job | Notes |
+|---|---|---|
+| `background.jpg` | `0e36b250-a446-4c5a-9de0-aabb0095cb39` | Nano Banana Pro 21:9, dusk dunes and the storm ring of floating rocks |
+| `island.webp` | `3686b097-92fd-405d-8861-d1c263d4abc1` | Main island, keyed from green, top ghost band cropped |
+| `platform.webp` | `9edf10cf-72f7-41f7-af10-4cc62b945e52` | Soft platform slab, keyed from green (first try leaked character art and was rejected) |
