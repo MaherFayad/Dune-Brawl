@@ -1,0 +1,11 @@
+{
+  "frameSize": 256,
+  "frames": 29,
+  "pivot": [
+    80,
+    250
+  ],
+  "bodyHeight": 128,
+  "source": "run.mp4 (source frames 33-61, one 29-frame loop)",
+  "sourceFrames": 29
+}

@@ -24,7 +24,8 @@ if trim:
     # keep only the span where the pose differs from the first frame (drop the held start and end)
     small = [np.asarray(Image.open(p).convert("L").resize((96, 96))).astype(np.int32) for p in src]
     d = [np.abs(s - small[0]).mean() for s in small]
-    moving = [i for i, v in enumerate(d) if v > 4]
+    thr = max(1.5, 0.12 * max(d))  # relative, so small or slow fighters are not cut
+    moving = [i for i, v in enumerate(d) if v > thr]
     lo, hi = (max(0, moving[0] - 2), min(len(src) - 1, moving[-1] + 2)) if moving else (0, len(src) - 1)
     src = src[lo:hi + 1]
 if "--motion" in sys.argv:

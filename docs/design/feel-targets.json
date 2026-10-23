@@ -1,0 +1,13 @@
+{
+  "_source": "Placeholder from the development plan's estimates; replace with docs/design/REFERENCE-MEASUREMENTS.md",
+  "runSpeed": { "range": [0.13, 0.15] },
+  "stageCrossFrames": { "range": [72, 88] },
+  "fallSpeed": { "range": [0.19, 0.21] },
+  "fastFallSpeed": { "range": [0.29, 0.33] },
+  "lightStartup": { "range": [3, 5] },
+  "heavyStartup": { "range": [11, 12] },
+  "hitstopLight": { "range": [5, 8] },
+  "hitstopHeavy": { "range": [10, 12] },
+  "launchLight50": { "range": [0.25, 0.45] },
+  "killSideHeavyLedge": { "range": [110, 140] }
+}
