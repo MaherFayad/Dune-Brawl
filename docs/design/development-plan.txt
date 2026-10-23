@@ -1,0 +1,878 @@
+Dune Brawl: Full Development Plan
+
+Oct 24, 2026 · @maher fayad
+
+Goal and success criteria
+
+Take Dune Brawl from today's prototype (live at dunebrawl.vercel.app,
+rollback netcode working) to a shareable browser platform fighter with
+Brawlhalla-level feel: real 2D characters made in Higgsfield, a full
+combat system, painted stages, Arabic and English UI, and reliable
+online play from a link. Art is proven first with 1 character and 4
+animations before scaling.
+
+In scope: game design, combat systems, art and animation pipeline,
+renderer, stages, audio, UI and localization, netcode hardening,
+hosting, QA, launch. Out of scope: Meshy and any 3D route, native mobile
+apps, ranked ladders with accounts, monetization.
+
+  -----------------------------------------------------------------------
+  Gate                    Pass criteria
+  ----------------------- -----------------------------------------------
+  Test (4 animations)     Same character recognizable across all 4 sheets
+                          with no visible color or proportion drift;
+                          readable at 64 px tall on a 1080p screen; side
+                          light reads as a strike within 4 frames; no
+                          desync in a 5-minute online match
+
+  Character 1 complete    22 animations retimed to frame data; every
+                          attack's hitbox matches the visible strike in
+                          the editor overlay; per-character asset under 3
+                          MB
+
+  Ship                    2 characters, 1 painted stage, both palettes
+                          playable online; 10 friends play a match from a
+                          link and rate the feel 4 out of 5 or higher
+  -----------------------------------------------------------------------
+
+Game design
+
+Dune Brawl is a 1v1 stock platform fighter: knock the rival off the
+stage 3 times to win. Damage % raises knockback, so every hit builds
+toward a kill. A match lasts 3 to 5 minutes and starts from a shared
+link with no account.
+
+Core loop: open link, pick fighter and palette, 3-2-1, fight, rematch in
+one key press. Losing a match should take under 10 seconds to restart.
+
+  --------------------------------------------------------------------------
+  Mode             Players   Ships in  Notes
+  ---------------- --------- --------- -------------------------------------
+  Online from a    2         Live now  Rollback P2P, room code in the URL
+  link                                 
+
+  Practice vs bot  1         Live now  Bot gets 3 levels (easy, normal,
+                                       hard) in phase 3
+
+  Local versus     2         Live now  One keyboard or 2 gamepads
+
+  Training room    1         Phase 3   Hitbox view, frame data overlay,
+                                       dummy settings, damage reset
+
+  2v2 online       4         Later     Rollback supports 4 inputs; needs a
+                                       mesh or host relay
+  --------------------------------------------------------------------------
+
+Roster (Arabian myth theme): launch with 2 fighters, grow to 4.
+
+  ------------------------------------------------------------------------
+  Fighter (working     Archetype     Weapon     Hook
+  name)                                         
+  -------------------- ------------- ---------- --------------------------
+  Djinn Warrior        All-rounder   Scimitar   Sand dash that leaves a
+                                                short trail
+
+  Ghoul of the Dunes   Heavy         Bare claws Slow, huge knockback,
+                       grappler                 armored heavy
+
+  Falcon Rider (later) Air           Spear      Extra jump, strong air
+                       specialist               game
+
+  Sea Siren of Sindbad Zoner         Chakram    Ranged signature that
+  (later)                                       returns
+  ------------------------------------------------------------------------
+
+Match rules: 3 stocks, 8-minute timer (higher stocks then lower damage
+wins), 3 jumps plus 1 recovery per airtime, blast zones fixed per stage,
+items off. Both players can pick the same fighter; player 2 gets the
+alternate palette automatically.
+
+Combat systems
+
+Skill depth comes from a few strict rules, not move count. Each mechanic
+below lives in sim.js, uses whole-number math only, and is built in the
+order listed so every step stays playable.
+
+  ------------------------------------------------------------------------
+  #     Mechanic         Rule                                  Status
+  ----- ---------------- ------------------------------------- -----------
+  1     Movement         Run, 3 jumps, short hop on early      Live
+                         release, fast fall, drop through soft 
+                         platforms                             
+
+  2     Lights and       5 lights (neutral, side, down, up,    Live
+        heavies          air), 5 heavies including recovery    
+                         and ground pound                      
+
+  3     Knockback and    Knockback = base + growth x damage;   Live,
+        hitstun          hitstun = 6 + knockback / 48 frames   retune in
+                                                               game feel
+                                                               section
+
+  4     Input buffer     Presses held for 7 frames and fired   Live
+                         on the first actionable frame         
+
+  5     Dodge            Ground dodge 20 frames, air dodge 22  Live
+                         frames, invulnerable from frame 3;    
+                         cooldown 36 ground, 60 air            
+
+  6     Chase dodge      After landing a hit, the next dodge   Phase 2
+                         has half cooldown and travels 30%     
+                         farther                               
+
+  7     Gravity cancel   Air dodge with no direction, then     Phase 2
+                         attack: allows ground lights in the   
+                         air                                   
+
+  8     Wall cling       Touching the island side refreshes    Phase 2
+                         jumps once per airtime; wall jump on  
+                         press                                 
+
+  9     Ledge rules      Recovery cannot hit through the stage Phase 2
+                         underside; a sweet spot on the ledge  
+                         gives landing priority                
+
+  10    Directional      Holding a direction during hitstun    Phase 2
+        influence        bends the launch angle up to 12       
+                         degrees                               
+
+  11    Weapons          2 weapons per fighter, spawned on the Phase 4
+                         stage every 15 seconds; unarmed has   
+                         its own light moves                   
+
+  12    Weapon throw     Throw key tosses the weapon as a      Phase 4
+                         projectile, 6 damage                  
+
+  13    Signatures       Heavies differ per fighter and per    Phase 4
+                         weapon: 3 signatures per weapon       
+
+  14    Armor and charge Heavies can be charged up to 30       Phase 4
+                         frames for up to +40% knockback; some 
+                         get 1 hit of armor                    
+  ------------------------------------------------------------------------
+
+Data-driven moves: from phase 2, move data (frames, hitboxes, damage,
+knockback, angles) moves out of code into one moves.json per fighter,
+exported by the retiming editor. Both clients compare a hash of all move
+data at handshake and refuse to start on mismatch, so a stale cache can
+never cause a desync.
+
+Art direction
+
+Target a bold 2D cel-shaded look where fighters always read before
+anything else on screen. The numbers below come from frame-by-frame
+analysis of the Dreamhack Valencia 2023 footage (Sandstorm vs Pavelski)
+you shared.
+
+  -----------------------------------------------------------------------
+  Target                Measured in footage  Dune Brawl rule
+  --------------------- -------------------- ----------------------------
+  Fighter height on     About 58 px in a     64 world px tall, so about
+  screen                720p frame, about 8% 9% of a 720p view at default
+                        of screen height     zoom
+
+  Outline               Dark outline on      2 to 3 px dark outline baked
+                        every fighter        into every sprite frame
+
+  Value contrast        Painted, soft        Background at 60 to 70%
+                        backgrounds; stage   saturation and lower
+                        edge is the          contrast; stage top edge is
+                        strongest line       the brightest line
+
+  Fighter palette       Saturated, high-key, Each fighter: 1 dominant
+                        white highlights     hue, 1 accent, white
+                                             highlight; never the
+                                             background's main hue
+
+  Poses                 Exaggerated          Every attack has 1 held
+                        anticipation, smear  anticipation pose and 1
+                        frames on swings     smear frame
+
+  Hit effects           Comic white and      Procedural bursts in code,
+                        orange bursts, 0.3   scaled by knockback
+                        to 0.5 s             
+  -----------------------------------------------------------------------
+
+Readability rules: fighters face right in source art and are mirrored in
+code; silhouettes must be recognizable as solid black shapes; no thin
+parts under 4 px at game size; team colors show in a ring under the
+feet, not only in the sprite.
+
+Originality: prompts describe the style in generic terms (2D fighting
+game, bold outlines, cel shading). They never name Brawlhalla or its
+characters, so the art is our own.
+
+Character 1: Djinn Warrior
+
+A desert warrior bound to a djinn: human body and legs (feet must read
+clearly on platforms), with djinn traits in the glowing eyes, smoke-like
+sash and sand that trails his scimitar. Confident, fast, slightly
+theatrical.
+
+  -----------------------------------------------------------------------
+  Attribute                   Spec
+  --------------------------- -------------------------------------------
+  Proportions                 About 4.5 heads tall, large hands and blade
+                              for readability, wide stance
+
+  Silhouette hooks            Tall turban-wrap with a flowing tail,
+                              curved scimitar, long sash
+
+  Main palette                Deep indigo body wear, saffron sash,
+                              turquoise glow (eyes, blade edge)
+
+  Alternate palette (player   Crimson wear, sand-white sash, gold glow
+  2)                          
+
+  Skin and metal              Warm brown skin; brass bracers and hilt
+
+  Personality in motion       Light on his feet, spins the blade in idle,
+                              lands in a crouch
+
+  Never                       Thin wisps that vanish at game size, a
+                              smoke lower body, text or symbols on
+                              clothing
+  -----------------------------------------------------------------------
+
+Source images to produce: 1 model sheet (front, 3/4, side, back), 1
+expression row (neutral, attack shout, hurt, victory), 1 clean base pose
+facing right on transparent background for AutoSprite, and the same base
+pose in the alternate palette.
+
+Animation list and frame data
+
+One fighter needs 22 animations. Frame data is in game frames at 60 per
+second (startup / active / recovery); the attack values are the retuned,
+faster numbers from the game feel section. We generate about 1.5 to 2
+times more source frames than needed, then retime down. Rows marked Test
+are the 4 animations in the first proof.
+
+  ---------------------------------------------------------------------------
+  #     Animation       Plays     Game       Generate (AutoSprite)     Test
+                                  frames                               
+  ----- --------------- --------- ---------- ------------------------- ------
+  1     Idle            Loop      36         idle, 24 frames           Test
+
+  2     Run             Loop      20         run, 16 frames            Test
+
+  3     Jump rise       Once      10         jump, 16 frames (split 3  
+                                             to 5)                     
+
+  4     Air jump (flip) Once      14         custom, 16 frames         
+
+  5     Fall            Loop      12         from jump sheet           
+
+  6     Land            Once      6          from jump sheet           
+
+  7     Ground dodge    Once      20         custom, 16 frames         
+
+  8     Air dodge       Once      22         custom, 16 frames         
+
+  9     Hitstun         Loop      8          custom, 12 frames         
+
+  10    Tumble          Loop      12         custom, 12 frames         
+        (launched)                                                     
+
+  11    Jab             Once      3 / 2 / 7  custom, 16 frames         
+
+  12    Side light      Once      4 / 3 / 9  custom, 24 frames         Test
+
+  13    Slide (down     Once      5 / 5 / 10 custom, 24 frames         
+        light)                                                         
+
+  14    Up light        Once      4 / 4 / 10 custom, 24 frames         
+
+  15    Neutral air     Once      3 / 5 / 9  custom, 24 frames         
+
+  16    Down air        Once      5 / 4 / 10 custom, 24 frames         
+
+  17    Side heavy      Once      12 / 4 /   custom, 32 frames         Test
+                                  20                                   
+
+  18    Recovery (up    Once      4 / 10 /   custom, 32 frames         
+        heavy)                    18                                   
+
+  19    Down heavy      Once      11 / 5 /   custom, 32 frames         
+                                  20                                   
+
+  20    Ground pound    Once plus 8 / falls  custom, 32 frames         
+                        loop      / 14                                 
+
+  21    Victory         Once      90         custom, 32 frames         
+
+  22    Respawn drop    Once      30         custom, 16 frames         
+  ---------------------------------------------------------------------------
+
+Weapons (phase 4) add about 10 attack animations per weapon per fighter,
+generated the same way.
+
+Higgsfield pipeline
+
+All art comes from Higgsfield; no Meshy. Every animation sheet is
+checked against the model sheet before anyone spends time retiming it.
+
+[Higgsfield art pipeline · 8 steps, 1 QA gate]
+
+Higgsfield art pipeline · 8 steps, 1 QA gate
+
+A rejected sheet goes back to AutoSprite with the same base pose and an
+adjusted prompt; only passing sheets reach the editor.
+
+  -----------------------------------------------------------------------
+  Step         Model or tool        Settings
+  ------------ -------------------- -------------------------------------
+  1 Model      Nano Banana Pro      16:9, 2k; 4 to 6 drafts, pick 1
+  sheet                             
+
+  2 Base poses FLUX 3 with the      1:1, 2k; main palette, then a recolor
+               model sheet as       for the alternate palette
+               reference            
+
+  3 Cut out    remove_background    Default; check edges at 200% zoom
+
+  4 Animations AutoSprite           frame_size 256, frame_count per the
+                                    animation table, video_tier turbo for
+                                    drafts and pro for keepers,
+                                    is_humanoid true, remove_bg default
+                                    (ultra if halos), with_sound off
+                                    except one test
+
+  Stages       Nano Banana Pro      21:9, 4k; one image per parallax
+                                    layer
+  -----------------------------------------------------------------------
+
+Rule for every animation prompt: the character stays in place, side view
+facing right, camera fixed, full body in frame. Movement across the
+stage comes from the game code, never from the art.
+
+Model sheet prompt:
+
+Character model sheet for an original 2D fighting game hero: a desert
+warrior bound to a djinn. Human body, about 4.5 heads tall, wide
+confident stance, large hands, curved scimitar with a turquoise glowing
+edge. Tall indigo turban wrap with a flowing tail, saffron sash, brass
+bracers, warm brown skin, glowing turquoise eyes. Views: front,
+three-quarter, side, back, plus a row of 4 expressions (neutral, attack
+shout, hurt, victory). Bold dark outlines, flat cel shading with one
+shadow tone, saturated colors, white highlights. Plain light grey
+background, no text, no logos.
+
+Base pose prompt (FLUX 3, model sheet attached):
+
+Same character as the reference. Full body, side view facing right,
+fighting ready stance, feet flat on the ground, whole body and blade
+inside the frame. Same outlines and cel shading. Plain flat background,
+no ground shadow.
+
+Alternate palette prompt (base pose attached):
+
+Same image, recolor only: crimson clothing instead of indigo, sand-white
+sash instead of saffron, gold glow instead of turquoise. Keep pose,
+outlines and shading identical.
+
+AutoSprite custom template:
+
+[MOVE NAME]: [one-line description]. Snappy 2D fighting game animation:
+hold a clear anticipation pose, then a fast strike with one smear frame,
+then a quick return to the ready stance. Character stays in place, side
+view facing right, camera fixed, full body always in frame.
+
+Test descriptions:
+
+Side light attack: a fast forward scimitar slash at chest height with a
+short lunge step.
+Side heavy attack: wind up the scimitar behind the head, then a huge
+two-handed horizontal swing that leaves a sand trail, with a big forward
+step.
+
+Idle and run use the idle and run presets with no prompt.
+
+Retiming and hitbox editor
+
+A small browser tool (/editor on the same site) turns each AutoSprite
+sheet into game-ready animation and move data. It is the step that makes
+AI art behave like fighting-game art.
+
+1.  Import: drop in the sprite sheet PNG and its atlas JSON; frames load
+    as a strip.
+
+2.  Trim and pivot: auto-crop transparent edges; set the foot pivot once
+    per animation (auto-detected from the lowest opaque row, then
+    nudged).
+
+3.  Retime: a 60 fps timeline shows startup, active and recovery bands
+    from the move's frame data. Each game frame is assigned a source
+    frame: hold, skip or repeat. Defaults spread frames evenly; the
+    animator drags to hold the anticipation pose and put the smear frame
+    on the first active frame.
+
+4.  Hurtboxes: 1 to 3 rectangles per frame (head, body, legs); copy
+    forward with one key.
+
+5.  Hitboxes: drawn only on active frames; each carries damage, base
+    knockback, growth, angle and an "away" flag.
+
+6.  Preview: plays at true 60 fps beside a dummy, mirrored and
+    unmirrored, with onion skin and a hitbox overlay toggle.
+
+7.  Export: writes fighter.atlas.webp, fighter.anim.json (frame order
+    per animation) and fighter.moves.json (frame data and boxes) plus a
+    content hash.
+
+Acceptance: retiming 1 attack takes under 5 minutes; the exported move
+plays identically in the editor preview and in an online match.
+
+Technical architecture
+
+Each browser runs the complete game; only inputs and state hashes travel
+between players. Servers only introduce players (signaling) and relay
+traffic when a direct path fails (TURN).
+
+[Dune Brawl architecture · browser, services, tooling]
+
+Dune Brawl architecture · browser, services, tooling
+
+The simulation is the single source of truth. Renderer, audio and
+effects read its state every frame and never write to it, which is what
+keeps rollback safe.
+
+Codebase move (phase 1): from 4 loose files to Vite + TypeScript, with
+the same no-framework approach. Layout:
+
+/src/sim/ deterministic game rules (no floats, no clocks)
+/src/net/ rollback session, peer connection, signaling client
+/src/render/ PixiJS scenes, camera, effects
+/src/audio/ sound triggers with rollback dedupe
+/src/ui/ menus, HUD, i18n (en.json, ar.json)
+/assets/fighters/ one folder per fighter: atlas, anim.json, moves.json
+/assets/stages/ parallax layers + collision.json
+/editor/ retiming and hitbox tool
+/worker/ Cloudflare Worker: rooms + TURN credentials
+/tests/ determinism, rollback soak, Playwright browser match
+
+Rendering and engine integration
+
+The Canvas 2D renderer is replaced by PixiJS (WebGL, version pinned at
+build time). The simulation does not change: rendering only reads state,
+never writes it.
+
+Frame mapping rule: the sprite frame shown is a pure function of sim
+state: frame = anim[state][t], where state and t come from the fighter
+(for example ATK + move 1 + t 5 shows side light, game frame 5).
+Rollback therefore re-renders the right pose for free, and no animation
+clock ever runs on its own.
+
+  -----------------------------------------------------------------------
+  Item              Decision
+  ----------------- -----------------------------------------------------
+  Asset format      WebP atlas (2048 x 2048 max per page) + anim.json +
+                    moves.json per fighter
+
+  Sprite size       256 px source frames for gameplay; 512 px only for
+                    menus and victory screens
+
+  Palettes          Alternate palette as a second atlas generated in
+                    Higgsfield, not a runtime shader, so colors stay
+                    hand-picked
+
+  Loading           Menu loads first (under 300 KB); fighters and stage
+                    load while the lobby waits for the opponent
+
+  Size budget       Under 3 MB per fighter, under 2 MB per stage, under 8
+                    MB for a full match
+
+  Effects           Procedural: hit bursts, rings, trails and dust drawn
+                    with Pixi Graphics and particles
+
+  Camera            Unchanged logic; Pixi container transform; 1 to 1
+                    pixel snapping at rest to keep outlines crisp
+
+  Fallback          If WebGL is missing, show a message rather than a
+                    broken Canvas mode
+  -----------------------------------------------------------------------
+
+Determinism rules (unchanged and enforced in code review): no floats,
+Math.random or clock reads in sim.js; move data only from hashed JSON;
+renderer, audio and effects never write to sim state.
+
+Game feel retune
+
+The prototype moves about 4 to 5 times slower than Brawlhalla relative
+to body size, mostly in knockback. These are starting values for phase
+1; playtests set the final ones. Units: world pixels (1 px = 100 sim
+units) per frame at 60 fps.
+
+  ------------------------------------------------------------------------
+  Parameter        Now            Target     Why
+  ---------------- -------------- ---------- -----------------------------
+  Fighter hurtbox  72 px          64 px      Matches about 9% of screen
+  height                                     height
+
+  Stage main       620 px         720 px     More room for the faster
+  platform width                             speeds
+
+  Gravity          0.58           0.72       Snappier jumps (+25%)
+
+  Max fall speed   10.5           13         Matches measured 0.2 body per
+                                             frame
+
+  Fast fall        17             20         Keeps the fast fall gap
+
+  Run speed        7.4            9          Crosses the stage in about 80
+                                             frames
+
+  Knockback        1x             3.5x on    Measured launch about 0.37
+  multiplier                      base and   body per frame
+                                  growth     
+
+  Hitstun gravity  0.34           0.45       Launched fighters arc instead
+                                             of floating
+
+  Knockback decay  2% per frame   4% per     Big launches still end, so
+  in hitstun                      frame      recoveries are possible
+
+  Light attack     3 to 6 frames  3 to 5     Exchanges resolve in about
+  startup                         frames     130 ms, as measured
+
+  Heavy startup    14 to 16       11 to 12   Still reactable, less
+                   frames         frames     sluggish
+
+  Hit pause        3 + damage / 3 4 + damage Hits land harder
+                                  / 2, max   
+                                  12         
+
+  Kill range (side About 100%     110 to     Classic platform fighter
+  heavy, from                     140%       pacing
+  ledge)                                     
+  ------------------------------------------------------------------------
+
+A debug panel (F2) exposes every value as a slider in practice mode so
+we can tune live, then copy the values back into sim.js.
+
+Netcode and infrastructure
+
+The rollback core works (tested at 80 ms added lag and 5% loss with no
+desync). What is left is making every link connect, on every network,
+and hosting it in the right place.
+
+  -------------------------------------------------------------------------
+  Item           Today        Plan                                  Phase
+  -------------- ------------ ------------------------------------- -------
+  Hosting        Vercel,      Move to your personal Vercel account  1
+                 under the    or Cloudflare Pages; serve at         
+                 Almosafer    maherfayad.com/brawl or a subdomain   
+                 team                                               
+
+  Signaling      Free public  Own signaling on a Cloudflare Worker  2
+                 PeerJS       with Durable Objects: 1 object per    
+                 server       room code, rooms expire after 30      
+                              minutes idle                          
+
+  NAT traversal  Google and   Add a paid TURN relay (Cloudflare or  2
+                 Cloudflare   Metered; confirm pricing) with        
+                 STUN only    short-lived credentials from the      
+                              Worker                                
+
+  Region         P2P, no      P2P stays; TURN picks the nearest     2
+                 region       edge, which matters for GCC players   
+                              on strict mobile networks             
+
+  Desync         Detected and On hash mismatch the host sends a     2
+  recovery       shown        full state snapshot and both resume   
+                              from it                               
+
+  Disconnects    Match ends   10-second reconnect window using the  3
+                              same room code                        
+
+  Input delay    Fixed 2      Auto: 1 to 3 frames picked from       3
+                 frames       measured ping at match start          
+
+  Spectators     None         Read-only peers receive confirmed     Later
+                              inputs only                           
+
+  Version safety None         Build hash and move-data hash checked 2
+                              at handshake                          
+  -------------------------------------------------------------------------
+
+Privacy: room codes are random and short-lived; no accounts, names or IP
+addresses are stored by our servers. The TURN provider sees IP addresses
+while relaying, which the privacy notice states (see the launch
+section).
+
+Stages, audio and effects
+
+Stages: each stage is 3 to 4 painted parallax layers made in Higgsfield
+(Nano Banana Pro at 21:9, 4K), plus a separately generated stage
+platform image whose collision shape is set in data, not traced from the
+art.
+
+  --------------------------------------------------------------------------
+  Stage        Setting               Layout                          Phase
+  ------------ --------------------- ------------------------------- -------
+  Dune Island  Dusk desert, floating 1 main platform, 2 soft         3
+               rock                  platforms (today's layout)      
+
+  Hejaz Ruins  Ancient stone ruins   Main platform with walls for    4
+               at noon               clinging                        
+
+  Djinn Market Lantern-lit night     Wide platform, 3 soft platforms Later
+               market                                                
+  --------------------------------------------------------------------------
+
+Audio (phase 4): hit sounds in 3 weights (light, heavy, kill), whoosh
+per attack, jump, land, dodge, KO blast, menu sounds, one looping track
+per stage. AutoSprite's with_sound option is tested on the first batch;
+if quality falls short, use Higgsfield audio generation for effects and
+music. Every sound is triggered from confirmed or predicted state with a
+2-frame dedupe so rollback never plays a hit twice.
+
+Effects (code, phase 1): comic hit bursts scaled by knockback, white
+startup flash 2 frames before active, launch trail on tumbling fighters,
+landing dust, dodge afterimage, KO blast toward stage center, damage %
+shake on hit.
+
+UI, localization and accessibility
+
+The UI ships in English and Arabic from phase 3. Menus switch to RTL in
+Arabic; the fight itself stays left to right (player 1 left, player 2
+right) so positions mean the same thing in both languages. Arabic copy
+uses white Saudi dialect, noun-form labels and no diacritics; font: IBM
+Plex Sans Arabic.
+
+  ---------------------------------------------------------------------------
+  Key                English               Arabic
+  ------------------ --------------------- ----------------------------------
+  menu.host          Create online match   إنشاء مباراة أونلاين
+
+  menu.bot           Practice vs bot       تدريب ضد البوت
+
+  menu.local         2 players, one        لاعبين على كيبورد واحد
+                     keyboard              
+
+  lobby.copy         Copy                  نسخ
+
+  lobby.copied       Copied                تم النسخ
+
+  lobby.waiting      Waiting for your      بانتظار الخصم
+                     opponent              
+
+  lobby.connecting   Connecting            جار الاتصال
+
+  lobby.notFound     Match not found. Ask  المباراة غير موجودة. اطلب رابط
+                     for a new link.       جديد.
+
+  lobby.left         Opponent left         الخصم غادر
+
+  hud.fight          FIGHT                 قتال
+
+  result.win         VICTORY               فوز
+
+  result.loss        DEFEAT                خسارة
+
+  result.rematch     Rematch               إعادة المباراة
+
+  controls.light     Light attack          ضربة خفيفة
+
+  controls.heavy     Heavy attack          ضربة قوية
+
+  controls.dodge     Dodge                 مراوغة
+
+  controls.jump      Jump                  قفز
+  ---------------------------------------------------------------------------
+
+Accessibility (WCAG 2.2 AA for menus and HUD):
+
+-   1.4.1 Use of color: players are told apart by a label (YOU / RIVAL)
+    and a shape marker, not color alone; alternate palettes are checked
+    for deuteranopia.
+
+-   1.4.3 Contrast: HUD text at 4.5:1 or higher over a dark plate.
+
+-   2.1.1 Keyboard: every menu works with keyboard and gamepad; visible
+    focus ring (2.4.7, 2.4.11).
+
+-   2.3.1 Three flashes: the KO flash fires once, under 3 flashes per
+    second, and a setting turns off flashes and screen shake.
+
+-   Remapping: all controls remappable and saved per browser.
+
+QA and testing
+
+Every change runs automated determinism and netcode tests before deploy;
+feel is judged by people, weekly.
+
+  ---------------------------------------------------------------------------
+  Test            How                           Pass bar          Runs
+  --------------- ----------------------------- ----------------- -----------
+  Determinism     Node: 20,000 frames of random Identical hashes  Every
+                  inputs run twice, plus        every frame       commit
+                  save/load and re-simulate                       
+                  checks                                          
+
+  Rollback soak   Node: 2 simulated peers, 60   No desync; max    Every
+                  and 120 ms lag, 5 to 15%      rollback 10       commit
+                  loss, 4 minutes               frames or fewer   
+
+  Browser match   Playwright: 2 browsers        Both online;      Every
+                  connect through a real link,  matching hashes   deploy
+                  random inputs, 60 seconds                       
+
+  Cross-browser   Chrome, Safari, Firefox, Edge Same hashes       Weekly
+                  on Windows and macOS          across browsers   
+
+  Performance     2 fighters + effects on a mid 60 fps;           Weekly
+                  laptop and a 4-year-old phone worst-case        
+                  browser                       8-frame rollback  
+                                                under 4 ms        
+
+  Load            Cold load over a 10 Mbps      Menu in under 2   Every
+                  connection                    s, match ready in deploy
+                                                under 6 s         
+
+  Feel playtest   5 to 10 players, 20 minutes,  Average 4 or      Weekly from
+                  short survey (1 to 5 on       higher by ship    phase 2
+                  speed, impact, clarity)                         
+
+  Art QA          Side-by-side sheet review     No visible drift  Each new
+                  against the model sheet       in color or       animation
+                                                proportion        
+  ---------------------------------------------------------------------------
+
+Launch
+
+Launch is a link people send each other, so the sharing moment is the
+funnel.
+
+-   Address: maherfayad.com/brawl (ties to your portfolio and the 404
+    game) or a short subdomain; the link preview image shows both
+    fighters mid-clash with "I challenge you" in English and Arabic.
+
+-   Share flow: the host screen offers Copy, WhatsApp and X share
+    buttons; the guest lands straight in the lobby with no menu in
+    between.
+
+-   Analytics: cookieless, aggregate only: matches started, matches
+    finished, rematch rate, connection failures by type, average ping.
+    No user IDs, no fingerprinting.
+
+-   PDPL (Saudi Personal Data Protection Law): the TURN relay and
+    hosting process IP addresses, which can count as personal data.
+    Publish a short bilingual privacy notice naming the processors, the
+    purpose (connecting matches) and retention (relay logs only as long
+    as the provider keeps them). Collect nothing else. Confirm the legal
+    basis with counsel before any marketing push.
+
+-   Soft launch: 20 friends and your network, 1 week, watch connection
+    failures and the playtest survey; fix, then post publicly.
+
+-   Showcase: a short case study on maherfayad.com covering the netcode,
+    the AI art pipeline and the design decisions.
+
+Phases, gates and budget
+
+About 10 to 14 weeks to a public launch with 2 fighters, assuming I
+build the code and you review art and feel each week. Nothing moves to
+the next phase until its gate passes.
+
+[Roadmap · 5 phases, 4 gates]
+
+Roadmap · 5 phases, 4 gates
+
+The first gate is the art test: if Higgsfield sheets drift or read
+poorly at game size, we adjust prompts or the style before spending on a
+full fighter.
+
+  ------------------------------------------------------------------------
+  Budget line      Estimate                        How it is controlled
+  ---------------- ------------------------------- -----------------------
+  Art test (phase  Cap at 150 Higgsfield credits   Turbo tier for drafts;
+  1)                                               stop at the cap and
+                                                   review
+
+  Fighter 1 full   Measured in the test: (cost per Pro tier only for
+  set              sheet) x 22 animations x about  keepers
+                   2 attempts, plus sheets and     
+                   poses                           
+
+  Fighter 2 +      Same formula, plus about 10     Reuse prompt templates
+  stages           stage layer images              
+
+  Hosting          Free tier on personal Vercel or Static files only
+                   Cloudflare Pages                
+
+  Signaling Worker Expected to fit the Cloudflare  Rooms expire after 30
+                   free tier at launch volume;     minutes idle
+                   confirm limits                  
+
+  TURN relay       Pay per GB relayed; confirm     Used only when direct
+                   current pricing                 P2P fails; inputs are
+                                                   tiny (about 2 KB per
+                                                   second per player)
+  ------------------------------------------------------------------------
+
+Current Higgsfield balance: about 1,119 credits on the Ultimate plan
+(checked today).
+
+Risks and open decisions
+
+  --------------------------------------------------------------------------
+  Risk              Likelihood   Impact   Mitigation
+  ----------------- ------------ -------- ----------------------------------
+  Character drifts  High         High     Same base pose and model sheet
+  across AutoSprite                       every run; reject and regenerate;
+  sheets                                  fix small color drift in a palette
+                                          pass
+
+  AI motion is      High         Medium   Prompts ask for anticipation and
+  floaty, lacks                           smears; retiming holds key poses;
+  snap                                    procedural effects carry impact
+
+  Credit cost per   Medium       Medium   Measure real cost in the test;
+  fighter higher                          turbo tier for drafts, pro only
+  than expected                           for keepers
+
+  Desync from new   Medium       High     Determinism tests on every commit;
+  mechanics                               move-data hash at handshake;
+                                          snapshot resync
+
+  Strict networks   Medium       High     TURN relay in phase 2
+  block P2P                               
+
+  Scope creep       High         Medium   Ship 2 fighters without weapons
+  (weapons, roster)                       first; weapons only after the feel
+                                          bar is met
+
+  Hosting on a work Already true Medium   Move hosting in phase 1
+  account                                 
+
+  Style too close   Low          High     Own characters, Arabian theme,
+  to Brawlhalla                           prompts never name the game
+  --------------------------------------------------------------------------
+
+Open decisions:
+
+-   ☐ Final name: Dune Brawl or something new
+
+-   ☐ Address: maherfayad.com/brawl or a subdomain
+
+-   ☐ Djinn Warrior as fighter 1, or another concept
+
+-   ☐ Credit cap for the art test (suggested: 150 credits)
+
+-   ☐ Personal Vercel account or Cloudflare Pages
+
+Sources
+
+-   Brawlhalla, Wikipedia: engine is Adobe AIR
+
+-   TheGamer: fighting games with the best rollback netcode: Brawlhalla
+    uses rollback
+
+-   Infil: delay-based and rollback netcode
+
+-   Higgsfield model catalog (AutoSprite, Nano Banana Pro, FLUX 3,
+    remove_background), read through the connected Higgsfield account on
+    24 Oct 2026
+
+-   Frame measurements: Dreamhack Valencia 2023, Sandstorm vs Pavelski
+    (video you shared)
