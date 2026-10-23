@@ -123,6 +123,7 @@
     mode = "loading"; hideMenu();
     defs = await Promise.all(pick.map(async (id) => (await fetch(`${ROOT}/assets/fighters/${id}/moves.draft.json`)).json()));
     gfx = await Promise.all(pick.map((id) => Render.loadFighter(id, ROOT)));
+    await Promise.all(pick.map((id) => new Promise((ok) => { const im = new Image(); im.onload = () => { portraits[id] = im; ok(); }; im.onerror = ok; im.src = `${ROOT}/assets/fighters/${id}/source/portrait.png`; })));
     M = Sim.match(defs[0], defs[1]); st = M.create(); fx.reset(); mode = m;
   }
   function rebuild() { if (defs.length) { M = Sim.match(defs[0], defs[1]); } }
@@ -332,37 +333,70 @@
     for (const q of fx.parts) { g.globalAlpha = Math.min(1, q.life * 1.5); g.fillStyle = q.c; g.beginPath(); g.arc(q.x, q.y, q.size * 0.7, 0, 7); g.fill(); }
     g.globalAlpha = 1;
   }
-  function hud(s) {
-    const sc = Math.max(0.75, Math.min(1.2, W / 1280));
-    g.save(); g.scale(sc, sc);
-    const w = W / sc;
-    s.p.forEach((p, i) => {
-      const x = i === 0 ? 24 : w - 24 - 210, info = FIGHTERS[pick[i]];
-      g.fillStyle = "rgba(12,8,26,.72)"; rr(x, 18, 210, 78, 14); g.fill();
-      g.fillStyle = TEAM[i]; rr(x, 18, 8, 78, 4); g.fill();
-      g.font = "700 13px system-ui, sans-serif"; g.textAlign = "left"; g.fillStyle = "#d9cfe6";
-      g.fillText(info.name, x + 22, 40);
-      const d = p.st === ST.DEAD ? 0 : p.dmg, e = Math.min(1, d / 160);
-      const shake = s.hf >= 0 && s.f - s.hf < 10 && s.p[1 - s.hp] === p ? (rnd() - 0.5) * 6 : 0;
-      g.font = "900 38px system-ui, sans-serif";
-      g.fillStyle = p.st === ST.DEAD ? "#6c6080" : `rgb(255,${Math.round(255 - 200 * e)},${Math.round(255 - 235 * Math.min(1, e * 1.6))})`;
-      g.fillText(d + "%", x + 22 + shake, 82 + shake * 0.5);
-      for (let k = 0; k < FEEL.stocks; k++) { g.fillStyle = k < p.stocks ? TEAM[i] : "rgba(255,255,255,.15)"; g.beginPath(); g.arc(x + 210 - 22 - 20 * k, 40, 7, 0, 7); g.fill(); }
-    });
+  // ---------- HUD: matches the reference layout ----------
+  // Top-right corner only: an italic match timer, then one round portrait per fighter. Damage is a
+  // colored arc around the portrait (white, yellow, orange, red, dark red), stocks a single digit.
+  const portraits = {};
+  const DMG_STOPS = [[0, [255, 255, 255]], [45, [255, 244, 140]], [70, [247, 232, 40]], [105, [255, 140, 26]], [150, [236, 40, 26]], [220, [140, 10, 20]]];
+  function dmgColor(d) {
+    for (let k = 1; k < DMG_STOPS.length; k++) {
+      const [d1, c1] = DMG_STOPS[k], [d0, c0] = DMG_STOPS[k - 1];
+      if (d <= d1) { const t = (d - d0) / (d1 - d0); return `rgb(${c0.map((v, j) => Math.round(v + (c1[j] - v) * t)).join(",")})`; }
+    }
+    return "rgb(140,10,20)";
+  }
+  function italic(text, x, y, size, fill, align) {
+    g.font = `italic 900 ${size}px "Arial Black", "Segoe UI Black", system-ui, sans-serif`;
+    g.textAlign = align || "left"; g.textBaseline = "alphabetic"; g.lineJoin = "round";
+    g.lineWidth = Math.max(3, size * 0.22); g.strokeStyle = "#0b0a1a"; g.strokeText(text, x, y);
+    g.fillStyle = fill; g.fillText(text, x, y);
+  }
+  function portrait(i, p, cx, cy, r, s) {
+    const im = portraits[pick[i]], dead = p.st === ST.DEAD || p.stocks <= 0;
+    g.save();
+    g.fillStyle = "#1c1b46"; g.beginPath(); g.arc(cx, cy, r, 0, 7); g.fill();
+    if (im) {
+      // the head may break out of the top of the circle, as in the reference
+      g.beginPath(); g.arc(cx, cy, r, 0, Math.PI * 2); g.moveTo(cx + r * 0.82, cy - r * 0.55); g.arc(cx, cy - r * 0.55, r * 0.82, 0, Math.PI * 2); g.clip();
+      if (dead) g.filter = "grayscale(1) brightness(0.6)";
+      const sz = r * 2.25; g.drawImage(im, cx - sz * 0.5, cy - sz * 0.62, sz, sz); g.filter = "none";
+    }
     g.restore();
-    g.textAlign = "center";
+    g.lineWidth = Math.max(2, r * 0.09); g.strokeStyle = "#0b0a1a"; g.beginPath(); g.arc(cx, cy, r, 0, 7); g.stroke();
+    // damage arc: dark under-stroke then the colored arc, from about 7 o'clock round to 2 o'clock
+    const a0 = Math.PI * 0.62, a1 = -Math.PI * 0.14, w = r * 0.34, d = dead ? 0 : p.dmg;
+    const hit = s.hf >= 0 && s.f - s.hf < 8 && s.p[1 - s.hp] === p, jig = hit ? (rnd() - 0.5) * r * 0.25 : 0;
+    g.lineCap = "round";
+    g.lineWidth = w + 4; g.strokeStyle = "#0b0a1a"; g.beginPath(); g.arc(cx + jig, cy, r * 0.98, a0, a1, true); g.stroke();
+    g.lineWidth = w; g.strokeStyle = dead ? "#5a5670" : dmgColor(d); g.beginPath(); g.arc(cx + jig, cy, r * 0.98, a0, a1, true); g.stroke();
+    italic(String(Math.max(0, p.stocks)), cx - r * 1.02, cy + r * 1.02, r * 0.95, "#ffffff", "center");
+    if (showBoxes) italic(d + "%", cx, cy + r * 2.0, r * 0.6, dmgColor(d), "center");
+  }
+  function hud(s) {
+    const u = Math.min(W / 1280, H / 720), r = 19 * u, top = 30 * u;
+    const right = W - 26 * u;
+    const cx2 = right - r, cx1 = cx2 - r * 2.85;
+    // match timer: 8 minutes from the end of the countdown
+    const left = Math.max(0, 8 * 60 - Math.max(0, s.f - FEEL.countdown) / 60);
+    const mm = String(Math.floor(left / 60)).padStart(2, "0"), ss = String(Math.floor(left % 60)).padStart(2, "0");
+    italic(`${mm}:${ss}`, cx1 - r * 1.55, top + r * 0.45, 17 * u, "#ffffff", "right");
+    portrait(0, s.p[0], cx1, top + r * 0.15, r, s);
+    portrait(1, s.p[1], cx2, top + r * 0.15, r, s);
+
     if (s.f < FEEL.countdown + 30) {
-      const n = Math.ceil((FEEL.countdown - s.f) / 30), t = s.f >= FEEL.countdown ? "FIGHT" : String(n), ph = (s.f % 30) / 30;
-      g.globalAlpha = 1 - ph * 0.6; g.font = `900 ${Math.round(100 + 30 * ph)}px system-ui, sans-serif`;
-      g.lineWidth = 10; g.strokeStyle = "#140b1f"; g.lineJoin = "round"; g.strokeText(t, W / 2, H * 0.42);
-      g.fillStyle = s.f >= FEEL.countdown ? "#ffcf8a" : "#fff"; g.fillText(t, W / 2, H * 0.42); g.globalAlpha = 1;
+      const n = Math.ceil((FEEL.countdown - s.f) / 30), go = s.f >= FEEL.countdown, ph = (s.f % 30) / 30;
+      // pop in, hold, then scale up and vanish quickly (never a slow fade through the outline)
+      g.save(); g.globalAlpha = go && ph > 0.7 ? Math.max(0, 1 - (ph - 0.7) / 0.3) : 1;
+      const pop = ph < 0.12 ? 1.25 - ph * 2 : 1;
+      const size = (go ? 120 : 96) * u * pop * (go && ph > 0.7 ? 1 + (ph - 0.7) : 1);
+      italic(go ? "FIGHT!" : String(n), W / 2, H * 0.44, size, go ? "#ffd36b" : "#ffffff", "center");
+      g.restore();
     }
     if (s.over) {
       const wi = s.over - 1;
-      g.fillStyle = "rgba(10,6,20,.5)"; g.fillRect(0, H * 0.3, W, H * 0.26);
-      g.font = "900 72px system-ui, sans-serif"; g.fillStyle = TEAM[wi];
-      g.fillText(`${FIGHTERS[pick[wi]].name.toUpperCase()} WINS`, W / 2, H * 0.44);
-      if (s.overT > 60) { g.font = "600 18px system-ui, sans-serif"; g.fillStyle = "#f6efe6"; g.fillText("Space or J: rematch   Esc: menu", W / 2, H * 0.51); }
+      g.fillStyle = "rgba(8,6,20,.45)"; g.fillRect(0, H * 0.33, W, H * 0.2);
+      italic(`${FIGHTERS[pick[wi]].name.toUpperCase()} WINS`, W / 2, H * 0.45, 64 * u, "#ffffff", "center");
+      if (s.overT > 60) italic("SPACE OR J: REMATCH     ESC: MENU", W / 2, H * 0.5, 16 * u, "#ffd36b", "center");
     }
   }
   function rr(x, y, w, h, r) { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); }
@@ -415,7 +449,8 @@
       row.innerHTML = "";
       for (const id in FIGHTERS) {
         const b = document.createElement("button");
-        b.className = "chip" + (pick[i] === id ? " on" : ""); b.textContent = FIGHTERS[id].name;
+        b.className = "chip" + (pick[i] === id ? " on" : ""); b.setAttribute("aria-pressed", pick[i] === id);
+        b.innerHTML = `<i class="disc"><img alt="" src="${ROOT}/assets/fighters/${id}/source/portrait.png"></i><span>${FIGHTERS[id].name}</span>`;
         b.onclick = () => { pick[i] = id; buildPickers(); };
         row.appendChild(b);
       }
