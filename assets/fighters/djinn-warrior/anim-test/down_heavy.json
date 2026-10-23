@@ -1,11 +1,11 @@
 {
-  "frameSize": 256,
+  "frameSize": 384,
   "frames": 32,
   "pivot": [
-    96,
-    250
+    120,
+    378
   ],
-  "bodyHeight": 150,
+  "bodyHeight": 128,
   "source": "down_heavy.mp4",
   "sourceFrames": 55
 }

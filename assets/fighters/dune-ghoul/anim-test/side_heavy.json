@@ -1,0 +1,11 @@
+{
+  "frameSize": 384,
+  "frames": 32,
+  "pivot": [
+    120,
+    378
+  ],
+  "bodyHeight": 128,
+  "source": "ghoul_side_heavy.mp4",
+  "sourceFrames": 57
+}

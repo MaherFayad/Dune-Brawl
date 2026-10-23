@@ -2,10 +2,10 @@
   "frameSize": 256,
   "frames": 24,
   "pivot": [
-    96,
+    80,
     250
   ],
-  "bodyHeight": 150,
+  "bodyHeight": 128,
   "source": "side_light_c.mp4",
   "sourceFrames": 40
 }

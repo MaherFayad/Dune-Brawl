@@ -2,10 +2,10 @@
   "frameSize": 256,
   "frames": 12,
   "pivot": [
-    96,
+    80,
     250
   ],
-  "bodyHeight": 150,
-  "source": "hurt.mp4",
+  "bodyHeight": 128,
+  "source": "hurt_b.mp4",
   "sourceFrames": 45
 }

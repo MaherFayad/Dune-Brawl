@@ -59,8 +59,8 @@ def key(path):
 frames = [key(p) for p in pick]
 # fixed scale from the ready pose (first frame of the clip): every sheet of a fighter gets the same
 # body height and the same foot pivot, so animations line up in game
-BODY = 150                     # ready-pose height in px inside the cell
-PIVOT = (size * 3 // 8, size - 6)  # feet slightly left of center: the fighter faces right
+BODY = 128                   # ready-pose height in px, the same in every sheet so fighters keep one scale
+PIVOT = (size * 5 // 16, size - 6)  # feet left of center: the fighter faces right
 ref = key(sorted(tmp.glob("f*.png"))[0]).getchannel("A").getbbox()
 scale = BODY / (ref[3] - ref[1])
 foot_x = (ref[0] + ref[2]) / 2

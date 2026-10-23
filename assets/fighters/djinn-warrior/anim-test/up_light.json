@@ -2,10 +2,10 @@
   "frameSize": 256,
   "frames": 32,
   "pivot": [
-    96,
+    80,
     250
   ],
-  "bodyHeight": 150,
+  "bodyHeight": 128,
   "source": "up_light.mp4",
   "sourceFrames": 50
 }
