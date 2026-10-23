@@ -81,7 +81,39 @@
   const stageArt = {};
   async function loadStage() {
     const load = (n) => new Promise((ok) => { const im = new Image(); im.onload = () => ok(im); im.onerror = () => ok(null); im.src = `${ROOT}/assets/stages/dune-island/${n}`; });
-    [stageArt.bg, stageArt.island, stageArt.plat] = await Promise.all([load("background.jpg"), load("island.webp"), load("platform.webp")]);
+    const [bg, island, plat] = await Promise.all([load("background.jpg"), load("island.webp"), load("platform.webp")]);
+    // Value plan: the background is the quietest layer (hazy, soft, desaturated), the stage is
+    // calmer than the fighters except for its bright walkable top edge, and the fighters carry
+    // the most saturation and the darkest outlines.
+    stageArt.bg = bg && grade(bg, "saturate(0.72) brightness(0.8) contrast(0.85) blur(3px)", null, true);
+    stageArt.island = island && shade(edgeLit(island, "saturate(0.78) brightness(0.72) contrast(0.95)", 0.05));
+    stageArt.plat = plat && edgeLit(plat, "saturate(0.7) brightness(0.66)", 0.2);
+  }
+  function grade(im, filter, haze, sky) {
+    const c = document.createElement("canvas"); c.width = im.width; c.height = im.height;
+    const x = c.getContext("2d"); x.filter = filter; x.drawImage(im, 0, 0); x.filter = "none";
+    if (haze) { x.fillStyle = haze; x.fillRect(0, 0, c.width, c.height); }
+    if (sky) {
+      // cool, darker sky up top where the fighters jump; warm glow kept low on the horizon
+      const v = x.createLinearGradient(0, 0, 0, c.height);
+      v.addColorStop(0, "rgba(22,14,64,0.62)"); v.addColorStop(0.45, "rgba(52,30,96,0.34)");
+      v.addColorStop(0.7, "rgba(255,140,80,0.06)"); v.addColorStop(1, "rgba(40,18,40,0.35)");
+      x.fillStyle = v; x.fillRect(0, 0, c.width, c.height);
+    }
+    return c;
+  }
+  function shade(c) {
+    // the island body falls into shadow toward its point, so the top edge leads the eye
+    const x = c.getContext("2d"), v = x.createLinearGradient(0, 0, 0, c.height);
+    v.addColorStop(0, "rgba(20,10,34,0)"); v.addColorStop(0.18, "rgba(20,10,34,0.1)"); v.addColorStop(1, "rgba(20,10,34,0.72)");
+    x.globalCompositeOperation = "source-atop"; x.fillStyle = v; x.fillRect(0, 0, c.width, c.height);
+    x.globalCompositeOperation = "source-over";
+    return c;
+  }
+  function edgeLit(im, filter, band) {
+    const c = grade(im, filter), x = c.getContext("2d"), h = Math.round(im.height * band);
+    x.drawImage(im, 0, 0, im.width, h, 0, 0, im.width, h); // keep the walkable top at full brightness
+    return c;
   }
 
   // ---------- match ----------
@@ -96,18 +128,18 @@
   function rebuild() { if (defs.length) { M = Sim.match(defs[0], defs[1]); } }
 
   // ---------- effects (render only, driven by sim events) ----------
+  // Painted effect sprites (assets/vfx) do the heavy lifting; a few embers add motion.
   let seed = 7;
   const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const vfx = {};
+  ["spark", "heavy", "ko", "slash", "dust"].forEach((n) => { const im = new Image(); im.onload = () => (vfx[n] = im); im.src = `${ROOT}/assets/vfx/${n}.webp`; });
   const fx = {
-    parts: [], rings: [], bursts: [], trails: [], ghosts: [], text: [], shake: 0, flash: 0, lastHf: -1, lastKf: -1, zoomKick: 0,
-    land: [0, 0], grounded: [1, 1], wasSt: [0, 0],
-    reset() { Object.assign(this, { parts: [], rings: [], bursts: [], trails: [], ghosts: [], text: [], shake: 0, flash: 0, lastHf: -1, lastKf: -1, zoomKick: 0 }); },
-    dust(x, y, n, spread) {
-      for (let k = 0; k < n; k++) {
-        const a = Math.PI + rnd() * Math.PI;
-        this.parts.push({ x: x + (rnd() - 0.5) * spread, y, vx: Math.cos(a) * (1 + rnd() * 2), vy: Math.sin(a) * (0.6 + rnd()), life: 0.6 + rnd() * 0.3, size: 3 + rnd() * 4, c: "#e9c27b", g: 0.02, soft: 1 });
-      }
-    },
+    sprites: [], parts: [], trails: [], ghosts: [], shake: 0, flash: 0, lastHf: -1, lastKf: -1, zoomKick: 0,
+    grounded: [1, 1], wasSt: [0, 0],
+    reset() { Object.assign(this, { sprites: [], parts: [], trails: [], ghosts: [], shake: 0, flash: 0, lastHf: -1, lastKf: -1, zoomKick: 0 }); },
+    // a painted sprite: grows from s0 to s1 in `pop` frames, holds, then fades over the rest of `life` frames
+    add(name, x, y, opt) { this.sprites.push({ name, x, y, t: 0, rot: 0, flip: 1, s0: 0.6, s1: 1, pop: 3, life: 18, w: 80, ax: 0.5, ay: 0.5, alpha: 1, ...opt }); },
+    dust(x, y, w, flip) { this.add("dust", x, y, { w, ay: 0.85, s0: 0.5, s1: 1.15, pop: 8, life: 26, flip: flip || 1, alpha: 0.85 }); },
   };
   function events(s) {
     if (s.hf !== fx.lastHf && s.hf >= 0) {
@@ -115,51 +147,50 @@
       const x = s.hx / S, y = s.hy / S, k = s.hk / 100, heavy = k > 18;
       const atk = s.p[s.hp], dir = atk ? atk.face : 1;
       fx.shake = Math.max(fx.shake, Math.min(14, 1.5 + k * 0.35));
-      fx.rings.push({ x, y, r: 6, life: 1, w: 3 + k * 0.15, c: heavy ? "255,214,120" : "255,255,255" });
-      fx.bursts.push({ x, y, life: 1, size: 18 + k * 1.4, dir, spikes: heavy ? 9 : 7, heavy });
-      const n = 8 + Math.min(18, k | 0);
-      for (let j = 0; j < n; j++) {
-        const a = (dir > 0 ? 0 : Math.PI) + (rnd() - 0.5) * 2.2, sp = 3 + rnd() * (3 + k * 0.25);
-        fx.parts.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: 0.5 + rnd() * 0.3, size: 2 + rnd() * 3, c: rnd() < 0.5 ? "#fff4d6" : heavy ? "#ffb347" : "#ffffff", g: 0.12, streak: 1 });
+      if (heavy) {
+        fx.add("heavy", x, y, { w: 110 + k * 1.6, flip: dir, rot: (rnd() - 0.5) * 0.3, s0: 0.4, s1: 1.05, pop: 3, life: 22 });
+        fx.add("slash", x - dir * 10, y, { w: 120, flip: dir, rot: -0.5 * dir, s0: 0.8, s1: 1.1, pop: 2, life: 10, alpha: 0.8 });
+        fx.zoomKick = Math.min(0.08, k * 0.002);
+      } else {
+        fx.add("spark", x, y, { w: 46 + k * 1.2, rot: rnd() * 6.28, s0: 0.5, s1: 1, pop: 2, life: 12 });
       }
-      if (heavy) fx.zoomKick = Math.min(0.08, k * 0.002);
-      fx.text.push({ x, y: y - 26, v: atk ? M.mv[s.hp][atk.mv].dmg : 0, life: 1 });
+      const n = heavy ? 10 : 4;
+      for (let j = 0; j < n; j++) {
+        const a = (dir > 0 ? 0 : Math.PI) + (rnd() - 0.5) * 1.6, sp = 3 + rnd() * (4 + k * 0.2);
+        fx.parts.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 1, life: 0.6 + rnd() * 0.4, size: 2 + rnd() * 2.5, c: rnd() < 0.5 ? "#fff1c4" : "#ff9a3c", g: 0.18 });
+      }
     }
     if (s.kf !== fx.lastKf && s.kf >= 0) {
       fx.lastKf = s.kf; fx.shake = 22; fx.flash = 1;
-      const x = s.kx / S, y = s.ky / S, ang = Math.atan2(360 - y, 640 - x), col = TEAM[s.kp];
-      fx.bursts.push({ x, y, life: 1.6, size: 140, dir: 1, spikes: 14, heavy: true, ko: true, ang, col });
-      for (let j = 0; j < 70; j++) {
-        const a = ang + (rnd() - 0.5) * 1.3, sp = 6 + rnd() * 18;
-        fx.parts.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: 1.2 + rnd() * 0.5, size: 3 + rnd() * 6, c: rnd() < 0.4 ? "#ffffff" : col, g: 0 });
+      const x = s.kx / S, y = s.ky / S, ang = Math.atan2(360 - y, 640 - x);
+      fx.add("ko", x, y, { w: 620, ax: 0.04, rot: ang, s0: 0.3, s1: 1, pop: 6, life: 42, alpha: 0.92 });
+      fx.add("heavy", x, y, { w: 260, s0: 0.3, s1: 1.2, pop: 4, life: 30 });
+      for (let j = 0; j < 40; j++) {
+        const a = ang + (rnd() - 0.5) * 1.1, sp = 6 + rnd() * 16;
+        fx.parts.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: 1 + rnd() * 0.5, size: 2 + rnd() * 4, c: rnd() < 0.5 ? "#ffffff" : "#ffc86b", g: 0 });
       }
     }
     s.p.forEach((p, i) => {
       if (p.st === ST.DEAD) return;
       const x = p.x / S, y = p.y / S;
-      if (p.ground && !fx.grounded[i]) fx.dust(x, y, 8, 20);
-      if (!p.ground && fx.grounded[i] && p.vy < 0) fx.dust(x, y, 5, 12);
+      if (p.ground && !fx.grounded[i]) fx.dust(x, y, 74);
+      if (!p.ground && fx.grounded[i] && p.vy < 0) fx.dust(x, y, 52);
       fx.grounded[i] = p.ground;
-      if (p.st === ST.DODGE && s.f % 3 === 0) fx.ghosts.push({ i, x: p.x, y: p.y, f: s.f, face: p.face, life: 0.5, p: { ...p } });
-      if (p.st === ST.DODGE && fx.wasSt[i] !== ST.DODGE) fx.dust(x, y, 6, 10);
-      if (p.st === ST.HIT && p.launch > 1800 && s.f % 2 === 0) fx.trails.push({ x, y: y - 32, life: 1, w: Math.min(16, p.launch / 260), c: TEAM[i] });
-      if (p.ground && Math.abs(p.vx) > 700 && s.f % 9 === 0) fx.dust(x - Math.sign(p.vx) * 8, y, 2, 6);
+      if (p.st === ST.DODGE && s.f % 3 === 0) fx.ghosts.push({ i, f: s.f, life: 0.5, p: { ...p } });
+      if (p.st === ST.DODGE && fx.wasSt[i] !== ST.DODGE && p.ground) fx.dust(x, y, 60, -p.face);
+      if (p.st === ST.HIT && p.launch > 1800 && s.f % 2 === 0) fx.trails.push({ x, y: y - 32, life: 1, w: Math.min(14, p.launch / 280) });
       fx.wasSt[i] = p.st;
     });
   }
   function stepFx() {
-    for (const q of fx.parts) { q.x += q.vx; q.y += q.vy; q.vy += q.g; q.vx *= 0.94; q.life -= 0.03; }
+    for (const q of fx.parts) { q.x += q.vx; q.y += q.vy; q.vy += q.g; q.vx *= 0.93; q.life -= 0.035; }
     fx.parts = fx.parts.filter((q) => q.life > 0);
-    for (const r of fx.rings) { r.r += 5; r.life -= 0.08; }
-    fx.rings = fx.rings.filter((r) => r.life > 0);
-    for (const b of fx.bursts) b.life -= b.ko ? 0.04 : 0.11;
-    fx.bursts = fx.bursts.filter((b) => b.life > 0);
-    for (const t of fx.trails) t.life -= 0.05;
+    for (const e of fx.sprites) e.t++;
+    fx.sprites = fx.sprites.filter((e) => e.t < e.life);
+    for (const t of fx.trails) t.life -= 0.06;
     fx.trails = fx.trails.filter((t) => t.life > 0);
     for (const gh of fx.ghosts) gh.life -= 0.06;
     fx.ghosts = fx.ghosts.filter((gh) => gh.life > 0);
-    for (const t of fx.text) { t.y -= 0.6; t.life -= 0.03; }
-    fx.text = fx.text.filter((t) => t.life > 0);
     fx.shake *= 0.85; fx.flash *= 0.88; fx.zoomKick *= 0.88;
   }
 
@@ -186,6 +217,35 @@
       gr.addColorStop(0, "#1b1036"); gr.addColorStop(0.55, "#4a2552"); gr.addColorStop(0.85, "#c2573b"); gr.addColorStop(1, "#f2a35e");
       g.fillStyle = gr; g.fillRect(0, 0, W, H);
     }
+    // warm sunset glow low on the horizon, offset from the play area
+    const glow = g.createRadialGradient(W * 0.78, H * 0.78, 10, W * 0.78, H * 0.78, W * 0.55);
+    glow.addColorStop(0, "rgba(255,170,90,0.42)"); glow.addColorStop(0.4, "rgba(255,120,70,0.14)"); glow.addColorStop(1, "rgba(255,120,70,0)");
+    g.fillStyle = glow; g.fillRect(0, 0, W, H);
+    // drifting sand haze, far layer
+    const t = performance.now() / 1000;
+    g.save(); g.globalAlpha = 0.18;
+    for (let k = 0; k < 3; k++) {
+      const yy = H * (0.58 + k * 0.12), off = ((t * (12 + k * 8)) % (W * 2)) - W;
+      const gr = g.createLinearGradient(0, yy - 60, 0, yy + 60);
+      gr.addColorStop(0, "rgba(233,194,123,0)"); gr.addColorStop(0.5, "rgba(233,194,123,0.55)"); gr.addColorStop(1, "rgba(233,194,123,0)");
+      g.fillStyle = gr; g.fillRect(off, yy - 60, W * 2, 120);
+    }
+    g.restore();
+  }
+  // foreground: sand motes in front of everything, and a vignette that frames the fight
+  const motes = Array.from({ length: 70 }, (_, k) => ({ x: (k * 977) % 1600, y: (k * 571) % 900, r: 0.6 + (k % 4) * 0.5, s: 0.4 + (k % 5) * 0.25 }));
+  function drawAtmosphere() {
+    const t = performance.now() / 16.7;
+    g.save();
+    for (const m of motes) {
+      const x = ((m.x + t * m.s * 1.6) % 1600) / 1600 * W, y = ((m.y + Math.sin(t / 40 + m.x) * 12) % 900) / 900 * H;
+      g.globalAlpha = 0.25 + 0.2 * Math.sin(t / 30 + m.y); g.fillStyle = "#f3d9a4";
+      g.beginPath(); g.arc(x, y, m.r * dpr * 0.8, 0, 7); g.fill();
+    }
+    g.restore();
+    const v = g.createRadialGradient(W / 2, H * 0.48, Math.min(W, H) * 0.35, W / 2, H * 0.5, Math.max(W, H) * 0.75);
+    v.addColorStop(0, "rgba(10,4,20,0)"); v.addColorStop(1, "rgba(10,4,20,0.55)");
+    g.fillStyle = v; g.fillRect(0, 0, W, H);
   }
   function drawStage() {
     const m = STAGE.main, x1 = m.x1 / S, x2 = m.x2 / S, y = m.y / S;
@@ -203,18 +263,27 @@
       g.fillStyle = "rgba(255,226,170,0.75)"; g.fillRect(a + 6, py - 1, b - a - 12, 2);
     }
   }
-  function drawSprite(i, p, f, alpha, tint) {
+  const tintBuf = document.createElement("canvas"), tg = tintBuf.getContext("2d");
+  function drawSprite(i, p, f, alpha, tint, halo) {
     const F = gfx[i], ps = Render.pose(F, p, f, M.mv[i], Sim);
     const x = p.x / S, y = p.y / S;
-    if (!ps) { g.fillStyle = FIGHTERS[pick[i]].color; g.fillRect(x - 14, y - 64, 28, 64); return; }
+    if (!ps) return;
     const { sh, k } = ps, sc = sh.scale;
+    const screenBody = Render.BODY_PX * cam.z * Math.min(W / 1280, H / 720) * dpr;
+    const { im, f: div } = Render.mip(sh, screenBody), cell = sh.size / div;
+    let src = im, sx = k * cell;
+    if (tint) { // flash a white overlay on the sprite only, through a small buffer
+      tintBuf.width = cell; tintBuf.height = cell;
+      tg.drawImage(im, sx, 0, cell, cell, 0, 0, cell, cell);
+      tg.globalCompositeOperation = "source-atop"; tg.globalAlpha = tint; tg.fillStyle = "#fff"; tg.fillRect(0, 0, cell, cell);
+      tg.globalCompositeOperation = "source-over"; tg.globalAlpha = 1;
+      src = tintBuf; sx = 0;
+    }
     g.save(); g.globalAlpha = alpha; g.translate(Math.round(x), Math.round(y)); g.scale(p.face, 1);
     if (p.st === ST.HIT && p.launch > 2600 && !gfx[i].sheets.tumble) { g.translate(0, -32); g.rotate((f % 24) / 24 * Math.PI * 2 * -1); g.translate(0, 32); }
-    g.drawImage(sh.im, k * sh.size, 0, sh.size, sh.size, -sh.pivot[0] * sc, (-sh.pivot[1] + sh.dy[k]) * sc, sh.size * sc, sh.size * sc);
-    if (tint) {
-      g.globalCompositeOperation = "source-atop"; g.globalAlpha = tint;
-      g.fillStyle = "#ffffff"; g.fillRect(-sh.pivot[0] * sc, -sh.pivot[1] * sc, sh.size * sc, sh.size * sc);
-    }
+    if (halo) { g.shadowColor = halo; g.shadowBlur = 3 * dpr; }
+    g.imageSmoothingEnabled = true; g.imageSmoothingQuality = "high";
+    g.drawImage(src, sx, 0, cell, cell, -sh.pivot[0] * sc, (-sh.pivot[1] + sh.dy[k]) * sc, sh.size * sc, sh.size * sc);
     g.restore();
   }
   function drawFighter(s, i) {
@@ -222,15 +291,15 @@
     if (p.st === ST.DEAD) return;
     const x = p.x / S, y = p.y / S, m = M.mv[i][p.mv];
     if (p.ground) { g.fillStyle = "rgba(0,0,0,.28)"; g.beginPath(); g.ellipse(x, y + 1, 20, 4.5, 0, 0, 7); g.fill(); }
-    g.strokeStyle = TEAM[i]; g.lineWidth = 2.5; g.globalAlpha = 0.9; g.beginPath(); g.ellipse(x, y + 1, 17, 4, 0, 0, 7); g.stroke(); g.globalAlpha = 1;
+    if (p.ground) { g.strokeStyle = TEAM[i]; g.lineWidth = 2.5; g.globalAlpha = 0.9; g.beginPath(); g.ellipse(x, y + 1, 17, 4, 0, 0, 7); g.stroke(); g.globalAlpha = 1; }
     for (const gh of fx.ghosts.filter((q) => q.i === i)) drawSprite(i, gh.p, gh.f, gh.life * 0.5, 0.6);
     let tint = 0;
     if (p.st === ST.ATK && m.su - p.t > 0 && m.su - p.t <= 2 && m.su >= 8) tint = 0.55; // heavy startup flash
-    if (p.st === ST.HIT && s.freeze > 0) tint = 0.7;                                      // hit flash during hitstop
+    if (p.st === ST.HIT && s.hp === 1 - i && s.f - s.hf < 3) tint = 0.6;                   // hit flash, first frames of hitstop
     const blink = p.inv > 0 && Math.floor(s.f / 6) % 2 === 0;
     const jitter = p.st === ST.HIT && s.freeze > 0 ? (rnd() - 0.5) * 4 : 0;
     g.save(); g.translate(jitter, 0);
-    drawSprite(i, p, s.f, p.st === ST.DODGE ? 0.55 : blink ? 0.55 : 1, tint);
+    drawSprite(i, p, s.f, p.st === ST.DODGE ? 0.55 : blink ? 0.55 : 1, tint, "rgba(8,3,18,0.7)");
     g.restore();
     if (showBoxes) {
       g.strokeStyle = "rgba(80,200,255,.9)"; g.lineWidth = 1;
@@ -241,42 +310,28 @@
       }
     }
     const label = mode === "bot" ? (i === 0 ? "YOU" : "BOT") : mode === "demo" ? FIGHTERS[pick[i]].name.toUpperCase() : "P" + (i + 1);
-    g.font = "700 12px system-ui, sans-serif"; g.textAlign = "center"; g.fillStyle = TEAM[i];
-    g.fillText(label, x, y - 82); g.beginPath(); g.moveTo(x - 5, y - 77); g.lineTo(x + 5, y - 77); g.lineTo(x, y - 72); g.fill();
+    g.textAlign = "center"; g.fillStyle = TEAM[i]; g.strokeStyle = "#140b1f"; g.lineWidth = 3;
+    if (s.f < FEEL.countdown + 60) { g.font = "800 11px system-ui, sans-serif"; g.strokeText(label, x, y - 86); g.fillText(label, x, y - 86); }
+    g.beginPath(); g.moveTo(x - 5, y - 80); g.lineTo(x + 5, y - 80); g.lineTo(x, y - 74); g.closePath(); g.stroke(); g.fill();
   }
   function drawFx() {
-    for (const t of fx.trails) { g.fillStyle = t.c; g.globalAlpha = t.life * 0.45; g.beginPath(); g.arc(t.x, t.y, t.w * t.life, 0, 7); g.fill(); }
+    // launch trail: a soft smoke ribbon behind launched fighters
+    for (const t of fx.trails) { g.fillStyle = "rgba(245,226,190,1)"; g.globalAlpha = t.life * 0.35; g.beginPath(); g.arc(t.x, t.y, t.w * (0.4 + t.life * 0.6), 0, 7); g.fill(); }
     g.globalAlpha = 1;
-    for (const b of fx.bursts) {
-      const k = b.ko ? 1 : Math.min(1, (1 - b.life) * 4), r = b.size * (0.55 + 0.45 * k);
-      g.save(); g.translate(b.x, b.y); g.globalAlpha = Math.min(1, b.life * 1.6);
-      if (b.ko) {
-        g.rotate(b.ang); const gr = g.createLinearGradient(0, 0, 900, 0);
-        gr.addColorStop(0, "rgba(255,255,255,.95)"); gr.addColorStop(0.3, b.col); gr.addColorStop(1, "rgba(255,255,255,0)");
-        g.fillStyle = gr; g.beginPath(); g.moveTo(0, -40 * b.life); g.lineTo(900, -160 * b.life); g.lineTo(900, 160 * b.life); g.lineTo(0, 40 * b.life); g.fill();
-      } else {
-        g.rotate(b.dir > 0 ? -0.2 : Math.PI + 0.2);
-        g.fillStyle = b.heavy ? "#ffb347" : "#ffe9a8"; star(r, b.spikes, 0.45);
-        g.fillStyle = "#ffffff"; star(r * 0.62, b.spikes, 0.4);
-      }
+    for (const e of fx.sprites) {
+      const im = vfx[e.name];
+      if (!im) continue;
+      const k = e.t < e.pop ? e.t / e.pop : 1, sc = e.s0 + (e.s1 - e.s0) * (1 - (1 - k) * (1 - k));
+      const fade = e.t < e.pop ? 1 : 1 - (e.t - e.pop) / Math.max(1, e.life - e.pop);
+      const w = e.w * sc, h = (im.height / im.width) * w;
+      g.save(); g.translate(e.x, e.y); g.rotate(e.rot); g.scale(e.flip, 1);
+      g.globalAlpha = e.alpha * Math.min(1, fade * 1.4);
+      g.drawImage(im, -w * e.ax, -h * e.ay, w, h);
       g.restore();
     }
     g.globalAlpha = 1;
-    for (const r of fx.rings) { g.strokeStyle = `rgba(${r.c},${r.life})`; g.lineWidth = r.w * r.life; g.beginPath(); g.arc(r.x, r.y, r.r, 0, 7); g.stroke(); }
-    for (const q of fx.parts) {
-      g.globalAlpha = Math.min(1, q.life * (q.soft ? 0.8 : 1.4)); g.fillStyle = q.c;
-      if (q.streak) { g.save(); g.translate(q.x, q.y); g.rotate(Math.atan2(q.vy, q.vx)); g.fillRect(-q.size * 2, -q.size / 3, q.size * 4, q.size * 0.66); g.restore(); }
-      else { g.beginPath(); g.arc(q.x, q.y, q.size * (q.soft ? 1 : 0.6), 0, 7); g.fill(); }
-    }
+    for (const q of fx.parts) { g.globalAlpha = Math.min(1, q.life * 1.5); g.fillStyle = q.c; g.beginPath(); g.arc(q.x, q.y, q.size * 0.7, 0, 7); g.fill(); }
     g.globalAlpha = 1;
-    g.font = "900 16px system-ui, sans-serif"; g.textAlign = "center";
-    for (const t of fx.text) { g.globalAlpha = t.life; g.fillStyle = "#fff"; g.strokeStyle = "#1a1426"; g.lineWidth = 4; g.strokeText(t.v + "%", t.x, t.y); g.fillText(t.v + "%", t.x, t.y); }
-    g.globalAlpha = 1;
-  }
-  function star(r, n, inner) {
-    g.beginPath();
-    for (let k = 0; k < n * 2; k++) { const a = (k / (n * 2)) * Math.PI * 2, rr = k % 2 ? r * inner : r * (k % 4 === 0 ? 1 : 0.78); g.lineTo(Math.cos(a) * rr, Math.sin(a) * rr); }
-    g.closePath(); g.fill();
   }
   function hud(s) {
     const sc = Math.max(0.75, Math.min(1.2, W / 1280));
@@ -300,6 +355,7 @@
     if (s.f < FEEL.countdown + 30) {
       const n = Math.ceil((FEEL.countdown - s.f) / 30), t = s.f >= FEEL.countdown ? "FIGHT" : String(n), ph = (s.f % 30) / 30;
       g.globalAlpha = 1 - ph * 0.6; g.font = `900 ${Math.round(100 + 30 * ph)}px system-ui, sans-serif`;
+      g.lineWidth = 10; g.strokeStyle = "#140b1f"; g.lineJoin = "round"; g.strokeText(t, W / 2, H * 0.42);
       g.fillStyle = s.f >= FEEL.countdown ? "#ffcf8a" : "#fff"; g.fillText(t, W / 2, H * 0.42); g.globalAlpha = 1;
     }
     if (s.over) {
@@ -323,6 +379,7 @@
     for (const t of [0, 1]) drawFighter(st, t);
     drawFx();
     g.restore();
+    drawAtmosphere();
     if (fx.flash > 0.02) { g.fillStyle = `rgba(255,240,220,${0.3 * fx.flash})`; g.fillRect(0, 0, W, H); }
     hud(st);
   }
@@ -338,11 +395,12 @@
     M.step(st, [a, b]);
     events(st); stepFx(); updateCam(st);
   }
+  const dbg = { paused: false }; // test hook: freezes the sim for screenshots
   let acc = 0, last = performance.now();
   function frame(now) {
     acc += Math.min(250, now - last); last = now;
     let n = 0;
-    while (acc >= 1000 / 60 && n < 6) { if (mode !== "menu" && mode !== "loading") tick(); acc -= 1000 / 60; n++; }
+    while (acc >= 1000 / 60 && n < 6) { if (mode !== "menu" && mode !== "loading" && !dbg.paused) tick(); acc -= 1000 / 60; n++; }
     if (n === 6) acc = 0;
     draw();
     requestAnimationFrame(frame);
@@ -393,5 +451,5 @@
   loadStage();
   if (params.get("mode")) startMatch(params.get("mode")); else showMenu();
   requestAnimationFrame(frame);
-  window.__db = { get state() { return st; }, get mode() { return mode; }, fx, cam };
+  window.__db = Object.assign(dbg, { get state() { return st; }, get mode() { return mode; }, fx, cam });
 })();

@@ -50,7 +50,33 @@
       if (ALIGN_CENTER.has(name)) return pivot[1] - body / 2 - (b[1] + b[3]) / 2;
       return 0;
     });
-    return { im, size, n, pivot, scale: BODY_PX / body, bounds, dy };
+    return { mips: ink(im), size, n, pivot, scale: BODY_PX / body, body, bounds, dy };
+  }
+
+  // Bake the fighter look into the sheet once: a little more color, plus smaller copies made
+  // with high quality resampling, so sprites stay crisp when drawn at 60 to 120 px tall.
+  function ink(im) {
+    const out = document.createElement("canvas"); out.width = im.width; out.height = im.height;
+    const o = out.getContext("2d");
+    o.filter = "saturate(1.15) contrast(1.05)"; o.drawImage(im, 0, 0); o.filter = "none";
+    const mips = [out];
+    for (let c = out; c.height >= 64; ) {
+      const h = document.createElement("canvas"); h.width = Math.round(c.width / 2); h.height = Math.round(c.height / 2);
+      const hg = h.getContext("2d"); hg.imageSmoothingEnabled = true; hg.imageSmoothingQuality = "high";
+      hg.drawImage(c, 0, 0, h.width, h.height); mips.push(h); c = h;
+    }
+    return mips;
+  }
+
+  // A still sprite from the base pose, used when a fighter has no idle sheet yet.
+  async function stillSheet(src) {
+    const im = await loadImage(src);
+    if (!im) return null;
+    const size = Math.max(im.width, im.height) + 16;
+    const c = document.createElement("canvas"); c.width = size; c.height = size;
+    c.getContext("2d").drawImage(im, (size - im.width) / 2, size - 6 - im.height);
+    const body = im.height;
+    return { mips: ink(c), size, n: 1, pivot: [size / 2, size - 6], scale: BODY_PX / body, body, bounds: [[0, size - 6 - body, size, size - 6]], dy: [0] };
   }
 
   function strikeFrame(sheet, axis) {
@@ -67,6 +93,7 @@
     const base = `${root}/assets/fighters/${id}/anim-test`;
     const sheets = {};
     await Promise.all(SHEETS.map(async (n) => { sheets[n] = await loadSheet(base, n); }));
+    if (!sheets.idle) sheets.idle = await stillSheet(`${root}/assets/fighters/${id}/source/base-pose.png`);
     const strike = SLOT_SHEETS.map((n, i) => (sheets[n] ? strikeFrame(sheets[n], SLOT_AXIS[i]) : 0));
     return { id, sheets, strike };
   }
@@ -107,5 +134,12 @@
     return loop("idle", 5);
   }
 
-  root.Render = { loadFighter, pose, SLOT_SHEETS, BODY_PX };
+  // pick the smallest copy that is still at least as big as the body on screen
+  function mip(sh, screenBody) {
+    let lvl = 0;
+    while (lvl + 1 < sh.mips.length && sh.body / 2 ** (lvl + 1) >= screenBody) lvl++;
+    return { im: sh.mips[lvl], f: 2 ** lvl };
+  }
+
+  root.Render = { loadFighter, pose, mip, SLOT_SHEETS, BODY_PX };
 })(this);

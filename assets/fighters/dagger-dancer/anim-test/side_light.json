@@ -1,11 +1,11 @@
 {
-  "frameSize": 256,
+  "frameSize": 384,
   "frames": 24,
   "pivot": [
-    80,
-    250
+    120,
+    378
   ],
   "bodyHeight": 128,
-  "source": "dancer_side_light.mp4",
-  "sourceFrames": 43
+  "source": "side_light_t2.mp4",
+  "sourceFrames": 59
 }
