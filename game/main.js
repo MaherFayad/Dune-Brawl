@@ -148,11 +148,11 @@
       const atk = s.p[s.hp], dir = atk ? atk.face : 1;
       fx.shake = Math.max(fx.shake, Math.min(14, 1.5 + k * 0.35));
       if (heavy) {
-        fx.add("heavy", x, y, { w: 110 + k * 1.6, flip: dir, rot: (rnd() - 0.5) * 0.3, s0: 0.4, s1: 1.05, pop: 3, life: 22 });
-        fx.add("slash", x - dir * 10, y, { w: 120, flip: dir, rot: -0.5 * dir, s0: 0.8, s1: 1.1, pop: 2, life: 10, alpha: 0.8 });
+        fx.add("heavy", x, y, { w: 64 + k * 0.9, flip: dir, rot: (rnd() - 0.5) * 0.3, s0: 0.45, s1: 1.05, pop: 3, life: 20 });
+        fx.add("slash", x - dir * 8, y, { w: 84, flip: dir, rot: -0.5 * dir, s0: 0.8, s1: 1.1, pop: 2, life: 9, alpha: 0.7 });
         fx.zoomKick = Math.min(0.08, k * 0.002);
       } else {
-        fx.add("spark", x, y, { w: 46 + k * 1.2, rot: rnd() * 6.28, s0: 0.5, s1: 1, pop: 2, life: 12 });
+        fx.add("spark", x, y, { w: 40 + k * 0.9, rot: rnd() * 6.28, s0: 0.5, s1: 1, pop: 2, life: 12 });
       }
       const n = heavy ? 10 : 4;
       for (let j = 0; j < n; j++) {
@@ -311,7 +311,6 @@
     }
     const label = mode === "bot" ? (i === 0 ? "YOU" : "BOT") : mode === "demo" ? FIGHTERS[pick[i]].name.toUpperCase() : "P" + (i + 1);
     g.textAlign = "center"; g.fillStyle = TEAM[i]; g.strokeStyle = "#140b1f"; g.lineWidth = 3;
-    if (s.f < FEEL.countdown + 60) { g.font = "800 11px system-ui, sans-serif"; g.strokeText(label, x, y - 86); g.fillText(label, x, y - 86); }
     g.beginPath(); g.moveTo(x - 5, y - 80); g.lineTo(x + 5, y - 80); g.lineTo(x, y - 74); g.closePath(); g.stroke(); g.fill();
   }
   function drawFx() {

@@ -31,3 +31,15 @@ Nano Banana Pro 2k image: 2. FLUX 3 2k image: 3. AutoSprite sheet: 2 turbo, 3 pr
 | `background.jpg` | `0e36b250-a446-4c5a-9de0-aabb0095cb39` | Nano Banana Pro 21:9, dusk dunes and the storm ring of floating rocks |
 | `island.webp` | `3686b097-92fd-405d-8861-d1c263d4abc1` | Main island, keyed from green, top ghost band cropped |
 | `platform.webp` | `9edf10cf-72f7-41f7-af10-4cc62b945e52` | Soft platform slab, keyed from green (first try leaked character art and was rejected) |
+
+## Effects (`assets/vfx/`)
+
+Nano Banana Pro on pure black, converted to transparency by un-premultiplying from black (alpha from brightness).
+
+| File | Higgsfield job | Use |
+|---|---|---|
+| `spark.webp` | `6174bec2-45ac-4c47-9192-0f5365375370` | Light hit spark |
+| `heavy.webp` | `4d58ff99-75e1-415d-9b1a-cb9aa0b5bad8` | Heavy hit impact, also part of the KO |
+| `ko.webp` | `0a5f1df7-73d6-4f15-a098-3a4876c954a6` | KO blast beam, aimed at stage center |
+| `slash.webp` | `faee2a68-364e-4f71-82bd-a1d9adb1d982` | Slash arc behind heavy hits |
+| `dust.webp` | `184f2765-71f0-4dd7-92fe-951f95e13e98` | Landing, jump and dodge dust |
