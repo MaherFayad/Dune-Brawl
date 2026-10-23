@@ -183,7 +183,7 @@ Hitbox `box` is `[x1, x2, y1, y2]` in world px relative to the feet, facing righ
 | 5 Side heavy | Roc Lance | رمح الرخ | Spear drawn far back with both hands, then a huge stepping two-handed lunge at full reach. | 13/4/22 | 15 | 520 | 56 | 90/-44 | 14, 112, -56, -24 | ix 560 | His only ground kill move. Longest reach in his kit, slow to recover. |
 | 6 Recovery | Muzna's Lift | رفعة مزنة | Muzna grips the shoulder guard and beats her great wings, lifting him as he thrusts the spear upward. | 5/10/20 | 9 | 500 | 30 | 24/-97 | -28, 38, -118, -20 | iy -1650, ix 240 | Gets him home. Slightly less height than baseline because he has 4 other air actions. |
 | 7 Down heavy | Spear Circle | دورة الرمح | Crouched, he swings the spear in a full low circle around himself, both sides. | 12/5/22 | 13 | 500 | 46 | 70/-71 | -88, 88, -30, 0 | away | Clears both sides when cornered on the ground; also the landing of Roc Stone. |
-| 8 Down air | Falling Spearhead | السنان الهابط | Body tucked, spear pointed straight down beneath his feet, Muzna's wings swept tight along his back like a dart. | 6/4/12 | 11 | 360 | 28 | 30/95 | -18, 18, -6, 34 | air | True spike offstage, ground bounce starter on stage. The payoff of the Stoop. |
+| 8 Down air | Falling Spearhead | السنان الهابط | Body tucked, spear pointed straight down beneath his feet, Muzna's wings swept tight along his back like a dart. | 5/4/13 | 11 | 360 | 28 | 30/95 | -18, 18, -6, 34 | air | True spike offstage, ground bounce starter on stage. The payoff of the Stoop. |
 | 9 Ground pound | Roc Stone | صخرة الرخ | Reuses the Falling Spearhead active pose held during the fall (like the stones the Roc dropped on ships). | 9/40/14 | 12 | 500 | 38 | 30/-95 | -26, 26, -20, 24 | iy 2300, air, endOnLand | Fast vertical drop to escape juggles or crash onto platforms; lands into Spear Circle. |
 
 ### Budget check
@@ -259,7 +259,7 @@ All sheets: AutoSprite, frame_size 256, is_humanoid true, video_tier turbo for d
 | 13 | Side heavy | custom | 13/4/22 | 64 | Roc Lance: he draws the spear far back with both hands, then makes a huge stepping two-handed lunge at full reach. |
 | 14 | Recovery | custom | 5/10/20 | 56 | Muzna's Lift: the falcon grips his shoulder guard and beats her huge wings above him while he thrusts the spear straight up. |
 | 15 | Down heavy | custom | 12/5/22 | 64 | Spear Circle: crouching low, he swings the spear in a full circle close to the ground on both sides of his body. |
-| 16 | Down air (ground pound reuses the active pose) | custom | 6/4/12 | 40 | Falling Spearhead: body tucked, he drives the spear straight down beneath his feet while the falcon sweeps her wings tight along his back. |
+| 16 | Down air (ground pound reuses the active pose) | custom | 5/4/13 | 40 | Falling Spearhead: body tucked, he drives the spear straight down beneath his feet while the falcon sweeps her wings tight along his back. |
 | 17 | Hook: Stoop | custom | 4 commit, then 8 loop | 16 | Stoop: he folds into a tight diving tuck with the spear pointing down and forward along his body, the falcon's wings swept tight against his back and his cape streaming upward. |
 
 Sheets 1 to 3, 5 to 16 are the 15 core sheets. Done in code: air jump flip (on the jump rise frames, with Muzna's wings shown spread on the first flip frame if art allows, otherwise none), ground dodge, air dodge, ground pound fall, respawn drop.

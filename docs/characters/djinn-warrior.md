@@ -222,11 +222,11 @@ Rule for every row: blade moves keep 2 to 4 px of extra reach over baseline; eve
 | 2 | Down light | Dune Slide | انزلاق الكثيب | Low slide on one knee, blade held flat and low, sash streaming behind, sand spray at the front foot. | 5/5/10 | 7 | 430 | 16 | 28/-96 | 0, 68, -24, 0 | ix 950 | Pop-up and approach under pokes; juggle setup |
 | 3 | Up light | Rising Arc | قوس صاعد | An overhead arc from front to back above the turban, both feet planted. | 4/4/10 | 7 | 410 | 18 | 14/-100 | -38, 38, -118, -56 | | Anti-air, juggle, links into recovery at 115% |
 | 4 | Neutral air | Blade Whirl | دوامة النصل | He spins once in place with the blade held out flat, the sash wrapping the circle. | 3/5/9 | 7 | 380 | 20 | 70/-70 | -50, 50, -70, -4 | away, air | Air combo ender, out-of-jump panic button, landing cover |
-| 5 | Side heavy | Sandstorm Cleave | شق العجاج | Winds the scimitar behind the head, then a huge two-handed horizontal swing that leaves a sand trail, with a big forward step (plan test). | 12/4/20 | 17 | 560 | 58 | 88/-48 | 10, 112, -64, -12 | ix 620 | Main kill move, ledge finisher |
+| 5 | Side heavy | Sandstorm Cleave | شق العجاج | Winds the scimitar behind the head, then a huge two-handed horizontal swing that leaves a sand trail, with a big forward step (plan test). Input: B or Side + B, on the ground or in the air (plain B in the air is this move); the same sheet plays in the air. | 12/4/20 | 17 | 560 | 58 | 88/-48 | 10, 112, -64, -12 | ix 620 (no `air` flag, so an aerial Cleave is not cancelled on landing) | Main kill move, ledge finisher; in the air, an edgeguard read on opponents recovering high |
 | 6 | Recovery | Djinn Updraft | صعود الجني | Ajaj's wind lifts him in a rising corkscrew slash, blade overhead, sash spiralling under his feet (feet still visible). | 4/10/18 | 11 | 520 | 32 | 25/-97 | -30, 40, -114, -18 | iy -1700, ix 220 | Recovery, vertical finisher after Rising Arc |
 | 7 | Down heavy | Twin Sweep | كسح مزدوج | Crouches and sweeps the blade in a low full circle around both feet, sand spraying both ways. | 11/5/20 | 14 | 520 | 50 | 72/-70 | -86, 86, -32, 0 | away | Two-sided roll and landing punish, second kill move |
 | 8 | Down air | Scorpion Sting | لدغة العقرب | Knees tucked, he stabs the blade straight down below his feet. | 5/4/10 | 9 | 380 | 24 | 40/92 | -26, 26, -8, 30 | air | Spike for edgeguards; ground bounce on stage |
-| 9 | Ground pound | Sandfall | انهيال الرمل | Reuses the Scorpion Sting active frame for the fall; lands into Twin Sweep. | 8/40/14 | 13 | 520 | 40 | 30/-92 | -30, 30, -24, 22 | iy 2100, air, endOnLand | Landing mixup, gets him down fast, resets to Twin Sweep |
+| 9 | Ground pound | Sandfall | انهيال الرمل | Input: Down + B in the air. Reuses the Scorpion Sting active frame for the fall; lands into Twin Sweep. Designed with the full iy 2100 applied (not clipped by the fall cap). | 8/40/14 | 13 | 520 | 40 | 30/-92 | -30, 30, -24, 22 | iy 2100, air, endOnLand | Landing mixup, gets him down fast, resets to Twin Sweep |
 
 ### Budget check
 
@@ -265,7 +265,7 @@ Note on Dune Slide: it only links into Rising Arc at **145% and up** (gap 19 aga
 ### Kill setups
 
 1. **Ledge Sand Trail.** When the opponent is recovering, stride along the ledge so the armed trail covers the landing spot. If they land on it, trip into Lunge Slash pushes them back off stage. If they jump over it, Rising Arc meets them. If they air dodge onto the stage, the dodge ends inside Sandstorm Cleave range: K 1140, the baseline kill move (in today's prototype units it kills a recovering opponent from the ledge at about 260%; the retune targets 110 to 140%).
-2. **Rising Arc into Djinn Updraft.** True from **115%** at point blank: the arc pops them straight up and the updraft carries them to the top blast zone. Best under a soft platform or near the top of the screen. For opponents recovering low, Scorpion Sting off stage is the spike alternative.
+2. **Rising Arc into Djinn Updraft.** True from **115%** at point blank: the arc pops them straight up and the updraft carries them to the top blast zone. Best under a soft platform or near the top of the screen. For opponents recovering low, Scorpion Sting (Down + A in the air) off stage is the spike alternative; for opponents recovering high, jump out and press plain B for an aerial Sandstorm Cleave (same K 1140). Down + B in the air is Sandfall, the ground pound, so never press it off stage.
 
 ### How to play against him
 
@@ -340,7 +340,8 @@ The current prototype sim uses one global move table and one global physics bloc
 6. **New fighter fields** `sx0`, `sy0`, `tx1`, `tx2`, `ty`, `tt`, added to `u()` so clone and hash cover them.
 7. **A non-move hitbox (the Sand Trail)**, resolved in `step()` after attack hits and before blast zones, with its own rules (grounded victims only, never in hitstun, respects dodge, stride and respawn invulnerability), its own hit pause and effects fields (`hf`, `hx`, `hy`, `hk`), and clearing on the owner's KO.
 8. **Renderer and audio**: draw the trail from its fields (settling and armed looks), a 2 frame afterimage on the stride, and the trip sound through the existing hit dedupe.
-9. **Tests**: add Saif with random stride inputs to the 20,000 frame determinism test and the rollback soak.
+9. **Ground pound fall cap exemption**: the sim currently clips a move's `iy` by the fall cap; `endOnLand` moves are to be exempted so Sandfall's `iy 2100` applies in full, as designed.
+10. **Tests**: add Saif with random stride inputs to the 20,000 frame determinism test and the rollback soak.
 
 ## 13. Canon changes requested
 
