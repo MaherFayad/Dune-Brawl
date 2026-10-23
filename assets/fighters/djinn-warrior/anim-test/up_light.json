@@ -1,0 +1,11 @@
+{
+  "frameSize": 256,
+  "frames": 32,
+  "pivot": [
+    96,
+    250
+  ],
+  "bodyHeight": 150,
+  "source": "up_light.mp4",
+  "sourceFrames": 50
+}

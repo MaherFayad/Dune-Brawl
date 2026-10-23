@@ -1,0 +1,11 @@
+{
+  "frameSize": 256,
+  "frames": 32,
+  "pivot": [
+    96,
+    250
+  ],
+  "bodyHeight": 150,
+  "source": "dair.mp4",
+  "sourceFrames": 50
+}

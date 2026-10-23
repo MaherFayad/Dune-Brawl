@@ -1,10 +1,10 @@
 """Turn a green-screen animation clip into a sprite sheet.
 
-usage: python3 video2sprite.py clip.mp4 out_prefix frame_count [frame_size] [--trim]
+usage: python3 video2sprite.py clip.mp4 out_prefix frame_count [frame_size] [--trim] [--magenta]
 
 The clip must be shot on flat pure green (#00FF00), starting from the fighter's ready pose, so the
 first frame sets one scale and foot pivot shared by every sheet. --trim drops the held frames
-before and after the motion (use it for attacks).
+before and after the motion (use it for attacks). --magenta keys #FF00FF instead (for green fighters).
 
 Writes out_prefix.png (sheet, one row), out_prefix.json (atlas), out_prefix_preview.gif
 (on a dark background) and out_prefix_64px.png (all frames at in-game height 64 px).
@@ -30,17 +30,30 @@ if trim:
 pick = [src[round(i * (len(src) - 1) / max(1, count - 1))] for i in range(count)]
 
 
+MAGENTA = "--magenta" in sys.argv  # for green fighters: shoot on #FF00FF instead
+
+
 def key(path):
     a = np.asarray(Image.open(path).convert("RGB")).astype(np.int32)
     r, g, b = a[..., 0], a[..., 1], a[..., 2]
-    spill = g - np.maximum(r, b)
-    # fully green -> 0, clearly not green -> 255, soft ramp between
+    if MAGENTA:
+        spill = np.minimum(r, b) - g
+        bright = np.minimum(r, b)
+    else:
+        spill = g - np.maximum(r, b)
+        bright = g
+    # fully key colored -> 0, clearly not -> 255, soft ramp between
     alpha = np.clip((90 - spill) * 255 // 60, 0, 255)
-    alpha[(g < 120)] = 255
-    # despill: pull green down to the max of red and blue on remaining pixels
-    g2 = np.where(spill > 0, np.maximum(r, b), g)
-    out = np.dstack([r, g2, b, alpha]).astype(np.uint8)
-    return Image.fromarray(out, "RGBA")
+    alpha[bright < 120] = 255
+    # despill the remaining edge pixels
+    if MAGENTA:
+        r2 = np.where(spill > 0, np.maximum(g, np.minimum(r, b) - spill), r)
+        b2 = np.where(spill > 0, np.maximum(g, np.minimum(r, b) - spill), b)
+        out = np.dstack([r2, g, b2, alpha])
+    else:
+        g2 = np.where(spill > 0, np.maximum(r, b), g)
+        out = np.dstack([r, g2, b, alpha])
+    return Image.fromarray(out.astype(np.uint8), "RGBA")
 
 
 frames = [key(p) for p in pick]
