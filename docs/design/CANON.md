@@ -127,7 +127,7 @@ Baseline physics (prototype units): gravity 58, max fall 1050, fast fall 1700, r
 - Damage sum of all 10 moves: 90 to 108.
 - Side heavy K: 1000 to 1350. Rushdown near the low end, heavy near the high end, all-rounder within 40 of 1140.
 - Per-fighter physics are percentages of the baseline: run, air speed, jump height, gravity and fall speed each 85% to 115% (one stat per fighter may reach 80% or 120% if it is the fighter's identity). Air jumps 2, or 3 for the air specialist only.
-- `weight`: mass in percent, 90 to 115 (baseline 100). Knockback taken is `floor(l * 100 / weight)`, applied before hitstun is computed. Light fighters are below 100 and fly farther; the heavy is above 100 and flies less. Note: `weight` is a new sim field, see below.
+- `weight`: mass in percent, 90 to 115 (baseline 100). Knockback taken is `floor(l * 100 / weight)`, applied before hitstun is computed, so hitstun uses the scaled launch strength (heavier fighters fly less and also recover sooner). Light fighters are below 100 and fly farther; the heavy is above 100 and flies less. Note: `weight` is a new sim field, see below.
 - Each fighter has exactly one hook: a unique mechanic that defines it. It must be specified with integer state fields and frame counts so it stays deterministic and rollback safe.
 - Any mechanic the sim does not have today (projectiles, armor, command grabs, extra jumps, stances, per-fighter physics, weight) goes in a "Sim changes required" list in the character document.
 
