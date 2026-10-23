@@ -1,0 +1,38 @@
+{
+  "id": "dagger-dancer",
+  "stats": {
+    "run": 120,
+    "airSpeed": 105,
+    "jump": 95,
+    "gravity": 110,
+    "fallSpeed": 110,
+    "airJumps": 2,
+    "weight": 90
+  },
+  "hook": {
+    "maxBeat": 4,
+    "beatWindow": 90,
+    "decayStep": 20,
+    "cutPerBeat": 2,
+    "reFloor": 3,
+    "stepMinBeat": 2,
+    "stepCost": 2,
+    "stepFrames": 8,
+    "stepSpeed": 1000,
+    "stepCooldown": 40,
+    "stepAirPerAirtime": 1,
+    "excludedMoves": [6, 9]
+  },
+  "moves": [
+    { "su": 3, "ac": 2, "re": 6, "box": [6, 48, -56, -28], "dmg": 4, "kb": 300, "kg": 8, "ax": 70, "ay": -71 },
+    { "su": 4, "ac": 3, "re": 8, "box": [8, 68, -52, -22], "dmg": 7, "kb": 340, "kg": 18, "ax": 84, "ay": -54, "ix": 520 },
+    { "su": 4, "ac": 4, "re": 9, "box": [0, 56, -22, 0], "dmg": 6, "kb": 400, "kg": 12, "ax": 26, "ay": -97, "ix": 1100 },
+    { "su": 4, "ac": 3, "re": 9, "box": [-32, 32, -104, -50], "dmg": 7, "kb": 380, "kg": 16, "ax": 12, "ay": -99 },
+    { "su": 3, "ac": 5, "re": 8, "box": [-40, 40, -64, -8], "dmg": 6, "kb": 340, "kg": 16, "ax": 70, "ay": -71, "away": 1, "air": 1 },
+    { "su": 11, "ac": 3, "re": 18, "box": [10, 90, -58, -20], "dmg": 15, "kb": 500, "kg": 52, "ax": 87, "ay": -49, "ix": 900 },
+    { "su": 5, "ac": 10, "re": 16, "box": [-28, 34, -108, -16], "dmg": 11, "kb": 460, "kg": 26, "ax": 30, "ay": -95, "iy": -1650, "ix": 360 },
+    { "su": 11, "ac": 4, "re": 18, "box": [-70, 70, -30, 0], "dmg": 14, "kb": 500, "kg": 46, "ax": 77, "ay": -64, "away": 1 },
+    { "su": 4, "ac": 3, "re": 10, "box": [-22, 22, -8, 28], "dmg": 7, "kb": 340, "kg": 20, "ax": 50, "ay": 87, "air": 1 },
+    { "su": 8, "ac": 40, "re": 12, "box": [-28, 28, -24, 20], "dmg": 13, "kb": 480, "kg": 34, "ax": 30, "ay": -95, "iy": 2300, "air": 1, "endOnLand": 1 }
+  ]
+}

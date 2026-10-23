@@ -52,9 +52,11 @@ Hue lanes exist so no two fighters share a dominant hue, and no fighter uses a s
 
 ## 5. Animation budget per fighter
 
-17 generated AutoSprite sheets, plus at most 1 extra sheet for the fighter's hook. Done in code, not generated: air jump flip, ground dodge, air dodge, ground pound fall (holds the down air active frame), respawn drop.
+At most 18 generated AutoSprite sheets: 15 core sheets, up to 2 optional splits, and at most 1 for the fighter's hook. Done in code, not generated: air jump flip, ground dodge, air dodge, ground pound fall (holds the down air active frame), respawn drop.
 
-Generated sheets: idle, run, jump (split into rise, fall, land), hurt (covers hitstun and tumble), victory, and the 10 attacks below except ground pound (9 sheets), plus 1 taunt that may reuse idle. Ground pound reuses down air.
+Core sheets (15): idle, run, jump (one sheet split in code into rise, fall and land), hurt (hitstun, with tumble as a rotation), victory, taunt, and the 9 attack sheets (all 10 slots except ground pound, which reuses down air).
+
+Optional splits (up to 2): give jump land its own sheet, and give tumble its own sheet separate from hitstun.
 
 AutoSprite custom template (from the plan):
 
@@ -125,7 +127,7 @@ Baseline physics (prototype units): gravity 58, max fall 1050, fast fall 1700, r
 - Damage sum of all 10 moves: 90 to 108.
 - Side heavy K: 1000 to 1350. Rushdown near the low end, heavy near the high end, all-rounder within 40 of 1140.
 - Per-fighter physics are percentages of the baseline: run, air speed, jump height, gravity and fall speed each 85% to 115% (one stat per fighter may reach 80% or 120% if it is the fighter's identity). Air jumps 2, or 3 for the air specialist only.
-- `weight`: knockback taken in percent, 90 to 115 (baseline 100). Light fighters below 100, the heavy above. Note: `weight` is a new sim field, see below.
+- `weight`: mass in percent, 90 to 115 (baseline 100). Knockback taken is `floor(l * 100 / weight)`, applied before hitstun is computed. Light fighters are below 100 and fly farther; the heavy is above 100 and flies less. Note: `weight` is a new sim field, see below.
 - Each fighter has exactly one hook: a unique mechanic that defines it. It must be specified with integer state fields and frame counts so it stays deterministic and rollback safe.
 - Any mechanic the sim does not have today (projectiles, armor, command grabs, extra jumps, stances, per-fighter physics, weight) goes in a "Sim changes required" list in the character document.
 
