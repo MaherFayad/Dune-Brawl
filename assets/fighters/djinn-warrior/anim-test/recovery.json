@@ -1,0 +1,11 @@
+{
+  "frameSize": 384,
+  "frames": 32,
+  "pivot": [
+    120,
+    378
+  ],
+  "bodyHeight": 128,
+  "source": "recovery.mp4",
+  "sourceFrames": 68
+}

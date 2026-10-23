@@ -1,11 +1,11 @@
 {
   "frameSize": 384,
-  "frames": 32,
+  "frames": 48,
   "pivot": [
     120,
     378
   ],
   "bodyHeight": 128,
-  "source": "dancer_side_heavy.mp4",
+  "source": "side_heavy_t3.mp4",
   "sourceFrames": 60
 }
