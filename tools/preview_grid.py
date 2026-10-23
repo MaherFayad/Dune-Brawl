@@ -1,6 +1,6 @@
 """Build an animated GIF grid of every sprite sheet under assets/fighters/*/anim-test.
 
-usage: python3 tools/preview_grid.py out.gif
+usage: python3 tools/preview_grid.py out.gif [fighter-id ...]
 """
 import json, pathlib, sys
 from PIL import Image, ImageDraw
@@ -8,16 +8,20 @@ from PIL import Image, ImageDraw
 ROOT = pathlib.Path(__file__).resolve().parent.parent / "assets" / "fighters"
 NAMES = {"djinn-warrior": "Saif", "dune-ghoul": "Abu Sarab", "falcon-rider": "Nawaf",
          "sea-siren": "Dana", "dagger-dancer": "Marjana"}
-ORDER = ["idle", "run", "jab", "side_light", "down_light", "up_light", "nair",
-         "side_heavy", "down_heavy", "dair", "recovery", "hurt"]
+ORDER = ["idle", "run", "jump", "fall", "land", "hurt", "tumble", "jab", "side_light", "down_light",
+         "up_light", "nair", "side_heavy", "down_heavy", "dair", "recovery", "victory", "taunt"]
+ONLY = sys.argv[2:]
 TILE, LABEL, COLS, STEPS = 240, 20, 5, 48
 SCALE = 0.75  # one scale for every sheet, so fighters and moves compare at true size
 ANCHOR = (90, TILE - 8)  # where each sheet's foot pivot lands in its tile
 
 items = []
 for fid, name in NAMES.items():
+    if ONLY and fid not in ONLY:
+        continue
     d = ROOT / fid / "anim-test"
-    for n in ORDER:
+    hooks = sorted(p.stem for p in d.glob("hook_*.png"))
+    for n in ORDER + hooks:
         p = d / f"{n}.png"
         if p.exists():
             im = Image.open(p)
