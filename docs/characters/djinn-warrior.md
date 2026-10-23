@@ -14,7 +14,7 @@ Character bible. Binding sources: `docs/design/CANON.md` and `docs/design/develo
 
 **Title:** The Bound Blade / **النصل المقيد**
 
-The djinn that lives in his sash and blade calls itself **Ajaj (عجاج)**, "the dust cloud". (If the world lore document names the djinn differently, the lore document wins.)
+The djinn that lives in his sash and blade is **Wahaj (وهج)**, "the glare": the shimmer of heat over noon sand that makes a mirage. It comes from the Court of Mirrors (مجلس المرايا), the jinn court of mirage-makers in `docs/lore/LORE.md`. The name is a plain everyday word with no folk owner and no religious link, and it is not one of the storm marid's names (Ajaj, Haboob, Abu Dawwama).
 
 ## 2. At a glance
 
@@ -37,33 +37,35 @@ The djinn that lives in his sash and blade calls itself **Ajaj (عجاج)**, "th
 
 ## 3. Lore
 
-**Bio (about 270 words)**
+**Bio (about 290 words)**
 
-Saif grew up guarding caravans on the edge of the Empty Quarter. He was the guard who walked at the back, so that nobody was left behind. One night a ghoul's false lanterns drew his caravan off the track. Saif went after the lost riders alone, and at the bottom of a buried well he found a brass hilt with no blade, warm as a coal. When he picked it up, sand poured out of the hilt and set itself into a curved edge, and a laughing wind wrapped around his waist and became a saffron sash.
+Saif guards caravans on the Salt Road, the long track the Salt Traders walk from the coast to the mountains. He is the guard who walks at the back, so that nobody is left behind. One night a ghoul's false lanterns drew his caravan off the road. Saif went after the lost riders alone, and at the bottom of a buried well he found a brass hilt with no blade, warm as a coal. When he picked it up, sand poured out of the hilt and set itself into a curved edge, and a shimmer like noon heat wrapped around his waist and became a saffron sash.
 
-The djinn calls itself Ajaj, the dust cloud. It led the caravan home that night, and it has not let go of Saif since. It lives in his sash and in his scimitar. It lends him speed when he asks, and sometimes when he does not. It laughs at the wrong moments. If Saif sets the sword down, the sash ties it back to his belt before he can take a step.
+The djinn is Wahaj, the glare, a mirage-maker of the Court of Mirrors. It led the caravan home that night, and it has not let go of Saif since. It lives in his sash and in his scimitar. It lends him speed when he asks, and sometimes when he does not. It laughs at the wrong moments. If Saif sets the sword down, the sash ties it back to his belt before he can take a step.
 
-When the old oath beneath the sands began to crack and the islands rose into the Drift, Ajaj grew excited, and that worried Saif more than any storm. Now, on the Night of Suhail, he climbs into the calm ring to win the one claim and ask the storm to unbind them. Ajaj agrees, a little too quickly. It has a wish of its own ready, and it will not say what it is.
+When the oath began to crack and the islands rose into the Drift, Wahaj grew brighter, and that worried Saif more than any storm. Now, on the Night of Suhail, he climbs into the Calm Ring to win the Claim and ask the storm to cut the bond. Wahaj agrees, a little too quickly. It means to speak the Claim itself, and it will not say for what.
 
-Saif fights the way he guarded caravans: steady, patient, never showing more than he must. Other champions measure themselves against him, and he knows a match is never won in one swing.
+Saif fights the way he guards caravans: steady, patient, never showing more than he must. Every blow leaves storm sand on him like anyone else, and he shakes it off like a man who has walked through worse. Other champions measure themselves against him.
 
-**His claim:** "Untie the knot between me and Ajaj, and let each of us walk his own road." Ajaj's own claim stays a mystery.
+**His Claim:** "Untie the knot between me and Wahaj, and let each of us walk his own road."
+
+**Wahaj's true aim (designer note, revealed in the season story's Act 4).** Wahaj wants to speak the Claim and ask the storm to keep the Drift exactly as it is: never pegged back down, never set free. Islands that each keep the hour they were torn away, endless dusk and endless noon, is the finest mirage weather the Court of Mirrors has ever had, and Wahaj has grown stronger with every island that rises. That serves neither Saif, who would stay bound, nor the Nameless Captain, who wants the storm free of the oath. Wahaj is not evil. It is a craftsman who has found the perfect studio and does not want to give it back.
 
 **Relationships**
 
 | Fighter | Relationship |
 |---|---|
-| Dune Ghoul (rival) | Its false lanterns led his caravan astray on the night he found Ajaj, and it has never forgiven him for the travelers he brought home. |
-| Falcon Rider | They once shared a fire on the high cliffs, and Saif respects a rider who lost a home to the storm and still keeps every promise. |
-| Sea Siren | He has never seen the sea and she finds that hilarious; he is wary of her songs but quietly agrees the water should be given back. |
-| Dagger Dancer | She suspects Ajaj of serving the thieves' captain, and Saif cannot swear she is wrong, because he does not know what Ajaj wants either. |
+| Dune Ghoul (rival) | He has guarded Salt Road caravans against its false lanterns for years, and Wahaj greets the ghoul by an older name, as if the two crafts of mirage and lure were once kin. |
+| Falcon Rider | The great falcon will not fly within ten paces of his sash, and Saif would also like to know why. |
+| Sea Siren | Wahaj grows brighter as the storm drinks her sea into the sky, and she suspects it is drinking too; Saif cannot tell her she is wrong. |
+| Dagger Dancer | She saw the Nameless Captain whispering to Wahaj and will not believe it said no; Saif believes it did, but only because Wahaj wants something of its own. |
 
 **Lines**
 
 | | English | Arabic |
 |---|---|---|
 | Victory | "Steady wins the storm." | الثبات يغلب العاصفة. |
-| Taunt | "Ajaj, stop laughing. They can hear you." | كفى ضحكا يا عجاج، فهم يسمعونك. |
+| Taunt | "Wahaj, stop laughing. They can hear you." | كفى ضحكا يا وهج، فهم يسمعونك. |
 
 ## 4. Visual design
 
@@ -77,7 +79,7 @@ A desert warrior bound to a djinn: a fully human body and legs (feet must read c
 | Alternate palette (player 2) | Crimson wear `#B5172F` (shadow `#7C0E1F`), sand-white sash `#EFE4CC` (shadow `#C9B997`), gold glow `#FFC93C`, white highlight `#FFFFFF`. |
 | Skin and materials | Warm brown skin `#9C6136` (shadow `#74431F`); brass bracers and hilt `#C89B3C` (shadow `#8E6A22`); blade steel `#DCE1EA` with the glow color on the edge; outline `#1A1426` at 2 to 3 px. Clothing: long-sleeved knee-length tunic, loose trousers, soft boots, wide belt under the sash. No bare torso. |
 | Sand Trail (code-drawn) | Sand grains `#E9C27B` with a 2 px outline `#1A1426` and a top rim in the palette's glow color, so the trail reads on dusk, noon sandstone and night amber stages alike. Settling sand is drawn loose and swirling; armed sand is a packed, brighter strip. |
-| Personality in motion | Light on his feet, spins the blade in idle, lands in a crouch (plan). The sash sometimes tugs on its own (Ajaj), Saif glances at it, then back to the fight. Confident, fast, slightly theatrical. |
+| Personality in motion | Light on his feet, spins the blade in idle, lands in a crouch (plan). The sash sometimes tugs on its own (Wahaj), with a brief heat shimmer along its edge; Saif glances at it, then back to the fight. Confident, fast, slightly theatrical. |
 | Never | Thin wisps that vanish at game size, a smoke lower body, text or symbols on clothing (plan). Also never: a crescent or star motif on the hilt or cloth, the djinn drawn as a separate floating body, blood or cuts, a bare torso. |
 
 **Palette discipline.** Indigo is his dominant hue lane. Saffron is the accent. The turquoise glow is kept to the eyes and blade edge (well under 5% of the sprite), so it never competes with the Sea Siren's sea teal lane. The alternate crimson is a true red and stays clear of the Dagger Dancer's rose magenta.
@@ -222,8 +224,8 @@ Rule for every row: blade moves keep 2 to 4 px of extra reach over baseline; eve
 | 2 | Down light | Dune Slide | انزلاق الكثيب | Low slide on one knee, blade held flat and low, sash streaming behind, sand spray at the front foot. | 5/5/10 | 7 | 430 | 16 | 28/-96 | 0, 68, -24, 0 | ix 950 | Pop-up and approach under pokes; juggle setup |
 | 3 | Up light | Rising Arc | قوس صاعد | An overhead arc from front to back above the turban, both feet planted. | 4/4/10 | 7 | 410 | 18 | 14/-100 | -38, 38, -118, -56 | | Anti-air, juggle, links into recovery at 115% |
 | 4 | Neutral air | Blade Whirl | دوامة النصل | He spins once in place with the blade held out flat, the sash wrapping the circle. | 3/5/9 | 7 | 380 | 20 | 70/-70 | -50, 50, -70, -4 | away, air | Air combo ender, out-of-jump panic button, landing cover |
-| 5 | Side heavy | Sandstorm Cleave | شق العجاج | Winds the scimitar behind the head, then a huge two-handed horizontal swing that leaves a sand trail, with a big forward step (plan test). Input: B or Side + B, on the ground or in the air (plain B in the air is this move); the same sheet plays in the air. | 12/4/20 | 17 | 560 | 58 | 88/-48 | 10, 112, -64, -12 | ix 620 (no `air` flag, so an aerial Cleave is not cancelled on landing) | Main kill move, ledge finisher; in the air, an edgeguard read on opponents recovering high |
-| 6 | Recovery | Djinn Updraft | صعود الجني | Ajaj's wind lifts him in a rising corkscrew slash, blade overhead, sash spiralling under his feet (feet still visible). | 4/10/18 | 11 | 520 | 32 | 25/-97 | -30, 40, -114, -18 | iy -1700, ix 220 | Recovery, vertical finisher after Rising Arc |
+| 5 | Side heavy | Sandstorm Cleave | شق العاصفة | Winds the scimitar behind the head, then a huge two-handed horizontal swing that leaves a sand trail, with a big forward step (plan test). Input: B or Side + B, on the ground or in the air (plain B in the air is this move); the same sheet plays in the air. | 12/4/20 | 17 | 560 | 58 | 88/-48 | 10, 112, -64, -12 | ix 620 (no `air` flag, so an aerial Cleave is not cancelled on landing) | Main kill move, ledge finisher; in the air, an edgeguard read on opponents recovering high |
+| 6 | Recovery | Djinn Updraft | صعود الجني | Wahaj's shimmering heat lifts him in a rising corkscrew slash, blade overhead, sash spiralling under his feet (feet still visible). | 4/10/18 | 11 | 520 | 32 | 25/-97 | -30, 40, -114, -18 | iy -1700, ix 220 | Recovery, vertical finisher after Rising Arc |
 | 7 | Down heavy | Twin Sweep | كسح مزدوج | Crouches and sweeps the blade in a low full circle around both feet, sand spraying both ways. | 11/5/20 | 14 | 520 | 50 | 72/-70 | -86, 86, -32, 0 | away | Two-sided roll and landing punish, second kill move |
 | 8 | Down air | Scorpion Sting | لدغة العقرب | Knees tucked, he stabs the blade straight down below his feet. | 5/4/10 | 9 | 380 | 24 | 40/92 | -26, 26, -8, 30 | air | Spike for edgeguards; ground bounce on stage |
 | 9 | Ground pound | Sandfall | انهيال الرمل | Input: Down + B in the air. Reuses the Scorpion Sting active frame for the fall; lands into Twin Sweep. Designed with the full iy 2100 applied (not clipped by the fall cap). | 8/40/14 | 13 | 520 | 40 | 30/-92 | -30, 30, -24, 22 | iy 2100, air, endOnLand | Landing mixup, gets him down fast, resets to Twin Sweep |

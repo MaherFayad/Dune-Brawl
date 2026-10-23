@@ -23,11 +23,11 @@ Zoner. Working name in the canon roster: Sea Siren of Sindbad. The fighter id, a
 | Difficulty | 3 of 3 |
 | Playstyle | Dana controls one horizontal lane of the stage with a single shell that flies out, hangs, and homes back to her, then fights up close with quick water-tinged palms and kicks while the shell is away. She wins by owning space and timing the shell's return through the opponent, and loses when she is caught empty-handed. |
 | Strengths | 1. The longest reach in the cast: the shell covers about 260 px and hits twice (out and back). 2. Pincer pressure: the return leg drags opponents toward her into a true combo. 3. Strong ledge and edge-guard tools (shell lane plus a spiking Plunge Kick). |
-| Weaknesses | 1. Ground-only throw with 13-frame startup: one clear jump or dodge beats it. 2. Hit her while the shell is out and she loses it for 90 frames. 3. Light and floaty: she is easy to juggle and her best launchers kill late. |
+| Weaknesses | 1. Her only projectile has a 13-frame held wind-up and flies in one flat lane: one clear jump or dodge beats it. 2. Hit her while the shell is out and she loses it for 90 frames. 3. Light and floaty: she is easy to juggle and her best launchers kill late. |
 
 ## 3. Lore
 
-**Bio (about 260 words).**
+**Bio (about 240 words).**
 Pearl divers tell of a girl who rose out of the oyster banks on the first morning of a diving season, when the fleet's singer, the nahham, called the dive. The crews of a small pearling village took her in and named her Dana, after the pearl every diver hopes for. She learned the rhythm of their work: the stone weight that carries a diver to the seabed, the rope that hauls him back, the long songs that keep a boat's oars together. She learned that the sea is never cruel to those who respect it, and that every boat that sails out must sail home.
 
 She is a sea spirit of the waters Sindbad sailed, older than she looks and younger than she pretends. She remembers the tales of his voyages the way a reef remembers ships: the great bird whose kin sank a merchant ship with stones, the island that turned out to be a whale. She carries a pearl oyster shell as wide as her shoulders, and when she throws it, it returns to her hand the way the fleet returns at season's end, the homecoming the divers call al-Qaffal.
@@ -79,7 +79,7 @@ Percentages of the baseline (section 8 of the canon). All within 85 to 115; no s
 |---|---|---|
 | run | 92 | A zoner should not win footraces; she holds ground instead of chasing. |
 | airSpeed | 96 | Slightly weak drift so the opponent can predict and pressure her in the air. |
-| jump | 104 | Soft platforms are her firing positions (the throw works from any ground, including platforms). A little extra height gets her there. |
+| jump | 104 | Height picks her firing lane: the throw works on the ground, on soft platforms and in the air, and the shell flies flat at whatever height she released it. A little extra jump lets her choose higher lanes. |
 | gravity | 88 | Buoyant, like a swimmer: floaty arcs for her identity, and a real weakness because floaty fighters are easier to juggle. |
 | fallSpeed | 90 | Slow falls keep her in the air longer: harder for her to escape pressure from above. |
 | airJumps | 2 | Standard; only the air specialist gets 3. |
@@ -93,13 +93,13 @@ Al-Qaffal is the homecoming of the pearling fleet at the end of the season. Her 
 
 ### Inputs
 
-| Input (ground) | Shell state | Result |
+| Input (ground or air) | Shell state | Result |
 |---|---|---|
 | B or Side + B | In hand, cooldown 0 | **Shell Cast** (side heavy, move 5): melee release sweep plus the shell spawns. |
 | B or Side + B | Out (flying out or hovering) | **Call (نداء العودة)**: hook action, 6/1/12 frames, no hitbox. On its frame 6 the shell switches straight to its return leg. |
 | B or Side + B | Returning, adrift, or in hand with cooldown above 0 | Nothing. The press sits in the normal 7-frame buffer and fires if the shell becomes available in time. |
-| Down + B, Up + B, any A | Any | Unchanged (Tidal Ring, Diver's Ascent, lights). |
-| B in the air | Any | Stone Dive (ground pound), unchanged. There is no aerial throw. |
+| Down + B, Up + B, any A | Any | Unchanged: Tidal Ring on the ground, Stone Dive (ground pound) with Down + B in the air, Diver's Ascent, lights. |
+| B in the air | As above | Plain B in the air is the side heavy slot (canon section 6), so Shell Cast and Call work in the air exactly as on the ground. Shell Cast is not an `air` move: landing during it does not cancel it. |
 
 ### Integer state fields (added to the fighter record)
 
@@ -155,7 +155,7 @@ Measured with a reference model of these rules on top of the prototype sim: apex
 3. **Empty back, no side heavy.** From frame 38 to about frame 93, her neutral B is only Call, a 19-frame commitment with no hitbox. Rush in during this window.
 4. **Swat it.** Any attack that meets the shell sends it home harmless. The opponent's attack is not used up.
 5. **Hit her while it is out.** She loses the shell for 90 frames, the biggest punish in her kit.
-6. **Platforms are not safe for her either.** She can only throw from the ground, so knocking her into the air shuts the shell off.
+6. **Punish an aerial cast from below.** In the air the wind-up is the same 13 frames while she drifts slowly down (gravity 88%, fall speed 90%), so an aerial Shell Cast is easy to read and to punish from underneath.
 
 ### Why it is rollback safe
 
@@ -172,11 +172,11 @@ The shell is drawn in code (see section 12), so every attack animation is genera
 | 2 | Down light | Undertow | سحبة الجزر | Low crouching sweep that hooks forward, a low wave curls under the foe and lifts it toward her | 5/3/9 | 6 | 420 | 16 | -24/-97 | 4, 70, -22, 0 | ix 500 | Combo starter: pops the opponent up and slightly back toward her |
 | 3 | Up light | Wave Crest | عرف الموجة | Both arms sweep overhead in an arc, a curling wave crest follows the hands | 4/5/10 | 8 | 420 | 20 | 10/-100 | -40, 40, -118, -54 | | Anti-air and juggle finisher; answers opponents who hop the shell |
 | 4 | Neutral air | Whirlpool | الدوامة | One mid-air spin, tunic hem flaring, a ring of water circling her waist | 4/6/10 | 7 | 360 | 18 | 70/-71 | -46, 46, -70, -6 | away, air | Air escape that hits both sides |
-| 5 | Side heavy | Shell Cast | رمية المحارة | Discus throw: plants the front foot, swings the arm far back (held), whips it forward at chest height; the release sweep is the hitbox and the shell leaves her hand | 13/3/22 | 15 | 530 | 55 | 86/-51 | 12, 64, -56, -20 | Spawns the shell on frame 13 (hook) | The zoning tool, and her best horizontal kill at point blank |
+| 5 | Side heavy | Shell Cast | رمية المحارة | Discus throw: plants the front foot, swings the arm far back (held), whips it forward at chest height; the release sweep is the hitbox and the shell leaves her hand | 13/3/22 | 15 | 530 | 55 | 86/-51 | 12, 64, -56, -20 | Ground and air (plain B in the air); spawns the shell on frame 13 (hook) | The zoning tool, and her best horizontal kill at point blank |
 | 6 | Recovery | Diver's Ascent | صعود الغيص | Arms pressed together overhead like a diver surfacing, legs kicking together, a column of bubbles | 5/10/20 | 10 | 480 | 26 | 30/-95 | -28, 36, -112, -20 | iy -1600, ix 180 | Vertical recovery with baseline height and little drift |
 | 7 | Down heavy | Tidal Ring | حلقة المد | Crouches, lifts both palms, slams them down; a low ring of water bursts out both sides | 12/5/22 | 14 | 510 | 50 | 70/-71 | -80, 80, -30, 0 | away | Two-sided punish and her kill move while the shell is out |
 | 8 | Down air | Plunge Kick | ركلة الغطسة | In the air, tucks, then drives both heels straight down with a splash crown at the heels | 5/4/11 | 8 | 360 | 22 | 30/95 | -22, 22, -6, 30 | air | Spike for edge-guarding below the shell lane |
-| 9 | Ground pound | Stone Dive | غطسة الحجر | Holds the Plunge Kick pose and drops like a pearl diver riding the stone weight to the seabed; lands into Tidal Ring | 9/40/14 | 12 | 500 | 38 | 30/-95 | -28, 28, -24, 22 | iy 2000, air, endOnLand | Fast way down from platforms, lands into the two-sided ring |
+| 9 | Ground pound | Stone Dive | غطسة الحجر | Holds the Plunge Kick pose and drops like a pearl diver riding the stone weight to the seabed; lands into Tidal Ring. Input: Down + B in the air | 9/40/14 | 12 | 500 | 38 | 30/-95 | -28, 28, -24, 22 | iy 2000 (applied in full: endOnLand moves are exempt from the fall cap), air, endOnLand | Fast way down from platforms, lands into the two-sided ring |
 | Hook | (replaces Shell Cast while the shell is out) | Call | نداء العودة | Cups one hand beside her mouth and sings a short rising note, the other hand open toward the shell | 6/1/12 | 0 | 0 | 0 | none | none | No hitbox; on frame 6 the shell switches to its return leg | Bring the shell home early to hit from behind |
 | Proj | Shell, outbound and hover | Homecoming Shell | محارة القفال | Code sprite, spinning | spawns on 13 | 6 | 300 | 14 | 85/-53 | 24 x 24 centered | Leg 1 | Lane control and chip damage |
 | Proj | Shell, return | Homecoming | القفال | Code sprite, spinning | | 4 | 340 | 6 | 70/-71 along travel | 24 x 24 centered | Leg 2 | Drags the opponent toward her |
@@ -214,7 +214,7 @@ Hitstun is `6 + floor(l / 48)`. Ranges below were checked in a scratch harness r
 ### Kill setups
 
 1. **The pincer: Homecoming into Tidal Ring.** Throw, then let the opponent advance between Dana and the returning shell. Start Tidal Ring so its active frames meet the shell's arrival: the return hit (hitstun 13 to 14) is a true link into Tidal Ring's 12-frame startup, with only 1 to 2 frames to spare, so it is a timed setup, not a reaction. In the harness it combos at every percent tested (40% to 140%); Tidal Ring's launch is 1095 at 120% and 1191 at 140%, a kill near the ledge from about 150%.
-2. **The ledge net.** With the opponent offstage, cast from the ledge: the shell lane sits at ledge height and hangs at its apex for 10 frames, so the low route back is covered. If they go high, jump out and Plunge Kick (spike, `ay` 95) to send them down, then cover the ledge with Tidal Ring if they make it back. The spike kills offstage from about 90%, and Shell Cast's melee sweep kills on a ledge landing from about 137%.
+2. **The ledge net.** With the opponent offstage, cast from the ledge (or from a short hop to raise the lane): the shell lane sits at ledge height and hangs at its apex for 10 frames, so the low route back is covered. If they go high, jump out and Plunge Kick (spike, `ay` 95) to send them down, then cover the ledge with Tidal Ring if they make it back. The spike kills offstage from about 90%, and Shell Cast's melee sweep kills on a ledge landing from about 137%.
 
 ### Playing against her
 
@@ -223,13 +223,13 @@ Hitstun is `6 + floor(l / 48)`. Ranges below were checked in a scratch harness r
 - Swat the shell with any attack when it hangs at the apex: it goes home harmless.
 - Do not stand between her and the returning shell near 100%+. Move up or past her instead.
 - Hit her while the shell is out and she is unarmed for 90 frames. Stay on her: she is floaty and light, easy to juggle and early to kill.
-- Knock her into the air. She cannot throw from the air.
+- When she casts from a jump, get under her: she falls slowly through 38 frames of commitment.
 
 ## 9. Matchups
 
 - **Djinn Warrior:** Even. His sand dash closes the gap fast, so cast only at full range and keep Tidal Ring ready for the end of the dash.
 - **Ghoul of the Dunes:** Favors Dana. He is slow and big, so the shell lands often, but never cast into his armored heavy at close range: armor absorbs the sweep and he punishes the 22 recovery frames.
-- **Falcon Rider (rival):** Slightly unfavorable. The extra jump flies over a ground-only lane, so Dana plays under the falcon with Wave Crest and saves the shell for the moments the rider must land.
+- **Falcon Rider (rival):** Slightly unfavorable. The extra jump flies over any single lane, and an aerial cast to meet the rider leaves floaty Dana exposed, so she plays under the falcon with Wave Crest and saves the shell for the moments the rider must land.
 - **Dagger Dancer:** Slightly unfavorable. The rushdown dodges the wind-up and punishes the empty back; Dana wins by keeping Foam Palm and Spray Kick in front of her and throwing only after a push.
 
 ## 10. Animation sheets
@@ -282,7 +282,7 @@ The large round pearl oyster shell from the reference, alone, seen flat from the
 1. **Projectile slot on every fighter.** Add the 10 integer fields `sh, shT, shX, shY, shVX, shVY, shF, shHit, shCd, shLife` to the fighter record created for every fighter (zero when unused), so the fixed key list that clone and hash iterate stays the same for all fighters. Any later projectile (phase 4 weapon throw) can reuse the slot.
 2. **Projectile update and fixed order inside `step`.** Per frame: (a) both fighters update as today, including the spawn on Shell Cast frame 13; (b) owner-hit and death resets from the previous frame; (c) shell movement, state changes and catch, player 0 then player 1; (d) shell vs shell clash; (e) swat check against the opponent's active hitboxes; (f) melee hits as today; (g) shell hits, skipping a victim already hit by melee this frame; (h) any owner who entered hitstun in (f) or (g) sends a flying shell adrift; (i) blast zones as today.
 3. **Shared hit application.** Refactor the melee hit code into one function used by melee and projectile hits: damage, launch strength, weight, launch direction from a given sign, hitstun, hit pause, hit effect fields.
-4. **Conditional input routing for the heavy button.** Ground neutral B and Side + B route to Shell Cast only when the shell is in hand with no cooldown, to Call when it is out or hovering, and to nothing otherwise. Down + B and Up + B are unchanged.
+4. **Conditional input routing for the heavy button.** Neutral B and Side + B, on the ground or in the air, route to Shell Cast only when the shell is in hand with no cooldown, to Call when it is out or hovering, and to nothing otherwise. Down + B (Tidal Ring on the ground, Stone Dive in the air) and Up + B are unchanged.
 5. **A hook move with no hitbox.** Call is move index 10 for this fighter (frames from `hook.callSu/callAc/callRe`), skipped by hit detection, with one scripted effect on its frame 6.
 6. **Projectile terrain and bounds checks.** Point-in-rectangle against solid terrain (main platform block, future walls) and the blast zone rectangle, turning the shell back.
 7. **Per-fighter physics percentages.** Run, air speed, gravity and fall speed become `floor(base * pct / 100)`. Jump height percent converts to launch velocity with a deterministic integer square root at load time (same result on every client).

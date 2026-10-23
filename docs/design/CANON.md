@@ -37,6 +37,8 @@ Agents may rename fighters (propose 3 names, recommend 1) and expand everything,
 | `sea-siren` | Sea Siren of Sindbad | Zoner | Returning thrown weapon (chakram or a pearl-diver variant) | Sea teal (alt: coral with pearl) | A sea spirit from the waters Sindbad sailed, raised among pearl divers. The storm is drinking the sea into the sky; she wants it given back. | Falcon Rider |
 | `dagger-dancer` | Dagger Dancer | Rushdown | Twin curved daggers | Rose magenta (alt: saffron with black) | Inspired by the clever heroine of Ali Baba and the Forty Thieves: a dancer and strategist who outwitted a band of thieves. Their surviving captain now serves the storm, and she has come to finish it. | Djinn Warrior (she suspects his djinn of serving the thieves) |
 
+Recommended names from the character bibles (pending Maher's approval): Saif (سيف), Abu Sarab (أبو سراب), Nawaf (نواف) with the falcon Muzna (مزنة), Dana (دانة), Marjana (مرجانة). Lore names: the storm marid Ajaj (عجاج), Saif's sash djinn Wahaj (وهج), the villain the Nameless Captain (القائد بلا اسم). IDs and string keys keep the working IDs.
+
 Hue lanes exist so no two fighters share a dominant hue, and no fighter uses a stage background's main hue (dusk purple and orange, noon sandstone, night amber).
 
 ## 4. Art and readability rules (from the plan)
@@ -57,6 +59,8 @@ At most 18 generated AutoSprite sheets: 15 core sheets, up to 2 optional splits,
 Core sheets (15): idle, run, jump (one sheet split in code into rise, fall and land), hurt (hitstun, with tumble as a rotation), victory, taunt, and the 9 attack sheets (all 10 slots except ground pound, which reuses down air).
 
 Optional splits (up to 2): give jump land its own sheet, and give tumble its own sheet separate from hitstun.
+
+Still props drawn and rotated in code (for example a thrown shell) are single images and do not count against the sheet budget.
 
 AutoSprite custom template (from the plan):
 
@@ -130,6 +134,7 @@ Baseline physics (prototype units): gravity 58, max fall 1050, fast fall 1700, r
 - Side heavy K: 1000 to 1350. Rushdown near the low end, heavy near the high end, all-rounder within 40 of 1140.
 - Per-fighter physics are percentages of the baseline: run, air speed, jump height, gravity and fall speed each 85% to 115% (one stat per fighter may reach 80% or 120% if it is the fighter's identity). Air jumps 2, or 3 for the air specialist only.
 - `weight`: mass in percent, 90 to 115 (baseline 100). Knockback taken is `floor(l * 100 / weight)`, applied before hitstun is computed, so hitstun uses the scaled launch strength (heavier fighters fly less and also recover sooner). Light fighters are below 100 and fly farther; the heavy is above 100 and flies less. Note: `weight` is a new sim field, see below.
+- A hook may borrow a slot's input while its own state requires it (for example Call replacing Shell Cast while the shell is out). A hook-only move goes after the 10 slots, at index 10.
 - Each fighter has exactly one hook: a unique mechanic that defines it. It must be specified with integer state fields and frame counts so it stays deterministic and rollback safe.
 - Any mechanic the sim does not have today (projectiles, armor, command grabs, extra jumps, stances, per-fighter physics, weight) goes in a "Sim changes required" list in the character document.
 
