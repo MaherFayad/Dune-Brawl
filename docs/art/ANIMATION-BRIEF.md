@@ -34,7 +34,7 @@ Write each prompt from the bible's description, in this shape:
 
 > 2D cel-shaded fighting game sprite animation, [move in plain words: anticipation, the action, follow-through, then back to the exact starting ready stance]. [Weapon] stays in [hand] and is visible in every frame. Strict side view facing right the whole time; [he/she] never turns toward the camera. Locked-off static camera, no zoom, no pan, the camera does not follow [him/her]. [He/She] stays well inside the frame with empty margin on every side. Flat solid pure [green/magenta] background stays unchanged, no ground, no shadow. Bold dark outlines and flat cel shading, identical character design in every frame.
 
-Add a bright smear arc or the fighter's effect (sand, water, feathers) on strikes. Aerials: "hops up, does X in mid-air, lands back in the ready stance, stays centered". Run: "runs in place like on a treadmill, body stays centered". Jump: "crouches, jumps straight up, rises and falls back, lands in the ready stance, stays inside the frame". Hurt: "a big exaggerated cartoon flinch, no blood". Never name another game. Keep costumes modest. Folklore only, no religious symbols.
+Attacks must be big and committed, fighting-game style: a short, quick anticipation (never a long hold), a strike with full extension and a step where the move has one, then a clear return to the ready stance. Add a thin smear arc that hugs the weapon or limb edge (never a detached white shape) or the fighter's effect (sand, water, feathers). Aerials: "hops up, does X in mid-air, lands back in the ready stance, stays centered". Run: "runs in place like on a treadmill, body stays centered". Jump: "crouches, jumps straight up, rises and falls back, lands in the ready stance, stays inside the frame". Hurt: "a big exaggerated cartoon flinch, no blood". Never name another game. Keep costumes modest. Folklore only, no religious symbols.
 
 ## Converting
 
@@ -46,6 +46,7 @@ python3 tools/video2sprite.py <work>/<name>.mp4 <work>/<name> <frames> <cell> [-
 - `<frames>`: the bible's generate count, capped at 48.
 - `<cell>`: 384 for side heavy, down heavy, recovery, neutral air, victory and any move that reaches far; 256 otherwise.
 - `--trim` for one-shot moves (attacks, land, victory, taunt, hook); no `--trim` for loops (idle, run, fall, tumble).
+- `--motion` for every attack: it spends frames on the movement instead of on held poses.
 - Then copy `<name>.png`, `<name>.json`, `<name>_preview.gif` into `assets/fighters/<id>/anim-test/`. Do not copy `_64px.png` or the mp4.
 
 File names: `idle, run, jump, fall, land, hurt, tumble, victory, taunt, jab, side_light, down_light, up_light, nair, side_heavy, recovery, down_heavy, dair, hook_<short_name>`.
@@ -58,7 +59,7 @@ Run `bash tools/contact.sh <work>/<name>_contact.jpg <work>/<name>.mp4` and look
 2. The weapon is visible in every frame where it should be.
 3. The whole body stays inside the frame (nothing cut by the clip edge).
 4. Side view facing right for most of the move (a brief turn during a spin is fine).
-5. The move reads as described, with a clear anticipation pose and strike.
+5. The move reads as described, with a clear anticipation pose and strike, and the strike pose is clearly bigger than the ready pose (no timid reach, no waving in place).
 6. The background stays flat green or magenta.
 
 If it fails, retake it with a sharper prompt that addresses the failure. You get **2 retakes per sheet**; after that keep the best take and flag it.

@@ -1,10 +1,10 @@
 """Turn a green-screen animation clip into a sprite sheet.
 
-usage: python3 video2sprite.py clip.mp4 out_prefix frame_count [frame_size] [--trim] [--magenta]
+usage: python3 video2sprite.py clip.mp4 out_prefix frame_count [frame_size] [--trim] [--motion] [--magenta]
 
 The clip must be shot on flat pure green (#00FF00), starting from the fighter's ready pose, so the
 first frame sets one scale and foot pivot shared by every sheet. --trim drops the held frames
-before and after the motion (use it for attacks). --magenta keys #FF00FF instead (for green fighters).
+before and after the motion (use it for attacks). --motion samples by movement instead of evenly in time (use it for attacks). --magenta keys #FF00FF instead (for green fighters).
 
 Writes out_prefix.png (sheet, one row), out_prefix.json (atlas), out_prefix_preview.gif
 (on a dark background) and out_prefix_64px.png (all frames at in-game height 64 px).
@@ -27,7 +27,16 @@ if trim:
     moving = [i for i, v in enumerate(d) if v > 4]
     lo, hi = (max(0, moving[0] - 2), min(len(src) - 1, moving[-1] + 2)) if moving else (0, len(src) - 1)
     src = src[lo:hi + 1]
-pick = [src[round(i * (len(src) - 1) / max(1, count - 1))] for i in range(count)]
+if "--motion" in sys.argv:
+    # spend frames where the pose changes: half by time, half by accumulated motion, so a long
+    # held wind-up gets a few frames and the fast strike gets most of them
+    small = [np.asarray(Image.open(p).convert("L").resize((96, 96))).astype(np.int32) for p in src]
+    step = [0.0] + [float(np.abs(b - a).mean()) for a, b in zip(small, small[1:])]
+    cum = np.cumsum(step); cum = cum / cum[-1] if cum[-1] else np.linspace(0, 1, len(src))
+    w = 0.5 * np.linspace(0, 1, len(src)) + 0.5 * cum
+    pick = [src[int(np.searchsorted(w, i / max(1, count - 1), side="left").clip(0, len(src) - 1))] for i in range(count)]
+else:
+    pick = [src[round(i * (len(src) - 1) / max(1, count - 1))] for i in range(count)]
 
 
 MAGENTA = "--magenta" in sys.argv  # for green fighters: shoot on #FF00FF instead
