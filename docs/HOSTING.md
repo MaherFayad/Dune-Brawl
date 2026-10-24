@@ -13,6 +13,23 @@ The game is a static site: no server of ours runs during a match. Players connec
 
 Without Git, from a terminal in the repo: `npx wrangler pages deploy . --project-name dune-brawl`.
 
+### If Cloudflare shows the Workers form instead (Build command / Deploy command)
+
+Cloudflare now often routes new Git projects to Workers. The repo has a `wrangler.jsonc` for that, so use:
+
+| Field | Value |
+|---|---|
+| Build command | leave empty |
+| Deploy command | `npx wrangler deploy` |
+| Non-production branch deploy command (preview) | `npx wrangler versions upload` |
+| Root directory | `/` |
+
+`.assetsignore` keeps `.git`, `tests`, `tools` and the config out of the site (checked: they return 404). The game is served at `/game/`, and invite links keep their `?join=` code through the redirect.
+
+### Preview on your own computer
+
+From the repo folder, either `python3 -m http.server 8000` and open `http://localhost:8000/`, or `npx wrangler dev` and open `http://localhost:8787/`. To test online play locally, open the game in two browser windows: host in one, paste the link in the other.
+
 Free plan limits that matter: 20,000 files and 25 MiB per file (the repo is about 650 files, largest 3 MB).
 
 ## Play with a friend

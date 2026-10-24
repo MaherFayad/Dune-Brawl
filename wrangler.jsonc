@@ -1,0 +1,7 @@
+// Cloudflare Workers static-assets deploy: the whole game is static files, no build step.
+// Deploy: npx wrangler deploy   Preview branch: npx wrangler versions upload   Local: npx wrangler dev
+{
+  "name": "dune-brawl",
+  "compatibility_date": "2025-09-01",
+  "assets": { "directory": "." }
+}

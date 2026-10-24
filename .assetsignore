@@ -1,0 +1,8 @@
+# not part of the game site
+.git
+.github
+node_modules
+tests
+tools
+wrangler.jsonc
+.assetsignore
