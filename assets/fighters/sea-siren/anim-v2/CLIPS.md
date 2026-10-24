@@ -12,3 +12,10 @@
 | jump | a27cdeab-7a62-4cc2-87c4-cc15e3b4bba6 | 2 | pass | Take 1 (8aa89246-8af6-4592-aa4d-c2c299736d53) failed: mid-air the shell shrank and vanished and she morphed into a sprawled split. Take 2: crouch, upright rise, knee tuck, drop, crouched landing, back to stance; shell on her back throughout. Height is modest (about a third of her body), one rise frame slightly blurred. 16 x 384, --trim. |
 | jab | 10734a30-58be-461a-89a9-046ac1fdf3aa | 1 | pass | Short chamber, then a straight open-palm strike at full extension, back to stance. The foam burst is tiny and tinted pink by the magenta screen (add a hit spark in code); the extension is held about 1 s, which --motion compresses. 16 x 256, --trim --motion. |
 | side_light | c255dd0c-48df-45bc-a02d-c1a3fd7ecd8a | 1 | pass | Crouch, then a high straight front kick at full extension with a white spray smear that curls back down, returns to stance. Anticipation crouch is long (about 1.2 s; --motion spends few frames on it) and the forward step is small, so the lunge should come from code movement. 24 x 384, --trim --motion. |
+| side_heavy | 98fa8db6-0799-4b4f-9f6a-78ca913b0009 (pending) | 1 | missing | Shell pulled off the back and swung overhead into a forward bash. Normal start frame, not the wide one. Job still "in_progress" about 45 min after submit (later jobs from other agents finished) when the round was ended; not downloaded, no sheet. When it lands: run tools/clip-check.py, and reshoot from the wide start (media 5c2eed32-c069-40ee-9cf9-50eb89131938) if CUT. |
+| nair | - | 0 | missing | Not shot (round ended by the lead). Use the wide start frame. |
+
+clip-check.py: idle, run, jump (both takes), hurt, jab, side_light all ok (no CUT).
+edge-check.py on anim-v2/*.png: 0 sprites with cut edges. feather-cuts.py: 0 sheets changed.
+Wide start frame for future attacks: `wide_sea-siren.png` (--magenta --height 0.34 --x 0.3), uploaded as media 5c2eed32-c069-40ee-9cf9-50eb89131938.
+Credits: 3 images x 2 + 8 clips x 3.75 (including the pending side_heavy) = 36.
