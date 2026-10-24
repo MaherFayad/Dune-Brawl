@@ -183,10 +183,10 @@
    "smear1", "smear2", "smear3", "kick1", "kick2", "kick3", "ko-splash", "ko-cloud"].forEach((n) => { const im = new Image(); im.onload = () => (vfx[n] = im); im.src = `${ROOT}/assets/vfx/${n}.webp`; });
   const fx = {
     sprites: [], parts: [], shake: 0, lastHf: -1, lastKf: -1, koStamp: [0, 0],
-    grounded: [1, 1], wasSt: [0, 0], lastVy: [0, 0], after: [[], []],
+    grounded: [1, 1], wasSt: [0, 0], lastVy: [0, 0], after: [[], []], landF: [-99, -99], jumpF: [-99, -99], turnF: [-99, -99], lastFace: [1, -1],
     bats: [], petals: [], marks: [], banner: null, won: 0, stats: [], lastDmg: [0, 0], hitOn: [-1e9, -1e9],
     reset() {
-      Object.assign(this, { sprites: [], parts: [], shake: 0, lastHf: -1, lastKf: -1, koStamp: [0, 0], bats: [], petals: [], marks: [], banner: null, won: 0, koHold: 0, chain: 0, chainF: -99,
+      Object.assign(this, { sprites: [], parts: [], shake: 0, lastHf: -1, lastKf: -1, koStamp: [0, 0], bats: [], petals: [], marks: [], banner: null, won: 0, koHold: 0, chain: 0, chainF: -99, landF: [-99, -99], jumpF: [-99, -99], turnF: [-99, -99], lastFace: [1, -1],
         stats: [0, 1].map(() => ({ kos: 0, falls: 0, acc: 0, done: 0, taken: 0 })), lastDmg: [0, 0], hitOn: [-1e9, -1e9] });
     },
     // a painted sprite: grows from s0 to s1 in `pop` frames, holds, then fades over the rest of `life` frames
@@ -227,6 +227,57 @@
     x.globalCompositeOperation = "source-atop"; x.globalAlpha = 0.78; x.fillStyle = color; x.fillRect(0, 0, c.width, c.height);
     return (tinted[key] = c);
   }
+  // ---------- swing smears ----------
+  // Authored shapes, as in the reference, built from each move's hitbox: a thrust leaves a
+  // straight tapered streak along its line, an up or down strike a vertical one, and a spin a
+  // crescent that sweeps round the fighter over the active frames. White core, the fighter's
+  // colour on the rim, a thin dark edge; it holds a beat after the strike and fades.
+  const SMEAR_KIND = ["thrust", "thrust", null, "up", "spin", "thrust", "up", "flat", "down", "down"];
+  function drawSmears() {
+    if (!st) return;
+    for (const i of [0, 1]) {
+      const p = st.p[i], col = style(i).trail;
+      if (!col || p.st !== ST.ATK) continue;
+      const m = M.mv[i][p.mv], kind = SMEAR_KIND[p.mv], k = p.t - m.su;
+      if (!kind || k < 0 || k > m.ac + 5) continue;
+      const body = gfx[i] ? gfx[i].h : 64, b = m.box, heavy = p.mv >= 5;
+      const grow = Math.min(1, (k + 1) / 2), fade = k <= m.ac ? 1 : 1 - (k - m.ac) / 6;
+      const w = body * (heavy ? 0.13 : 0.09);
+      g.save(); g.translate(p.x / S, p.y / S); g.scale(p.face, 1); g.lineJoin = "round";
+      const layers = [[1.35, "#14060f", 0.45], [1, col, 0.92], [0.42, "#ffffff", 1]];
+      if (kind === "spin" || kind === "flat") {
+        const cx = (b[0] + b[1]) / 2, cy = (b[2] + b[3]) / 2, rx = (b[1] - b[0]) / 2 * 0.92, ry = kind === "flat" ? rx * 0.28 : (b[3] - b[2]) / 2 * 0.92;
+        const head = -Math.PI / 2 + Math.min(1, k / Math.max(1, m.ac)) * Math.PI * 2.1, len = Math.PI * 1.25;
+        for (const [wk, c, al] of layers) {
+          g.globalAlpha = al * fade; g.fillStyle = c; g.beginPath();
+          const N = 28;
+          for (let j = 0; j <= N; j++) { const a = head - len * (j / N), r = 1 + (wk * w / rx) * (1 - j / N); g.lineTo(cx + Math.cos(a) * rx * r, cy + Math.sin(a) * ry * r); }
+          for (let j = N; j >= 0; j--) { const a = head - len * (j / N), r = 1 - (wk * w / rx) * 0.4 * (1 - j / N); g.lineTo(cx + Math.cos(a) * rx * r, cy + Math.sin(a) * ry * r); }
+          g.closePath(); g.fill();
+        }
+      } else {
+        // a streak from near the body to the hitbox's far edge, thickest just behind the point
+        let x0, y0, x1, y1;
+        if (kind === "thrust") { const ym = (b[2] + b[3]) / 2; x0 = b[0] * 0.2; x1 = b[1]; y0 = y1 = ym; }
+        else if (kind === "up") { const xm = (b[0] + b[1]) / 2; x0 = x1 = xm; y0 = -body * 0.45; y1 = b[2]; }
+        else { x0 = x1 = 0; y0 = -body * 0.4; y1 = Math.max(b[3], body * 0.5); }
+        const D = Math.hypot(x1 - x0, y1 - y0) || 1, L = D * grow, ux = (x1 - x0) / D, uy = (y1 - y0) / D;
+        const tipX = x0 + ux * L, tipY = y0 + uy * L;
+        for (const [wk, c, al] of layers) {
+          const ww = w * wk * 0.8;
+          g.globalAlpha = al * fade; g.fillStyle = c; g.beginPath();
+          g.moveTo(x0, y0);
+          g.quadraticCurveTo(x0 + ux * L * 0.75 - uy * ww * 1.2, y0 + uy * L * 0.75 + ux * ww * 1.2, tipX, tipY);
+          g.quadraticCurveTo(x0 + ux * L * 0.75 + uy * ww * 1.2, y0 + uy * L * 0.75 - ux * ww * 1.2, x0, y0);
+          g.fill();
+        }
+        if (heavy) { g.globalAlpha = 0.7 * fade; g.strokeStyle = "#ffffff"; g.lineWidth = 1.5; g.lineCap = "round"; // two speed lines alongside
+          for (const o of [-1, 1]) { g.beginPath(); g.moveTo(x0 + ux * L * 0.2 - uy * w * 1.6 * o, y0 + uy * L * 0.2 + ux * w * 1.6 * o); g.lineTo(x0 + ux * L * 0.7 - uy * w * 1.6 * o, y0 + uy * L * 0.7 + ux * w * 1.6 * o); g.stroke(); } }
+      }
+      g.restore();
+    }
+    g.globalAlpha = 1;
+  }
   function events(s) {
     // countdown and match end cues
     const cd = FEEL.countdown - s.f;
@@ -250,6 +301,8 @@
         fx.shake = Math.max(fx.shake, heavy ? 6 : 3); // the reference camera barely moves: 0.05 to 0.1 bodies
         // a small flat white starburst at the contact point; colour comes from the victim flash
         fx.add(`star${1 + Math.floor(rnd() * 3)}`, x, y, { w: body * (heavy ? 0.62 : 0.45), rot: rnd() * 6.28, s0: 1, s1: 0.7, pop: 1, life: heavy ? 10 : 7 });
+        fx.marks.push({ t: 0, kind: "burst", x, y, dir, r: body * (heavy ? 0.85 : 0.55), n: heavy ? 8 : 5, life: heavy ? 9 : 6, rot: rnd() * 6.28 });
+        if (heavy) fx.marks.push({ t: 0, kind: "ring", x, y, color: "#ffffff", life: 12, r0: 0.3, r1: 1.5 });
         for (let j = 0; j < 3; j++) {
           const a = (dir > 0 ? 0 : Math.PI) + (rnd() - 0.5) * 1.6, sp = 2 + rnd() * 3;
           fx.parts.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 1, life: 0.4, size: 1.5 + rnd(), c: "#ffffff", g: 0.1 });
@@ -287,6 +340,14 @@
     s.p.forEach((p, i) => {
       if (p.st === ST.DEAD) return;
       if (style(i).frame) style(i).frame(flairApi, i, p, s);
+      if (p.ground && !fx.grounded[i]) fx.landF[i] = s.f;
+      if (!p.ground && fx.grounded[i] && p.vy < 0) fx.jumpF[i] = s.f;
+      if (p.face !== fx.lastFace[i]) { // a turn at speed skids: a small kick of dust
+        if (p.ground && Math.abs(p.vx) > 500) { fx.turnF[i] = s.f; fx.kick(p.x / S, p.y / S, (gfx[i] ? gfx[i].h : 64) * 0.5, -p.face); }
+        fx.lastFace[i] = p.face;
+      }
+      // running feet kick up small puffs, as in the reference
+      if (p.ground && p.st === ST.IDLE && Math.abs(p.vx) > 700 && s.f % 9 === 0) fx.puff(p.x / S - Math.sign(p.vx) * 10, p.y / S - 3, (gfx[i] ? gfx[i].h : 64) * 0.13, { s0: 0.6, s1: 1.2, pop: 4, life: 16, alpha: 0.6 });
       const x = p.x / S, y = p.y / S;
       const body = gfx[i] ? gfx[i].h : 64;
       if (p.ground && !fx.grounded[i]) {
@@ -313,12 +374,12 @@
         const w = body * (0.42 + Math.min(0.3, p.launch / 12000));
         fx.puff(x - (p.vx / S) * 0.3, y - body / 2 - (p.vy / S) * 0.3, w, { s0: 0.9, s1: 1.25, pop: 8, life: 50, under: 1 });
       }
-      if (p.st === ST.ATK && p.t === M.mv[i][p.mv].su && p.mv <= 4) { // a white swing crescent on every light, hit or miss
+      if (p.st === ST.ATK && p.t === M.mv[i][p.mv].su && p.mv <= 4 && !style(i).trail) { // a white swing crescent on every light, hit or miss
         const b = M.box(p, M.mv[i][p.mv]).map((v) => v / S);
         const sm = `smear${1 + Math.floor(rnd() * 3)}`;
-        sfx("swing", x, { who: i, mv: p.mv });
         fx.add(sm, (b[0] + b[1]) / 2, (b[2] + b[3]) / 2, { w: Math.max(18, (b[1] - b[0]) * 0.55), flip: -p.face, rot: (rnd() - 0.5) * 0.4, s0: 0.85, s1: 1, pop: 1, life: 7, alpha: 0.9, im: style(i).smear && tintedVfx(sm, style(i).smear) });
       }
+      if (p.st === ST.ATK && p.t === M.mv[i][p.mv].su && p.mv <= 4) sfx("swing", x, { who: i, mv: p.mv });
       if (p.st === ST.ATK && p.t === M.mv[i][p.mv].su && p.mv > 4 && p.mv !== 9) sfx("swingHeavy", x, { who: i, mv: p.mv });
       fx.wasSt[i] = p.st;
     });
@@ -436,12 +497,34 @@
       src = tintBuf; sx = 0;
     }
     g.save(); g.globalAlpha = alpha; g.translate(Math.round(x), Math.round(y)); g.scale(p.face, 1);
+    if (p.juice) { g.rotate(p.juice.rot); g.scale(p.juice.sx, p.juice.sy); } // squash, stretch and lean about the feet
     if (rot) { g.translate(0, -F.h / 2); g.rotate(rot); g.translate(0, F.h / 2); } // remapped sheet, turned about the body centre
     if (p.st === ST.HIT && p.launch > 2600 && !F.sheets.tumble) { g.translate(0, -F.h / 2); g.rotate((f % 24) / 24 * Math.PI * 2 * -1); g.translate(0, F.h / 2); }
     if (halo) { g.shadowColor = halo; g.shadowBlur = 3 * dpr; }
     g.imageSmoothingEnabled = true; g.imageSmoothingQuality = "high";
     g.drawImage(src, sx, 0, cell, cell, -sh.pivot[0] * sc, (-sh.pivot[1] + sh.dy[k]) * sc, sh.size * sc, sh.size * sc);
     g.restore();
+  }
+  // Squash, stretch and lean, render only: the clips are smooth generated motion, so the snap the
+  // reference gets from drawn key poses comes from here. Landing squashes, take-off stretches,
+  // running and drifting lean into the motion, a dash leans hard, a strike stretches toward its
+  // target after a short anticipation squash, and a skid pinches for a few frames.
+  function juice(s, i, p, m) {
+    let sx = 1, sy = 1, rot = 0;
+    const land = s.f - fx.landF[i], take = s.f - fx.jumpF[i], turn = s.f - fx.turnF[i];
+    if (p.ground && land < 7) { const k = 1 - land / 7; sy -= 0.16 * k; sx += 0.12 * k; }
+    if (!p.ground && take < 6) { const k = 1 - take / 6; sy += 0.14 * k; sx -= 0.1 * k; }
+    if (turn < 4) sx *= 0.86 + 0.035 * turn;
+    const fwd = p.vx * p.face;
+    if (p.st === ST.DASH) { rot += 0.16; sx *= 1.06; sy *= 0.97; }
+    else if (p.st === ST.IDLE && p.ground && fwd > 300) rot += 0.07 * Math.min(1, fwd / 900);
+    else if (!p.ground && p.st !== ST.HIT) { rot += Math.max(-0.08, Math.min(0.08, fwd / 9500)); if (p.vy > 1400) { sy *= 1.06; sx *= 0.96; } }
+    if (p.st === ST.ATK && m) {
+      const up = p.mv === 3 || p.mv === 6, down = p.mv === 8 || p.mv === 9;
+      if (p.t >= m.su - 3 && p.t < m.su) { sx *= 0.94; sy *= 1.05; }                        // anticipation
+      else if (p.t >= m.su && p.t < m.su + 2) { if (up || down) { sy *= 1.1; sx *= 0.94; } else { sx *= 1.1; sy *= 0.95; } } // the strike
+    }
+    return { sx, sy, rot };
   }
   function drawFighter(s, i) {
     const p = s.p[i];
@@ -480,7 +563,7 @@
       for (let k = trail.length - 1; k >= 0; k--) drawSprite(i, { ...p, x: trail[k].x, y: trail[k].y }, s.f, 0.32 - k * 0.07, 1, null, style(i).after || TEAM[i]);
       if (p.st === ST.DODGE && !tint) { tint = 0.18 + 0.14 * Math.sin(s.f * 1.3); tintColor = "#ffffff"; } // invulnerable shimmer
     }
-    drawSprite(i, p, s.f, blink ? 0.55 : 1, tint, "rgba(8,3,18,0.7)", tintColor);
+    drawSprite(i, { ...p, juice: juice(s, i, p, m) }, s.f, blink ? 0.55 : 1, tint, "rgba(8,3,18,0.7)", tintColor);
     g.restore();
     if (showBoxes) {
       g.strokeStyle = "rgba(80,200,255,.9)"; g.lineWidth = 1;
@@ -522,7 +605,14 @@
     for (const m of fx.marks) {
       const k = m.t / m.life, fade = 1 - k;
       g.save();
-      if (m.kind === "pierce") { // a long thin glint straight through the target
+      if (m.kind === "burst") { // impact lines: thin white wedges thrown out from the contact point
+        g.translate(m.x, m.y); g.rotate(m.rot); g.globalAlpha = fade; g.fillStyle = "#ffffff"; g.strokeStyle = "#14060f"; g.lineWidth = 1.2;
+        for (let j = 0; j < m.n; j++) {
+          const a = (j / m.n) * Math.PI * 2 + (j % 2) * 0.3, r0 = m.r * (0.25 + 0.5 * k), r1 = m.r * (0.75 + 0.45 * k) * (j % 2 ? 0.7 : 1), w = m.r * 0.07 * fade;
+          g.beginPath(); g.moveTo(Math.cos(a) * r0 - Math.sin(a) * w, Math.sin(a) * r0 + Math.cos(a) * w); g.lineTo(Math.cos(a) * r1, Math.sin(a) * r1);
+          g.lineTo(Math.cos(a) * r0 + Math.sin(a) * w, Math.sin(a) * r0 - Math.cos(a) * w); g.closePath(); g.fill(); g.stroke();
+        }
+      } else if (m.kind === "pierce") { // a long thin glint straight through the target
         const L = m.len * 64 * (0.6 + 0.4 * Math.min(1, m.t / 3));
         g.translate(m.x, m.y); g.scale(m.dir, 1); g.globalAlpha = fade;
         g.fillStyle = "#ff8fb1"; g.beginPath(); g.moveTo(-L * 0.35, 0); g.lineTo(L * 0.1, -2.6 * fade - 0.5); g.lineTo(L * 0.65, 0); g.lineTo(L * 0.1, 2.6 * fade + 0.5); g.closePath(); g.fill();
@@ -764,6 +854,7 @@
     drawStage();
     drawFx(true);
     for (const t of [0, 1]) drawFighter(st, t);
+    drawSmears();
     drawFx();
     for (const t of [0, 1]) bubble(st, t, z);
     g.restore();

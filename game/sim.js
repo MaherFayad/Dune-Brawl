@@ -29,7 +29,7 @@
   // Units: sim units per frame (velocities), sim units per frame squared (gravity).
   const FEEL = {
     grav: 100, hitGrav: 45, maxFall: 1300, fastFall: 2000, hitMaxFall: 2800,
-    run: 900, gAcc: 210, fric: 150, airAcc: 95, airMax: 760, airFric: 8,
+    run: 900, gAcc: 420, fric: 300, airAcc: 190, airMax: 760, airFric: 8, // snappy: full run in 2 frames, a stop in 3, an air reversal in 8
     jumpV: 1640, airJumpV: 1560, jumpCut: 800,
     h: 64, hw: 18,
     kbMul: 350,          // knockback multiplier in percent, applied to base and growth

@@ -178,10 +178,14 @@
       const seq = sh.seq || [...Array(sh.n).keys()], sf = F.strike[p.mv], n = seq.length;
       const at = (k) => pick(name, seq[Math.max(0, Math.min(n - 1, Math.round(k)))]);
       if (p.mv === 9 && p.t >= m.su) return at(sf); // ground pound holds the down air strike pose
+      // Key poses over in-betweens, like drawn animation: the wind-up pose arrives early and
+      // settles (ease out), the strike pose snaps in and holds through the active frames, and
+      // the recovery holds it a beat before easing back to ready.
+      const eo = (u) => 1 - (1 - u) ** 3, eio = (u) => (u < 0.5 ? 4 * u ** 3 : 1 - (-2 * u + 2) ** 3 / 2);
       let k;
-      if (p.t < m.su) k = (p.t / m.su) * sf;
-      else if (p.t < m.su + m.ac) k = sf + ((p.t - m.su) / m.ac) * Math.min(2, n - 1 - sf);
-      else k = sf + 2 + ((p.t - m.su - m.ac) / Math.max(1, m.re)) * (n - 1 - sf - 2);
+      if (p.t < m.su) k = eo(p.t / m.su) * Math.max(0, sf - 1);
+      else if (p.t < m.su + m.ac) k = sf + Math.min(1, (p.t - m.su) / Math.max(1, m.ac)) * Math.min(1, n - 1 - sf);
+      else { const u = (p.t - m.su - m.ac) / Math.max(1, m.re), a = Math.min(n - 1, sf + 1); k = u < 0.3 ? a : a + eio((u - 0.3) / 0.7) * (n - 1 - a); }
       return at(k);
     }
     if (p.st === ST.HIT) {

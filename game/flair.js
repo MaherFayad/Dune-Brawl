@@ -5,6 +5,8 @@
 //
 // A style can set:
 //   smear: colour           tint of the swing crescent on light attacks
+//   trail: colour           rim of the authored swing smears (streaks and sweeping crescents, see
+//                           drawSmears in main.js); a fighter with it swaps the crescent sprites
 //   after: colour           tint of dodge and dash afterimages
 //   ko: colour              speed lines of the KO splash this fighter scores
 //   hooks (all optional), called by main.js with an api object (see main.js `flairApi`):
@@ -100,7 +102,7 @@
   const ROSE = ["#ff8fb1", "#ffc2d4", "#f2648f", "#ffe0ea"];
   const STYLES = {
     "vampire-countess": {
-      smear: "#e0244a", after: "#8a1638", ko: "#ff3d64",
+      smear: "#e0244a", trail: "#ff3d64", after: "#8a1638", ko: "#ff3d64",
       // a hit sheds rose petals along the thrust; Countess Thrust also pierces with a long glint
       hit(api, i, x, y, dir, heavy, mv) {
         const n = heavy ? 6 : 3;
