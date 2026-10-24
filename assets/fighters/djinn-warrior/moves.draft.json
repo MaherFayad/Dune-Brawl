@@ -7,7 +7,7 @@
     "gravity": 100,
     "fallSpeed": 100,
     "airJumps": 2,
-    "weight": 100
+    "weight": 100, "hurtW": 36, "hurtH": 64, "height": 64
   },
   "hook": {
     "strideFrames": 14,

@@ -1,17 +1,17 @@
 {
   "id": "clockwork-elephant",
   "name": "Tiktak",
-  "stats": { "run": 80, "airSpeed": 85, "jump": 86, "gravity": 115, "fallSpeed": 112, "airJumps": 2, "weight": 130, "hurtW": 58, "height": 84 },
+  "stats": { "run": 80, "airSpeed": 85, "jump": 86, "gravity": 115, "fallSpeed": 112, "airJumps": 2, "weight": 130, "hurtH": 88, "hurtW": 66, "height": 104 },
   "moves": [
-    { "name": "Trunk Tap", "su": 4, "ac": 2, "re": 9, "box": [8, 76, -82, -40], "dmg": 5, "kb": 350, "kg": 8, "ax": 80, "ay": -60 },
-    { "name": "Trunk Snag", "su": 5, "ac": 3, "re": 13, "box": [12, 104, -62, -24], "dmg": 7, "kb": 420, "kg": 12, "ax": -30, "ay": -95 },
-    { "name": "Gear Grind", "su": 5, "ac": 5, "re": 12, "box": [0, 86, -28, 0], "dmg": 7, "kb": 450, "kg": 12, "ax": 28, "ay": -96, "ix": 400 },
-    { "name": "Tusk Toss", "su": 5, "ac": 4, "re": 12, "box": [-40, 44, -152, -70], "dmg": 7, "kb": 430, "kg": 14, "ax": 12, "ay": -99 },
-    { "name": "Pendulum", "su": 5, "ac": 6, "re": 12, "box": [-58, 58, -92, -6], "dmg": 8, "kb": 400, "kg": 14, "ax": 70, "ay": -71, "away": 1, "air": 1 },
-    { "name": "Gong Ram", "su": 14, "ac": 5, "re": 28, "box": [12, 122, -86, -10], "dmg": 16, "kb": 620, "kg": 54, "ax": 86, "ay": -51, "ix": 450, "armor": [4, 13], "charge": 1 },
-    { "name": "Steam Lift", "su": 6, "ac": 12, "re": 24, "box": [-38, 46, -142, -20], "dmg": 9, "kb": 500, "kg": 20, "ax": 25, "ay": -97, "iy": -1400, "ix": 160 },
-    { "name": "Escapement Stomp", "su": 14, "ac": 6, "re": 26, "box": [-106, 106, -36, 0], "dmg": 14, "kb": 580, "kg": 38, "ax": 64, "ay": -77, "away": 1, "armor": [4, 13], "charge": 1 },
-    { "name": "Bell Drop", "su": 5, "ac": 4, "re": 14, "box": [-30, 30, -6, 36], "dmg": 9, "kb": 420, "kg": 18, "ax": 30, "ay": 95, "air": 1 },
-    { "name": "Counterweight", "su": 10, "ac": 40, "re": 18, "box": [-40, 40, -30, 26], "dmg": 13, "kb": 580, "kg": 32, "ax": 35, "ay": -94, "iy": 2300, "air": 1, "endOnLand": 1 }
+    { "name": "Trunk Tap", "su": 4, "ac": 2, "re": 9, "box": [10, 94, -102, -50], "dmg": 5, "kb": 350, "kg": 8, "ax": 80, "ay": -60 },
+    { "name": "Trunk Snag", "su": 5, "ac": 3, "re": 13, "box": [15, 129, -77, -30], "dmg": 7, "kb": 420, "kg": 12, "ax": -30, "ay": -95 },
+    { "name": "Gear Grind", "su": 5, "ac": 5, "re": 12, "box": [0, 106, -35, 0], "dmg": 7, "kb": 450, "kg": 12, "ax": 28, "ay": -96, "ix": 400 },
+    { "name": "Tusk Toss", "su": 5, "ac": 4, "re": 12, "box": [-50, 54, -188, -87], "dmg": 7, "kb": 430, "kg": 14, "ax": 12, "ay": -99 },
+    { "name": "Pendulum", "su": 5, "ac": 6, "re": 12, "box": [-72, 72, -114, -7], "dmg": 8, "kb": 400, "kg": 14, "ax": 70, "ay": -71, "away": 1, "air": 1 },
+    { "name": "Gong Ram", "su": 14, "ac": 5, "re": 28, "box": [15, 151, -106, -12], "dmg": 16, "kb": 620, "kg": 54, "ax": 86, "ay": -51, "ix": 450, "armor": [4, 13], "charge": 1 },
+    { "name": "Steam Lift", "su": 6, "ac": 12, "re": 24, "box": [-47, 57, -176, -25], "dmg": 9, "kb": 500, "kg": 20, "ax": 25, "ay": -97, "iy": -1400, "ix": 160 },
+    { "name": "Escapement Stomp", "su": 14, "ac": 6, "re": 26, "box": [-131, 131, -45, 0], "dmg": 14, "kb": 580, "kg": 38, "ax": 64, "ay": -77, "away": 1, "armor": [4, 13], "charge": 1 },
+    { "name": "Bell Drop", "su": 5, "ac": 4, "re": 14, "box": [-37, 37, -7, 45], "dmg": 9, "kb": 420, "kg": 18, "ax": 30, "ay": 95, "air": 1 },
+    { "name": "Counterweight", "su": 10, "ac": 40, "re": 18, "box": [-50, 50, -37, 32], "dmg": 13, "kb": 580, "kg": 32, "ax": 35, "ay": -94, "iy": 2300, "air": 1, "endOnLand": 1 }
   ]
 }

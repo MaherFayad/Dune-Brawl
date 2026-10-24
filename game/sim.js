@@ -78,7 +78,8 @@
       airJumps: st.airJumps === undefined ? 2 : st.airJumps,
       weight: st.weight || 100,
       hw: div((st.hurtW || FEEL.hw * 2) * S, 2),
-      h: (st.height || FEEL.h) * S,
+      // hurtbox height: big fighters' hurtboxes grow only 60% as much as their art, so size is not a free target
+      h: (st.hurtH || st.height || FEEL.h) * S,
     };
   }
 

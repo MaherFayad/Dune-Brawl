@@ -1,7 +1,7 @@
 {
   "id": "vampire-countess",
   "name": "Vespera",
-  "stats": { "run": 95, "airSpeed": 106, "jump": 110, "gravity": 82, "fallSpeed": 86, "airJumps": 2, "weight": 96, "hurtW": 32, "height": 70 },
+  "stats": { "run": 95, "airSpeed": 106, "jump": 110, "gravity": 82, "fallSpeed": 86, "airJumps": 2, "weight": 96, "hurtH": 68, "hurtW": 32, "height": 70 },
   "moves": [
     { "name": "Parasol Tap", "su": 3, "ac": 2, "re": 7, "box": [8, 68, -64, -32], "dmg": 5, "kb": 320, "kg": 12, "ax": 80, "ay": -60 },
     { "name": "Rapier Lunge", "su": 5, "ac": 3, "re": 10, "box": [14, 106, -54, -34], "dmg": 9, "kb": 370, "kg": 28, "ax": 88, "ay": -47, "ix": 380 },

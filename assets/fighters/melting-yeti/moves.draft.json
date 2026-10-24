@@ -1,18 +1,18 @@
 {
   "id": "melting-yeti",
   "name": "Brrr",
-  "stats": { "run": 90, "airSpeed": 92, "jump": 94, "gravity": 104, "fallSpeed": 100, "airJumps": 2, "weight": 106, "hurtW": 46, "height": 70 },
+  "stats": { "run": 90, "airSpeed": 92, "jump": 94, "gravity": 104, "fallSpeed": 100, "airJumps": 2, "weight": 106, "hurtH": 80, "hurtW": 53, "height": 90 },
   "hook": { "meltStepPct": 30, "meltMaxSteps": 4, "weightPerStep": -4, "runPerStep": 4, "airSpeedPerStep": 3, "jumpPerStep": 2 },
   "moves": [
-    { "name": "Mitten Pat", "su": 3, "ac": 2, "re": 8, "box": [8, 66, -66, -30], "dmg": 5, "kb": 330, "kg": 12, "ax": 80, "ay": -60 },
-    { "name": "Hammer Poke", "su": 5, "ac": 3, "re": 11, "box": [12, 106, -58, -26], "dmg": 8, "kb": 380, "kg": 24, "ax": 87, "ay": -49, "ix": 200 },
-    { "name": "Frost Slide", "su": 5, "ac": 5, "re": 12, "box": [10, 126, -16, 0], "dmg": 7, "kb": 420, "kg": 16, "ax": 34, "ay": -94 },
-    { "name": "Snow Flurry", "su": 4, "ac": 5, "re": 11, "box": [-40, 40, -126, -58], "dmg": 7, "kb": 410, "kg": 18, "ax": 12, "ay": -99 },
-    { "name": "Snowball Spin", "su": 4, "ac": 6, "re": 10, "box": [-50, 50, -76, -4], "dmg": 8, "kb": 380, "kg": 20, "ax": 70, "ay": -71, "away": 1, "air": 1 },
-    { "name": "Glacier Swing", "su": 13, "ac": 5, "re": 24, "box": [14, 126, -72, -10], "dmg": 16, "kb": 560, "kg": 66, "ax": 88, "ay": -48, "ix": 300, "charge": 1 },
-    { "name": "Fan Lift", "su": 5, "ac": 10, "re": 20, "box": [-32, 40, -122, -20], "dmg": 10, "kb": 480, "kg": 28, "ax": 25, "ay": -97, "iy": -1600, "ix": 200 },
-    { "name": "Ice Floor", "su": 13, "ac": 8, "re": 24, "box": [-40, 152, -18, 0], "dmg": 14, "kb": 520, "kg": 48, "ax": 60, "ay": -80, "away": 1, "charge": 1 },
-    { "name": "Icicle Drop", "su": 5, "ac": 4, "re": 12, "box": [-22, 22, -6, 34], "dmg": 9, "kb": 380, "kg": 24, "ax": 35, "ay": 94, "air": 1 },
-    { "name": "Avalanche", "su": 9, "ac": 40, "re": 15, "box": [-34, 34, -26, 24], "dmg": 13, "kb": 520, "kg": 40, "ax": 30, "ay": -95, "iy": 2200, "air": 1, "endOnLand": 1 }
+    { "name": "Mitten Pat", "su": 3, "ac": 2, "re": 8, "box": [10, 85, -85, -39], "dmg": 5, "kb": 330, "kg": 12, "ax": 80, "ay": -60 },
+    { "name": "Hammer Poke", "su": 5, "ac": 3, "re": 11, "box": [15, 136, -75, -33], "dmg": 8, "kb": 380, "kg": 24, "ax": 87, "ay": -49, "ix": 200 },
+    { "name": "Frost Slide", "su": 5, "ac": 5, "re": 12, "box": [13, 162, -21, 0], "dmg": 7, "kb": 420, "kg": 16, "ax": 34, "ay": -94 },
+    { "name": "Snow Flurry", "su": 4, "ac": 5, "re": 11, "box": [-51, 51, -162, -75], "dmg": 7, "kb": 410, "kg": 18, "ax": 12, "ay": -99 },
+    { "name": "Snowball Spin", "su": 4, "ac": 6, "re": 10, "box": [-64, 64, -98, -5], "dmg": 8, "kb": 380, "kg": 20, "ax": 70, "ay": -71, "away": 1, "air": 1 },
+    { "name": "Glacier Swing", "su": 13, "ac": 5, "re": 24, "box": [18, 162, -93, -13], "dmg": 16, "kb": 560, "kg": 66, "ax": 88, "ay": -48, "ix": 300, "charge": 1 },
+    { "name": "Fan Lift", "su": 5, "ac": 10, "re": 20, "box": [-41, 51, -157, -26], "dmg": 10, "kb": 480, "kg": 28, "ax": 25, "ay": -97, "iy": -1600, "ix": 200 },
+    { "name": "Ice Floor", "su": 13, "ac": 8, "re": 24, "box": [-51, 195, -23, 0], "dmg": 14, "kb": 520, "kg": 48, "ax": 60, "ay": -80, "away": 1, "charge": 1 },
+    { "name": "Icicle Drop", "su": 5, "ac": 4, "re": 12, "box": [-28, 28, -8, 44], "dmg": 9, "kb": 380, "kg": 24, "ax": 35, "ay": 94, "air": 1 },
+    { "name": "Avalanche", "su": 9, "ac": 40, "re": 15, "box": [-44, 44, -33, 31], "dmg": 13, "kb": 520, "kg": 40, "ax": 30, "ay": -95, "iy": 2200, "air": 1, "endOnLand": 1 }
   ]
 }
