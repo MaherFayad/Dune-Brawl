@@ -3,7 +3,8 @@
 usage: python3 tools/key-vfx.py sheet.png out_dir name [--single]
 
 Pieces laid out in a row with empty columns between them become name1.webp, name2.webp, ...;
---single keeps the whole keyed image as name.webp. Keying matches tools/video2sprite.py.
+--single keeps the whole keyed image as name.webp. Keying matches tools/video2sprite.py, and art
+that touches the source border fades out instead of ending in a straight cut.
 """
 import pathlib, sys
 import numpy as np
@@ -16,6 +17,17 @@ spill = g - np.maximum(r, b)
 alpha = np.clip((90 - spill) * 255 // 60, 0, 255)
 alpha[g < 120] = 255
 g2 = np.where(spill > 0, np.maximum(r, b), g)  # despill the edges
+# art that touches the source image border would end in a straight cut: fade it out over the
+# outer 12% on those sides instead
+H, W = alpha.shape
+for side, edge in (("l", alpha[:, 0]), ("r", alpha[:, -1]), ("t", alpha[0, :]), ("b", alpha[-1, :])):
+    if (edge > 128).sum() > 3:
+        n = (W if side in "lr" else H) * 12 // 100
+        ramp = (np.linspace(0, 1, n) ** 0.9 * 255).astype(np.int32)
+        if side == "l": alpha[:, :n] = alpha[:, :n] * ramp[None, :] // 255
+        if side == "r": alpha[:, -n:] = alpha[:, -n:] * ramp[::-1][None, :] // 255
+        if side == "t": alpha[:n, :] = alpha[:n, :] * ramp[:, None] // 255
+        if side == "b": alpha[-n:, :] = alpha[-n:, :] * ramp[::-1][:, None] // 255
 img = Image.fromarray(np.dstack([r, g2, b, alpha]).astype(np.uint8), "RGBA")
 out.mkdir(parents=True, exist_ok=True)
 

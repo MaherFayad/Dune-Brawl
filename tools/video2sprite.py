@@ -5,7 +5,8 @@ usage: python3 video2sprite.py clip.mp4 out_prefix frame_count [frame_size] [--t
 The clip must be shot on flat pure green (#00FF00), starting from the fighter's ready pose, so the
 first frame sets one scale and foot pivot shared by every sheet. --trim drops the held frames
 before and after the motion (use it for attacks). --motion samples by movement instead of evenly in time (use it for attacks). --magenta keys #FF00FF instead (for green fighters).
---skip=SECONDS drops the start of the clip (a loop that begins with a transition) but still takes
+The cell grows when a move reaches past it, and content touching the clip's border is faded out
+rather than cut. --skip=SECONDS drops the start of the clip (a loop that begins with a transition) but still takes
 the scale from the first frame, which is the ready pose.
 
 Writes out_prefix.png (sheet, one row), out_prefix.json (atlas), out_prefix_preview.gif
@@ -73,21 +74,45 @@ def key(path):
     return Image.fromarray(out.astype(np.uint8), "RGBA")
 
 
+def feather(im, px):
+    """Fade the alpha toward any source-frame border the content touches, so an effect that left
+    the clip dissolves instead of ending in a hard straight cut."""
+    a = np.asarray(im).copy()
+    al = a[..., 3].astype(np.float32)
+    H, W = al.shape
+    ramp = np.linspace(0, 1, px, endpoint=False) ** 0.8
+    if (al[:, 0] > 128).sum() > 3: al[:, :px] *= ramp[None, :]
+    if (al[:, -1] > 128).sum() > 3: al[:, -px:] *= ramp[::-1][None, :]
+    if (al[0, :] > 128).sum() > 3: al[:px, :] *= ramp[:, None]
+    a[..., 3] = al.astype(np.uint8)
+    return Image.fromarray(a, "RGBA")
+
+
 frames = [key(p) for p in pick]
+frames = [feather(f, max(8, f.width // 24)) for f in frames]
 # fixed scale from the ready pose (first frame of the clip): every sheet of a fighter gets the same
 # body height and the same foot pivot, so animations line up in game
 BODY = 128                   # ready-pose height in px, the same in every sheet so fighters keep one scale
-PIVOT = (size * 5 // 16, size - 6)  # feet left of center: the fighter faces right
 ref = key(sorted(tmp.glob("f*.png"))[0]).getchannel("A").getbbox()
 scale = BODY / (ref[3] - ref[1])
 foot_x = (ref[0] + ref[2]) / 2
+scaled = [f.resize((round(f.width * scale), round(f.height * scale)), Image.LANCZOS) for f in frames]
+# the cell grows to fit every frame, so a big move is never clipped by its cell: measure how far
+# the content reaches left, right and up from the feet across all frames
+ox, oy = foot_x * scale, ref[3] * scale
+boxes = [b for b in (im.getchannel("A").point(lambda v: 255 if v > 24 else 0).getbbox() for im in scaled) if b]
+reach_l = max([ox - b[0] for b in boxes] + [0]); reach_r = max([b[2] - ox for b in boxes] + [0])
+reach_u = max([oy - b[1] for b in boxes] + [0])
+need = max(size, int(-(-max(reach_l / (5 / 16), (reach_r + 4) / (11 / 16), reach_l + reach_r + 8, reach_u + 14) // 32) * 32))
+if need > size:
+    print(f"cell {size} -> {need}: the move reaches {reach_l:.0f} px back, {reach_r:.0f} forward, {reach_u:.0f} up")
+    size = need
+PIVOT = (max(size * 5 // 16, int(reach_l) + 4), size - 6)  # feet left of center: the fighter faces right
 cells = []
-for f in frames:
-    big = f.resize((round(f.width * scale), round(f.height * scale)), Image.LANCZOS)
+for big in scaled:
     cell = Image.new("RGBA", (size, size))
-    cell.alpha_composite(big, (round(PIVOT[0] - foot_x * scale), round(PIVOT[1] - ref[3] * scale)))
+    cell.alpha_composite(big, (round(PIVOT[0] - ox), round(PIVOT[1] - oy)))
     cells.append(cell)
-w = h = 0
 sheet = Image.new("RGBA", (size * count, size))
 for i, c in enumerate(cells):
     sheet.alpha_composite(c, (i * size, 0))

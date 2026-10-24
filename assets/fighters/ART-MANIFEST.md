@@ -57,4 +57,4 @@ Painted on pure green and keyed with `tools/key-vfx.py` (same keying as the spri
 | `ko-splash.webp` | `0ec9ea16-aaa9-4c5d-ac22-ad35166cf8b6` | KO ink splash at the screen edge |
 | `ko-cloud.webp` | `e6ca030e-f8d1-47d3-ad80-614a94db41f8` | KO cloud bank at the screen edge |
 
-The v1 painted effects (`spark`, `heavy`, `ko`, `slash`, `dust`) are no longer drawn.
+The v1 painted effects (`spark`, `heavy`, `ko`, `slash`, `dust`) were removed: they had straight cut edges and are replaced by this set.
