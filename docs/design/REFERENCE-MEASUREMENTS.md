@@ -21,7 +21,7 @@ Confidence: **High** means a direct count or a repeated measurement. **Medium** 
 | Jumps | ground jump plus 2 air jumps, plus a recovery move | Observed chains off-stage | High | same |
 | Hit pause | about 4 frames on a typical hit, 6 to 8 on a big one; projectiles keep moving | Freeze-run histogram (peak at 4 frames) checked against 60 fps strips | Medium | 4 light, 6 heavy |
 | Dodge and dash | about 2 to 3 bodies per dodge, long smoke trail on dashes | 10 fps strips | Low | 1.8 |
-| Fighter size on screen | 8 to 10% of screen height up close, about 6% when spread | Body height against frame height | Medium | 5.5 to 10.2%, camera frames the pair |
+| Fighter size on screen | 8 to 10% of screen height up close, about 6% when spread | Body height against frame height | Medium | up to 11.4% body (about 12.5% silhouette; the reference silhouettes run 12 to 13%), camera frames the pair |
 | Where fights happen | mostly off the ledge: edge guarding, recovery, wall play | Strips of games 1 and 2 | High | wall slide and wall jump added, collision follows the island art |
 | Sky value | luminance 97 to 190 (typical 157), saturation 0.18 to 0.30 | Top 60% of six frames, mean of 320x180 | High | 141, 0.31 (was 79, 0.41), stage mass darker than the sky |
 | Match opening | fighters spawn mid-air on pads, 3, 2, 1, BRAWL, then drop in | 3 fps strip, game 2 | High | same: spawn pads 150 px up, drop lands on the go |

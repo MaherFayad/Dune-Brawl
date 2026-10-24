@@ -217,6 +217,7 @@
   const cam = { x: 640, y: 380, z: 1 };
   function updateCam(s) {
     // frame the fighters, not the stage, like the reference broadcast camera: a tight window
+    // (max zoom puts the silhouette at about 12 percent of screen height, as in the reference)
     // around the pair (never narrower than about 10 bodies) that follows them off the ledge and
     // up into the air, with only a light pull toward stage center
     const live = s.over ? [s.p[s.over - 1]] : s.p.filter((p) => p.st !== ST.DEAD);
@@ -225,7 +226,7 @@
     for (const p of live) { const x = p.x / S, y = p.y / S; x0 = Math.min(x0, x - 110); x1 = Math.max(x1, x + 110); y0 = Math.min(y0, y - 150); y1 = Math.max(y1, y + 70); }
     // match over: push in on the winner so the victory animation reads
     const w = Math.max(s.over ? 420 : 640, x1 - x0), h = Math.max(s.over ? 240 : 340, y1 - y0);
-    const z = Math.max(0.62, Math.min(s.over ? 1.7 : 1.15, Math.min(1280 / (w + 160), 720 / (h + 120)))) + fx.zoomKick;
+    const z = Math.max(0.62, Math.min(s.over ? 1.7 : 1.28, Math.min(1280 / (w + 160), 720 / (h + 120)))) + fx.zoomKick;
     const tx = ((x0 + x1) / 2) * 0.85 + 640 * 0.15, ty = ((y0 + y1) / 2) * 0.8 + 400 * 0.2;
     cam.x += (tx - cam.x) * 0.12; cam.y += (ty - cam.y) * 0.12; cam.z += (z - cam.z) * 0.09;
   }
