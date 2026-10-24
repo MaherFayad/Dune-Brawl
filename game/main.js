@@ -3,13 +3,22 @@
   "use strict";
   const { S, IN, ST, STAGE, FEEL } = Sim;
   const ROOT = "..";
+  // ready: shown on the select screen. art and portrait point at the v2 rework once it lands.
   const FIGHTERS = {
-    "djinn-warrior": { name: "Saif", color: "#3d4fd6", glow: "#36e2d4" },
-    "dune-ghoul": { name: "Abu Sarab", color: "#7fbf3a", glow: "#c6ff3d" },
-    "falcon-rider": { name: "Nawaf", color: "#e9dcc0", glow: "#ffcf5a" },
-    "sea-siren": { name: "Dana", color: "#1fb5a6", glow: "#8ff5ea" },
-    "dagger-dancer": { name: "Marjana", color: "#d6337a", glow: "#ffd0e4" },
+    "djinn-warrior": { name: "Saif", color: "#3d4fd6", glow: "#36e2d4", ready: 1 },
+    "dune-ghoul": { name: "Abu Sarab", color: "#7fbf3a", glow: "#c6ff3d", ready: 1 },
+    "falcon-rider": { name: "Nawaf", color: "#e9dcc0", glow: "#ffcf5a", ready: 1 },
+    "sea-siren": { name: "Dana", color: "#1fb5a6", glow: "#8ff5ea", ready: 1 },
+    "dagger-dancer": { name: "Marjana", color: "#d6337a", glow: "#ffd0e4", ready: 1 },
+    "vampire-countess": { name: "Vespera", color: "#b3123a", glow: "#ff5c7a", art: "anim-v2" },
+    "gorilla-lumberjack": { name: "Timber", color: "#c8302c", glow: "#ffb15c", art: "anim-v2" },
+    "fennec-host": { name: "Finjan", color: "#f2b632", glow: "#fff0a0", art: "anim-v2" },
+    "clockwork-elephant": { name: "Tiktak", color: "#c9973a", glow: "#5ff0d8", art: "anim-v2" },
+    "melting-yeti": { name: "Brrr", color: "#9fd8ff", glow: "#e8fbff", art: "anim-v2" },
+    "baby-roc": { name: "Rukhayy", color: "#2443b8", glow: "#ffd25a", art: "anim-v2" },
+    "chameleon-slinger": { name: "Hirba", color: "#7ccf2a", glow: "#ff5ad0", art: "anim-v2" },
   };
+  const portraitSrc = (id) => `${ROOT}/assets/fighters/${id}/${FIGHTERS[id].portrait || "source/portrait.png"}`;
   const TEAM = ["#2fd5c4", "#ff7a45"];
   const params = new URLSearchParams(location.search);
 
@@ -67,6 +76,7 @@
     if (foe.st === ST.DEAD) return Math.abs(me.x - 640 * S) > 60 * S ? (me.x < 640 * S ? IN.R : IN.L) : 0;
     const close = Math.abs(dx) < 95 * S && Math.abs(dy) < 90 * S;
     if (!close) v |= dx > 0 ? IN.R : IN.L;
+    if (!close && me.ground && Math.abs(dx) > 220 * S && even && Math.random() < 0.05) v |= IN.X; // dash in
     // the reference fights in the air: hop in from mid range, chase a launched foe upward
     const chase = foe.st === ST.HIT && dy < -60 * S && Math.abs(dx) < 260 * S;
     if (even && (me.ground || me.jumps > 0)) {
@@ -133,8 +143,8 @@
   async function startMatch(m) {
     mode = "loading"; hideMenu();
     defs = await Promise.all(pick.map(async (id) => (await fetch(`${ROOT}/assets/fighters/${id}/moves.draft.json`)).json()));
-    gfx = await Promise.all(pick.map((id) => Render.loadFighter(id, ROOT)));
-    await Promise.all(pick.map((id) => new Promise((ok) => { const im = new Image(); im.onload = () => { portraits[id] = im; ok(); }; im.onerror = ok; im.src = `${ROOT}/assets/fighters/${id}/source/portrait.png`; })));
+    gfx = await Promise.all(pick.map((id, i) => Render.loadFighter(id, ROOT, { art: FIGHTERS[id].art, height: (defs[i].stats || {}).height, basePose: FIGHTERS[id].basePose })));
+    await Promise.all(pick.map((id) => new Promise((ok) => { const im = new Image(); im.onload = () => { portraits[id] = im; ok(); }; im.onerror = ok; im.src = portraitSrc(id); })));
     M = Sim.match(defs[0], defs[1]); st = M.create(); fx.reset(); mode = m;
   }
   function rebuild() { if (defs.length) { M = Sim.match(defs[0], defs[1]); } }
@@ -157,19 +167,24 @@
     if (s.hf !== fx.lastHf && s.hf >= 0) {
       fx.lastHf = s.hf;
       const x = s.hx / S, y = s.hy / S, k = s.hk / 100, heavy = k > 18;
-      const atk = s.p[s.hp], dir = atk ? atk.face : 1;
-      fx.shake = Math.max(fx.shake, Math.min(14, 1.5 + k * 0.35));
-      if (heavy) {
-        fx.add("heavy", x, y, { w: 64 + k * 0.9, flip: dir, rot: (rnd() - 0.5) * 0.3, s0: 0.45, s1: 1.05, pop: 3, life: 20 });
-        fx.add("slash", x - dir * 8, y, { w: 84, flip: dir, rot: -0.5 * dir, s0: 0.8, s1: 1.1, pop: 2, life: 9, alpha: 0.7 });
-        fx.zoomKick = Math.min(0.08, k * 0.002);
+      if (s.ha === 2) { // parry: a bright ring and a hard shake, no damage spark
+        fx.add("spark", x, y, { w: 110, rot: rnd() * 6.28, s0: 0.3, s1: 1.3, pop: 3, life: 16 });
+        fx.shake = Math.max(fx.shake, 10); fx.flash = Math.max(fx.flash, 0.35);
       } else {
-        fx.add("spark", x, y, { w: 40 + k * 0.9, rot: rnd() * 6.28, s0: 0.5, s1: 1, pop: 2, life: 12 });
-      }
-      const n = heavy ? 10 : 4;
-      for (let j = 0; j < n; j++) {
-        const a = (dir > 0 ? 0 : Math.PI) + (rnd() - 0.5) * 1.6, sp = 3 + rnd() * (4 + k * 0.2);
-        fx.parts.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 1, life: 0.6 + rnd() * 0.4, size: 2 + rnd() * 2.5, c: rnd() < 0.5 ? "#fff1c4" : "#ff9a3c", g: 0.18 });
+        const atk = s.p[s.hp], dir = atk ? atk.face : 1;
+        fx.shake = Math.max(fx.shake, Math.min(14, 1.5 + k * 0.35));
+        if (heavy) {
+          fx.add("heavy", x, y, { w: 64 + k * 0.9, flip: dir, rot: (rnd() - 0.5) * 0.3, s0: 0.45, s1: 1.05, pop: 3, life: 20 });
+          fx.add("slash", x - dir * 8, y, { w: 84, flip: dir, rot: -0.5 * dir, s0: 0.8, s1: 1.1, pop: 2, life: 9, alpha: 0.7 });
+          fx.zoomKick = Math.min(0.08, k * 0.002);
+        } else {
+          fx.add("spark", x, y, { w: 40 + k * 0.9, rot: rnd() * 6.28, s0: 0.5, s1: 1, pop: 2, life: 12 });
+        }
+        const n = heavy ? 10 : 4;
+        for (let j = 0; j < n; j++) {
+          const a = (dir > 0 ? 0 : Math.PI) + (rnd() - 0.5) * 1.6, sp = 3 + rnd() * (4 + k * 0.2);
+          fx.parts.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 1, life: 0.6 + rnd() * 0.4, size: 2 + rnd() * 2.5, c: rnd() < 0.5 ? "#fff1c4" : "#ff9a3c", g: 0.18 });
+        }
       }
     }
     if (s.kf !== fx.lastKf && s.kf >= 0) {
@@ -189,7 +204,7 @@
       if (!p.ground && fx.grounded[i] && p.vy < 0) fx.dust(x, y, 52);
       fx.grounded[i] = p.ground;
       if (p.st === ST.DODGE && s.f % 3 === 0) fx.ghosts.push({ i, f: s.f, life: 0.5, p: { ...p } });
-      if (p.st === ST.DODGE && fx.wasSt[i] !== ST.DODGE && p.ground) fx.dust(x, y, 60, -p.face);
+      if ((p.st === ST.DODGE || p.st === ST.DASH) && fx.wasSt[i] !== p.st && p.ground) fx.dust(x, y, 60, -p.face);
       // the reference's signature: a launched fighter leaves a trail of white smoke puffs, and a
       // dodge leaves a short streak; puffs grow and fade where they were left
       const sp = Math.hypot(p.vx, p.vy);
@@ -197,7 +212,7 @@
         fx.trails.push({ x, y: y - 32, life: 1, w: Math.min(14, p.launch / 280) });
         fx.add("dust", x - p.vx / S * 0.5, y - 30, { w: 22 + Math.min(34, p.launch / 120), ay: 0.5, rot: rnd() * 6.28, s0: 0.55, s1: 1.25, pop: 10, life: 30, alpha: 0.8 });
       }
-      if (p.st === ST.DODGE && sp > 500 && s.f % 2 === 0) fx.add("dust", x, y - (p.ground ? 8 : 30), { w: 30, ay: 0.5, rot: rnd() * 6.28, s0: 0.5, s1: 1.1, pop: 6, life: 18, alpha: 0.6 });
+      if ((p.st === ST.DODGE || p.st === ST.DASH) && sp > 500 && s.f % 2 === 0) fx.add("dust", x, y - (p.ground ? 8 : 30), { w: 30, ay: 0.5, rot: rnd() * 6.28, s0: 0.5, s1: 1.1, pop: 6, life: 18, alpha: 0.6 });
       fx.wasSt[i] = p.st;
     });
   }
@@ -296,7 +311,7 @@
     const x = p.x / S, y = p.y / S;
     if (!ps) return;
     const { sh, k } = ps, sc = sh.scale;
-    const screenBody = Render.BODY_PX * cam.z * Math.min(W / 1280, H / 720) * dpr;
+    const screenBody = F.h * cam.z * Math.min(W / 1280, H / 720) * dpr;
     const { im, f: div } = Render.mip(sh, screenBody), cell = sh.size / div;
     let src = im, sx = k * cell;
     if (tint) { // flash a white overlay on the sprite only, through a small buffer
@@ -307,7 +322,7 @@
       src = tintBuf; sx = 0;
     }
     g.save(); g.globalAlpha = alpha; g.translate(Math.round(x), Math.round(y)); g.scale(p.face, 1);
-    if (p.st === ST.HIT && p.launch > 2600 && !gfx[i].sheets.tumble) { g.translate(0, -32); g.rotate((f % 24) / 24 * Math.PI * 2 * -1); g.translate(0, 32); }
+    if (p.st === ST.HIT && p.launch > 2600 && !F.sheets.tumble) { g.translate(0, -F.h / 2); g.rotate((f % 24) / 24 * Math.PI * 2 * -1); g.translate(0, F.h / 2); }
     if (halo) { g.shadowColor = halo; g.shadowBlur = 3 * dpr; }
     g.imageSmoothingEnabled = true; g.imageSmoothingQuality = "high";
     g.drawImage(src, sx, 0, cell, cell, -sh.pivot[0] * sc, (-sh.pivot[1] + sh.dy[k]) * sc, sh.size * sc, sh.size * sc);
@@ -327,6 +342,8 @@
     let tint = 0;
     if (p.st === ST.ATK && m.su - p.t > 0 && m.su - p.t <= 2 && m.su >= 8) tint = 0.55; // heavy startup flash
     if (p.st === ST.HIT && s.hp === 1 - i && s.f - s.hf < 3) tint = 0.6;                   // hit flash, first frames of hitstop
+    if (p.st === ST.ATK && p.chg > 0 && p.t === m.su - 1) tint = 0.25 + 0.25 * Math.sin(s.f * 0.8); // a held heavy pulses while it charges
+    if (s.ha === 1 && s.hp === 1 - i && s.f - s.hf < 6) tint = 0.45;                         // armor took the hit
     const blink = p.inv > 0 && Math.floor(s.f / 6) % 2 === 0;
     const jitter = p.st === ST.HIT && s.freeze > 0 ? (rnd() - 0.5) * 4 : 0;
     g.save(); g.translate(jitter, 0);
@@ -342,7 +359,8 @@
     }
     const label = mode === "bot" ? (i === 0 ? "YOU" : "BOT") : mode === "demo" ? FIGHTERS[pick[i]].name.toUpperCase() : "P" + (i + 1);
     g.textAlign = "center"; g.fillStyle = TEAM[i]; g.strokeStyle = "#140b1f"; g.lineWidth = 3;
-    g.beginPath(); g.moveTo(x - 5, y - 80); g.lineTo(x + 5, y - 80); g.lineTo(x, y - 74); g.closePath(); g.stroke(); g.fill();
+    const top = y - gfx[i].h - 16;
+    g.beginPath(); g.moveTo(x - 5, top); g.lineTo(x + 5, top); g.lineTo(x, top + 6); g.closePath(); g.stroke(); g.fill();
   }
   function drawFx() {
     // launch trail: a soft smoke ribbon behind launched fighters
@@ -478,9 +496,10 @@
       const row = document.getElementById("pick" + i);
       row.innerHTML = "";
       for (const id in FIGHTERS) {
+        if (!FIGHTERS[id].ready) continue;
         const b = document.createElement("button");
         b.className = "chip" + (pick[i] === id ? " on" : ""); b.setAttribute("aria-pressed", pick[i] === id);
-        b.innerHTML = `<i class="disc"><img alt="" src="${ROOT}/assets/fighters/${id}/source/portrait.png"></i><span>${FIGHTERS[id].name}</span>`;
+        b.innerHTML = `<i class="disc"><img alt="" src="${portraitSrc(id)}"></i><span>${FIGHTERS[id].name}</span>`;
         b.onclick = () => { pick[i] = id; buildPickers(); };
         row.appendChild(b);
       }

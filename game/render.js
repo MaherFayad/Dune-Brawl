@@ -89,13 +89,24 @@
     return best;
   }
 
-  async function loadFighter(id, root) {
-    const base = `${root}/assets/fighters/${id}/anim-test`;
+  // A sheet that is not made yet borrows the closest one, so a fighter with only the core set
+  // (idle, run, jump, hurt, jab, side_light, side_heavy, nair) still animates every move.
+  const STAND_IN = { up_light: "jab", down_light: "side_light", dair: "nair", recovery: "jump", down_heavy: "side_heavy" };
+
+  // opts.art: sheet folder (anim-test or anim-v2), opts.height: standing height in world px,
+  // opts.basePose: fallback still when there is no idle sheet
+  async function loadFighter(id, root, opts = {}) {
+    const dir = `${root}/assets/fighters/${id}`, base = `${dir}/${opts.art || "anim-test"}`;
+    let names = SHEETS;
+    try { names = (await (await fetch(`${base}/index.json`)).json()).sheets || SHEETS; } catch (e) { /* probe every sheet */ }
     const sheets = {};
-    await Promise.all(SHEETS.map(async (n) => { sheets[n] = await loadSheet(base, n); }));
-    if (!sheets.idle) sheets.idle = await stillSheet(`${root}/assets/fighters/${id}/source/base-pose.png`);
+    await Promise.all(names.filter((n) => SHEETS.includes(n)).map(async (n) => { sheets[n] = await loadSheet(base, n); }));
+    if (!sheets.idle) sheets.idle = await stillSheet(`${dir}/${opts.basePose || "source/base-pose.png"}`);
+    for (const n in STAND_IN) if (!sheets[n] && sheets[STAND_IN[n]]) sheets[n] = sheets[STAND_IN[n]];
+    const h = opts.height || BODY_PX;
+    for (const n in sheets) if (sheets[n] && !sheets[n].sized) { sheets[n].scale *= h / BODY_PX; sheets[n].sized = 1; }
     const strike = SLOT_SHEETS.map((n, i) => (sheets[n] ? strikeFrame(sheets[n], SLOT_AXIS[i]) : 0));
-    return { id, sheets, strike };
+    return { id, sheets, strike, h };
   }
 
   // ---------- pose selection (pure) ----------
@@ -130,6 +141,7 @@
       return S.hurt ? pick("hurt", Math.min(S.hurt.n - 1, Math.floor(f / 3) % S.hurt.n)) : loop("idle", 5);
     }
     if (p.st === ST.DODGE) return p.ground ? loop("idle", 5) : air();
+    if (p.st === ST.DASH) return S.run ? pick("run", Math.floor(f / 1.5) % S.run.n) : loop("idle", 5);
     if (!p.ground) return air();
     if (p.land > 0 && S.land) return pick("land", ((6 - p.land) / 6) * S.land.n * 0.5);
     if (Math.abs(p.vx) > 150 && S.run) return pick("run", Math.floor(f / 2) % S.run.n);

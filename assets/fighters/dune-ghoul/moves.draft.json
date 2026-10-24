@@ -74,7 +74,8 @@
         "throwRe": 16,
         "dodgeCatch": 1,
         "clashRe": 12
-      }
+      },
+      "charge": 1
     },
     {
       "name": "Sand Geyser",
@@ -91,7 +92,8 @@
       "dmg": 16, "kb": 560, "kg": 54,
       "ax": 66, "ay": -75,
       "away": 1,
-      "armor": { "from": 3, "to": 15 }
+      "armor": { "from": 3, "to": 15 },
+      "charge": 1
     },
     {
       "name": "Hoof Stomp",

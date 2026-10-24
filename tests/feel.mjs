@@ -92,7 +92,9 @@ for (const [name, mid] of [["killSideHeavyLedge", false], ["killSideHeavyMidStag
   out[name] = kill; // victim recovers toward the stage with jumps and recovery
 }
 out.dodgeFrames = FEEL.dodgeG;
-out.dodgeDistance = (() => { const { M, s } = fresh(); run(M, s, 1, () => IN.R | IN.X); const x0 = s.p[0].x; run(M, s, FEEL.dodgeG, () => 0); return b(Math.abs(s.p[0].x - x0)); })();
+// dodge with a direction on the ground is a dash; air dodge travel is measured from a jump apex
+out.dashDistance = (() => { const { M, s } = fresh(); run(M, s, 1, () => IN.R | IN.X); const x0 = s.p[0].x; run(M, s, FEEL.dashFrames, () => 0); return b(Math.abs(s.p[0].x - x0)); })();
+out.airDodgeDistance = (() => { const { M, s } = fresh(); run(M, s, 1, () => IN.J); run(M, s, 12, () => IN.J); const x0 = s.p[0].x; run(M, s, 1, () => IN.R | IN.X); run(M, s, FEEL.dodgeA, () => 0); return b(Math.abs(s.p[0].x - x0)); })();
 
 if (process.argv.includes("--json")) { console.log(JSON.stringify(out, null, 2)); process.exit(0); }
 const rows = Object.entries(out).map(([k, v]) => {

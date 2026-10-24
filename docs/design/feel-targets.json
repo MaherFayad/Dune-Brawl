@@ -16,5 +16,6 @@
   "launchLight50": { "range": [0.2, 0.35] },
   "killSideHeavyLedge": { "range": [130, 165] },
   "killSideHeavyMidStage": { "range": [200, 290] },
-  "dodgeDistance": { "range": [1.7, 2.3] }
+  "dashDistance": { "range": [2.3, 3.0] },
+  "airDodgeDistance": { "range": [1.7, 2.6] }
 }

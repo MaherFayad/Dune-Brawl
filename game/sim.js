@@ -8,7 +8,7 @@
   const S = 100;
   const div = (a, b) => Math.trunc(a / b);
   const IN = { L: 1, R: 2, U: 4, D: 8, J: 16, A: 32, B: 64, X: 128 };
-  const ST = { IDLE: 0, ATK: 1, HIT: 2, DODGE: 3, DEAD: 4 };
+  const ST = { IDLE: 0, ATK: 1, HIT: 2, DODGE: 3, DEAD: 4, DASH: 5 };
 
   // Dune Island, scaled to the reference (docs/design/REFERENCE-MEASUREMENTS.md): the main
   // platform is 14 bodies wide, soft platforms sit 3 bodies up so they take a double jump, and
@@ -39,6 +39,11 @@
     pauseBase: 3, pauseDiv: 5, pauseMax: 7,   // the reference holds 4 frames on a light hit, 6 on a heavy
     dodgeG: 20, dodgeA: 22, dodgeCdG: 36, dodgeCdA: 60, dodgeInvFrom: 3,
     dodgeSpeedG: 1250, dodgeSpeedA: 1150, dodgeDragG: 8, dodgeDragA: 6,
+    // ground dodge with a direction is a dash: fast, cancelable into a jump or an attack
+    dashSpeed: 1500, dashDrag: 4, dashFrames: 14, dashCancelFrom: 5, dashCd: 16,
+    chase: 40, chaseSpeed: 130, // after landing a hit: air dodge 30% faster, shorter cooldown
+    parryStun: 40,      // frames an attacker is stunned after hitting a parry
+    chargeMax: 30,      // heavies with `charge` can be held up to 30 frames for up to +50%
     wallJumps: 3, wallSlide: 500, // touching the island side: slide slowly, jump off it up to 3 times
     spawnDrop: 150, spawnRelease: 24, // px above the stage, frames before the go the drop starts
     buffer: 7, countdown: 90, stocks: 3, deadFrames: 75, respawnInv: 100,
@@ -67,16 +72,20 @@
       airJumps: st.airJumps === undefined ? 2 : st.airJumps,
       weight: st.weight || 100,
       hw: div((st.hurtW || FEEL.hw * 2) * S, 2),
-      h: FEEL.h * S,
+      h: (st.height || FEEL.h) * S,
     };
   }
+
+  // a frame window from move data: [from, to] or { from, to }
+  const span = (w) => (!w ? null : Array.isArray(w) ? [w[0], w[1]] : [w.from, w.to]);
 
   // Moves: the 10 slots from the fighter JSON, integers only.
   function moves(def) {
     return def.moves.slice(0, 10).map((m) => ({
       su: m.su, ac: m.ac, re: m.re, box: m.box.slice(), dmg: m.dmg, kb: m.kb, kg: m.kg,
       ax: m.ax, ay: m.ay, ix: m.ix || 0, iy: m.iy || 0, away: m.away || 0, air: m.air || 0,
-      endOnLand: m.endOnLand || 0,
+      endOnLand: m.endOnLand || 0, charge: m.charge || 0,
+      armor: span(m.armor), parry: span(m.parry),
     }));
   }
 
@@ -85,10 +94,11 @@
       x, y: STAGE.main.y - FEEL.spawnDrop * S, vx: 0, vy: 0, face, ground: 0, jumps: ph.airJumps, dmg: 0,
       stocks: FEEL.stocks, st: ST.IDLE, t: 0, mv: 0, hit: 0, inv: 0, dcd: 0, drop: 0, recov: 0,
       ff: 0, cut: 1, prev: 0, buf: 0, bufT: 0, land: 0, launch: 0, wall: 0, wj: FEEL.wallJumps,
+      chase: 0, chg: 0,
     };
   }
   const PKEYS = Object.keys(player(0, 1, { airJumps: 2 }));
-  const GKEYS = ["f", "freeze", "over", "overT", "hf", "hx", "hy", "hk", "hp", "kf", "kx", "ky", "kp"];
+  const GKEYS = ["f", "freeze", "over", "overT", "hf", "hx", "hy", "hk", "hp", "ha", "kf", "kx", "ky", "kp"];
 
   // A match binds two fighter definitions; the returned object steps a plain state.
   function match(defA, defB) {
@@ -97,7 +107,7 @@
 
     function create() {
       return {
-        f: 0, freeze: 0, over: 0, overT: 0, hf: -1, hx: 0, hy: 0, hk: 0, hp: 0,
+        f: 0, freeze: 0, over: 0, overT: 0, hf: -1, hx: 0, hy: 0, hk: 0, hp: 0, ha: 0, // ha: 0 hit, 1 armored, 2 parried
         kf: -1, kx: 0, ky: 0, kp: 0,
         p: [player(STAGE.spawnX[0], 1, ph[0]), player(STAGE.spawnX[1], -1, ph[1])],
       };
@@ -151,6 +161,7 @@
       if (p.dcd > 0) p.dcd--;
       if (p.drop > 0) p.drop--;
       if (p.land > 0) p.land--;
+      if (p.chase > 0) p.chase--;
       const dx = (input & IN.R ? 1 : 0) - (input & IN.L ? 1 : 0);
       const take = (bit) => {
         if (p.bufT > 0 && p.buf & bit) { p.buf &= ~bit; if (!p.buf) p.bufT = 0; return true; }
@@ -165,9 +176,16 @@
         if (p.ground) p.vx -= div(FEEL.dodgeDragG * p.vx, 100);
         else { p.vx -= div(FEEL.dodgeDragA * p.vx, 100); p.vy -= div(FEEL.dodgeDragA * p.vy, 100); }
         if (p.t <= 0) { p.st = ST.IDLE; p.t = 0; }
+      } else if (p.st === ST.DASH) {
+        p.t++;
+        p.vx -= div(FEEL.dashDrag * p.vx, 100);
+        const cancel = p.t >= FEEL.dashCancelFrom && p.bufT > 0 && p.buf & (IN.J | IN.A | IN.B);
+        if (cancel || !p.ground || p.t >= FEEL.dashFrames) { p.st = ST.IDLE; p.t = 0; } // keeps its momentum
       } else if (p.st === ST.ATK) {
         const m = M[p.mv];
         p.t++;
+        // a held heavy charges: hold one frame before the strike, up to chargeMax frames
+        if (m.charge && p.ground && input & IN.B && p.t === m.su - 1 && p.chg < FEEL.chargeMax) { p.chg++; p.t--; }
         if (p.t === m.su) {
           if (m.ix) p.vx = p.face * m.ix;
           if (m.iy) p.vy = m.iy;
@@ -178,17 +196,21 @@
           p.vx += dx * div(P.airAcc, 2);
           if (Math.abs(p.vx) > P.airMax) p.vx -= dx * div(P.airAcc, 2);
         }
-        if (p.t >= m.su + m.ac + m.re) { p.st = ST.IDLE; p.t = 0; }
+        // after a hit connects, jump or dodge cancels the recovery so strings flow
+        if (p.hit && p.t >= m.su + m.ac && p.bufT > 0 && p.buf & (IN.J | IN.X)) { p.st = ST.IDLE; p.t = 0; }
+        else if (p.t >= m.su + m.ac + m.re) { p.st = ST.IDLE; p.t = 0; }
       }
 
       if (p.st === ST.IDLE && s.f >= FEEL.countdown) {
         if (take(IN.X) && p.dcd <= 0) {
           p.st = ST.DODGE;
-          if (p.ground) { p.t = FEEL.dodgeG; p.vx = FEEL.dodgeSpeedG * dx; p.dcd = FEEL.dodgeCdG; }
+          if (p.ground && dx) { p.st = ST.DASH; p.t = 0; p.vx = FEEL.dashSpeed * dx; p.dcd = FEEL.dashCd; }
+          else if (p.ground) { p.t = FEEL.dodgeG; p.vx = 0; p.dcd = FEEL.dodgeCdG; } // spot dodge
           else {
-            p.t = FEEL.dodgeA; p.dcd = FEEL.dodgeCdA;
+            const chase = p.chase > 0, sp = chase ? div(FEEL.dodgeSpeedA * FEEL.chaseSpeed, 100) : FEEL.dodgeSpeedA;
+            p.t = FEEL.dodgeA; p.dcd = chase ? div(FEEL.dodgeCdA * 2, 3) : FEEL.dodgeCdA; p.chase = 0;
             const dy = (input & IN.U ? -1 : 0) + (input & IN.D ? 1 : 0);
-            p.vx = FEEL.dodgeSpeedA * dx; p.vy = dy ? FEEL.dodgeSpeedA * dy : Math.min(p.vy, 200);
+            p.vx = sp * dx; p.vy = dy ? sp * dy : Math.min(p.vy, 200);
           }
           if (dx) p.face = dx;
         } else if (take(IN.J)) {
@@ -207,7 +229,7 @@
             else m = input & IN.U ? 3 : input & IN.D ? (p.ground ? 2 : 8) : dx ? 1 : p.ground ? 0 : 4;
             if (m >= 0) {
               if (dx) p.face = dx;
-              p.st = ST.ATK; p.t = 0; p.mv = m; p.hit = 0;
+              p.st = ST.ATK; p.t = 0; p.mv = m; p.hit = 0; p.chg = 0;
               if (m === 6) p.recov = 1;
               if (m === 9) { p.vy = 0; p.vx = div(p.vx, 3); }
             }
@@ -320,27 +342,44 @@
         if (b[0] < v.x + V.hw && b[1] > v.x - V.hw && b[2] < v.y && b[3] > v.y - V.h) hits.push(i);
       }
       for (const i of hits) {
-        const a = s.p[i], v = s.p[1 - i], m = mv[i][a.mv];
+        const a = s.p[i], v = s.p[1 - i], m = mv[i][a.mv], V = ph[1 - i];
         a.hit = 1;
-        v.dmg = Math.min(999, v.dmg + m.dmg);
+        const vm = v.st === ST.ATK ? mv[1 - i][v.mv] : null;
+        const within = (w) => w && v.t >= w[0] && v.t <= w[1];
+        const hb = box(a, m);
+        // spark at the contact point: the hitbox center clamped onto the victim's hurtbox
+        s.hf = s.f; s.hp = i; s.ha = 0;
+        s.hx = Math.max(v.x - V.hw, Math.min(v.x + V.hw, div(hb[0] + hb[1], 2)));
+        s.hy = Math.max(v.y - V.h, Math.min(v.y - 8 * S, div(hb[2] + hb[3], 2)));
+        if (vm && within(vm.parry)) {
+          // parried: no damage, the attacker is knocked back and stunned
+          a.st = ST.HIT; a.t = FEEL.parryStun; a.launch = 0; a.vx = -a.face * 600; a.vy = a.ground ? 0 : -300;
+          s.ha = 2; s.hk = 0; s.freeze = Math.max(s.freeze, FEEL.pauseMax);
+          continue;
+        }
+        const dmg = m.dmg + div(m.dmg * a.chg, 60);
+        v.dmg = Math.min(999, v.dmg + dmg);
         let l = m.kb + div(m.kg * v.dmg, FEEL.growthDiv);
         l = div(l * FEEL.kbMul, 100);
-        l = div(l * 100, ph[1 - i].weight);
+        l = div(l * 100, V.weight);
+        l = div(l * (60 + a.chg), 60);
+        a.chase = FEEL.chase;
+        s.hk = l;
+        if (vm && within(vm.armor)) {
+          // armored: the damage sticks, the move goes on
+          s.ha = 1; s.freeze = Math.max(s.freeze, FEEL.pauseBase);
+          continue;
+        }
         const dir = m.away ? (v.x >= a.x ? 1 : -1) : a.face;
         v.vx = dir * div(l * m.ax, 100);
         v.vy = div(l * m.ay, 100);
         if (v.ground && v.vy > 0) v.vy = -div(v.vy, 2);
         v.ground = 0; v.st = ST.HIT; v.t = 6 + div(l, FEEL.hitstunDiv); v.launch = l;
-        v.ff = 0; v.recov = 0;
+        v.ff = 0; v.recov = 0; v.chg = 0;
         if (v.jumps < 1) v.jumps = 1;
         if (v.vx) v.face = v.vx > 0 ? -1 : 1;
         if (a.mv === 9) { a.st = ST.IDLE; a.t = 0; a.vy = -900; }
-        s.freeze = Math.max(s.freeze, Math.min(FEEL.pauseMax, FEEL.pauseBase + div(m.dmg, FEEL.pauseDiv)));
-        // spark at the contact point: the hitbox center clamped onto the victim's hurtbox
-        const hb = box(a, m), V = ph[1 - i];
-        s.hf = s.f; s.hk = l; s.hp = i;
-        s.hx = Math.max(v.x - V.hw, Math.min(v.x + V.hw, div(hb[0] + hb[1], 2)));
-        s.hy = Math.max(v.y - V.h, Math.min(v.y - 8 * S, div(hb[2] + hb[3], 2)));
+        s.freeze = Math.max(s.freeze, Math.min(FEEL.pauseMax, FEEL.pauseBase + div(dmg, FEEL.pauseDiv)));
       }
       const B = STAGE.blast;
       for (let i = 0; i < 2; i++) {
