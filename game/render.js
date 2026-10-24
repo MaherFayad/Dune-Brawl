@@ -91,7 +91,8 @@
 
   // A sheet that is not made yet borrows the closest one, so a fighter with only the core set
   // (idle, run, jump, hurt, jab, side_light, side_heavy, nair) still animates every move.
-  const STAND_IN = { up_light: "jab", down_light: "side_light", dair: "nair", recovery: "jump", down_heavy: "side_heavy" };
+  const STAND_IN = { side_heavy: "side_light", side_light: "jab", jab: "side_light", nair: "jab", hurt: "idle",
+    up_light: "jab", down_light: "side_light", dair: "nair", recovery: "jump", down_heavy: "side_heavy" };
 
   // opts.art: sheet folder (anim-test or anim-v2), opts.height: standing height in world px,
   // opts.basePose: fallback still when there is no idle sheet
@@ -102,7 +103,7 @@
     const sheets = {};
     await Promise.all(names.filter((n) => SHEETS.includes(n)).map(async (n) => { sheets[n] = await loadSheet(base, n); }));
     if (!sheets.idle) sheets.idle = await stillSheet(`${dir}/${opts.basePose || "source/base-pose.png"}`);
-    for (const n in STAND_IN) if (!sheets[n] && sheets[STAND_IN[n]]) sheets[n] = sheets[STAND_IN[n]];
+    for (let pass = 0; pass < 3; pass++) for (const n in STAND_IN) if (!sheets[n] && sheets[STAND_IN[n]]) sheets[n] = sheets[STAND_IN[n]];
     const h = opts.height || BODY_PX;
     for (const n in sheets) if (sheets[n] && !sheets[n].sized) { sheets[n].scale *= h / BODY_PX; sheets[n].sized = 1; }
     const strike = SLOT_SHEETS.map((n, i) => (sheets[n] ? strikeFrame(sheets[n], SLOT_AXIS[i]) : 0));

@@ -60,3 +60,7 @@ Prompt shape (from v1, it works): "2D cel-shaded fighting game sprite animation,
 ## Logging
 
 Keep `assets/fighters/<id>/anim-v2/CLIPS.md` with the concept job, the start pose job, then one row per sheet: sheet, kept job ID, takes, pass or flagged, and a one-line note. Only write inside `assets/fighters/<your ids>/` and your scratch folder. Do not edit code, the manifest or other docs, and do not run git.
+
+## Lesson from round 2: side heavies
+
+Every side heavy that failed clip-check failed the same way: Kling adds a big separate impact burst or particles that fly off the edge of the frame. For side heavies (and any big attack) say "a thin smear arc hugging the weapon only; no separate impact burst, no flying particles, no shockwave" in the prompt, and keep the wide start frame.

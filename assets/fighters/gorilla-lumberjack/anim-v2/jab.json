@@ -1,0 +1,11 @@
+{
+  "frameSize": 320,
+  "frames": 16,
+  "pivot": [
+    100,
+    314
+  ],
+  "bodyHeight": 128,
+  "source": "jab1.mp4",
+  "sourceFrames": 59
+}

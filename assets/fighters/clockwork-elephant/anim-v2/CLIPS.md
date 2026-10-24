@@ -10,6 +10,10 @@ Kling 3.0, std, 3 s, 1:1, sound off. Pure magenta, converted with `--magenta`. C
 | idle | d07fcf6f-e3ab-4f56-ad4e-5493820ec596 | 1 | pass, clip-check ok | Weight sway, trunk sway, the monkey turns and points forward; the gear tick is subtle at sprite size. Loops. 24 f, 256 cell. |
 | run | f25d8c91-bdbe-48de-a474-762a3e005c45 | 1 | flagged, clip-check ok | Heavy in-place run, stays in frame, but the clip zooms in about 25% after the first frame, so the sheet draws Tiktak larger than its other sheets, and it swings toward three-quarter view in several frames. Start image only. 16 f, 256 cell. |
 | jump | 72756281-ea8f-486b-84ea-0c7c86567c2a | 1 | pass, clip-check ok | Crouch, low hop with ears flapping, heavy landing on the same spot; squares toward the camera at the apex. 16 f, 384 cell, --trim. |
-| hurt, jab, side_light, side_heavy, nair | (not made) | 0 | missing | Round ended by the lead before these were shot (CUT re-shoots came first). Use the wide frame `wide_clockwork-elephant.png` from tools/wide-start.py for the attacks. |
+| jab | 32a08d63-9c96-4241-b5d9-bcfbdaafc74c | 1 (round 3) | pass, clip-check ok | From the wide frame (tools/wide-start.py --height 0.4 --magenta on source/base-pose.png, uploaded media `4baeb8d5-ccde-4fdf-8ba2-e7475f994655`). Upright on two legs, side view, a straight punch with the front fist at full extension, trunk and monkey visible, no chest numerals. Long-ish small anticipation before the punch. 16 f, 256 cell, --trim --motion. |
+| side_heavy | (none kept) | 1 (round 3) | missing | Take `09ce46cb-fa04-4356-a8ac-c3d8904c9df7` was CUT (a white impact burst flew off the right edge, 7 frames) despite "no visual effects" in the prompt; the punch with the trunk whip was otherwise good. No credits for a retake. |
+| hurt, side_light, nair | (not made) | 0 | missing | Credit cap reached in round 3. Shoot from the same wide frame media `4baeb8d5-ccde-4fdf-8ba2-e7475f994655`. |
 
-Checks after this round: tools/edge-check.py 0 sprites with cut edges; tools/feather-cuts.py 0 sheets softened.
+Round 3 clips and contact sheets: scratch folder `fix-e/tiktak/`.
+
+Checks after round 3: tools/edge-check.py 0 sprites with cut edges; tools/feather-cuts.py 0 sheets softened.
