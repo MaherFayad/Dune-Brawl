@@ -6,15 +6,15 @@
   // ready: shown on the select screen. art and portrait point at the v2 rework once it lands.
   const FIGHTERS = {
     "djinn-warrior": { name: "Saif", color: "#3d4fd6", glow: "#36e2d4", ready: 1 },
-    "dune-ghoul": { name: "Abu Sarab", color: "#7fbf3a", glow: "#c6ff3d", ready: 1 },
+    "dune-ghoul": { name: "Abu Sarab", color: "#7fbf3a", glow: "#c6ff3d", ready: 1, art: "anim-v2", portrait: "source/portrait-v2.png", basePose: "source/base-pose-v2.png" },
     "falcon-rider": { name: "Nawaf", color: "#e9dcc0", glow: "#ffcf5a", ready: 1 },
     "sea-siren": { name: "Dana", color: "#1fb5a6", glow: "#8ff5ea", ready: 1 },
     "dagger-dancer": { name: "Marjana", color: "#d6337a", glow: "#ffd0e4", ready: 1 },
-    "vampire-countess": { name: "Vespera", color: "#b3123a", glow: "#ff5c7a", art: "anim-v2" },
+    "vampire-countess": { name: "Vespera", color: "#b3123a", glow: "#ff5c7a", art: "anim-v2", ready: 1 },
     "gorilla-lumberjack": { name: "Timber", color: "#c8302c", glow: "#ffb15c", art: "anim-v2" },
     "fennec-host": { name: "Finjan", color: "#f2b632", glow: "#fff0a0", art: "anim-v2" },
     "clockwork-elephant": { name: "Tiktak", color: "#c9973a", glow: "#5ff0d8", art: "anim-v2" },
-    "melting-yeti": { name: "Brrr", color: "#9fd8ff", glow: "#e8fbff", art: "anim-v2" },
+    "melting-yeti": { name: "Brrr", color: "#9fd8ff", glow: "#e8fbff", art: "anim-v2", ready: 1 },
     "baby-roc": { name: "Rukhayy", color: "#2443b8", glow: "#ffd25a", art: "anim-v2" },
     "chameleon-slinger": { name: "Hirba", color: "#7ccf2a", glow: "#ff5ad0", art: "anim-v2" },
   };
