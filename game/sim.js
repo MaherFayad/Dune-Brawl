@@ -33,8 +33,13 @@
     jumpV: 1640, airJumpV: 1560, jumpCut: 800,
     h: 64, hw: 18,
     kbMul: 350,          // knockback multiplier in percent, applied to base and growth
-    growthDiv: 14,       // launch = kb + kg * damage / growthDiv; higher means later kills
-    hitstunDiv: 168,     // hitstun = 6 + launch / hitstunDiv (48 x 3.5 keeps the prototype's hitstun)
+    growthDiv: 14,       // launch = kb + kg * max(0, damage - growthFrom) / growthDiv; higher means later kills
+    growthFrom: 60,      // knockback only starts growing above this damage (docs/design/REFERENCE-KNOCKBACK.md)
+    hitstunBase: 8,      // hitstun = hitstunBase + launch / hitstunDiv
+    // move classes scale the move data in percent: small hits stay short at any damage, big
+    // committed hits are weak early and send far once the victim is red
+    kbClass: [30, 60, 30, 60, 30, 60, 60, 60, 60, 60], kgClass: [50, 100, 50, 100, 50, 160, 100, 160, 100, 160],
+    hitstunDiv: 168,
     hitDecay: 4,         // percent of horizontal launch speed lost per frame in hitstun
     pauseBase: 3, pauseDiv: 5, pauseMax: 7,   // the reference holds 4 frames on a light hit, 6 on a heavy
     dodgeG: 20, dodgeA: 22, dodgeCdG: 36, dodgeCdA: 60, dodgeInvFrom: 3,
@@ -82,8 +87,9 @@
 
   // Moves: the 10 slots from the fighter JSON, integers only.
   function moves(def) {
-    return def.moves.slice(0, 10).map((m) => ({
-      su: m.su, ac: m.ac, re: m.re, box: m.box.slice(), dmg: m.dmg, kb: m.kb, kg: m.kg,
+    return def.moves.slice(0, 10).map((m, slot) => ({
+      su: m.su, ac: m.ac, re: m.re, box: m.box.slice(), dmg: m.dmg,
+      kb: div(m.kb * FEEL.kbClass[slot], 100), kg: div(m.kg * FEEL.kgClass[slot], 100),
       ax: m.ax, ay: m.ay, ix: m.ix || 0, iy: m.iy || 0, away: m.away || 0, air: m.air || 0,
       endOnLand: m.endOnLand || 0, charge: m.charge || 0,
       armor: span(m.armor), parry: span(m.parry),
@@ -365,7 +371,7 @@
         }
         const dmg = m.dmg + div(m.dmg * a.chg, 60);
         v.dmg = Math.min(999, v.dmg + dmg);
-        let l = m.kb + div(m.kg * v.dmg, FEEL.growthDiv);
+        let l = m.kb + div(m.kg * Math.max(0, v.dmg - FEEL.growthFrom), FEEL.growthDiv);
         l = div(l * FEEL.kbMul, 100);
         l = div(l * 100, V.weight);
         l = div(l * (60 + a.chg), 60);
@@ -380,7 +386,7 @@
         v.vx = dir * div(l * m.ax, 100);
         v.vy = div(l * m.ay, 100);
         if (v.ground && v.vy > 0) v.vy = -div(v.vy, 2);
-        v.ground = 0; v.st = ST.HIT; v.t = 6 + div(l, FEEL.hitstunDiv); v.launch = l;
+        v.ground = 0; v.st = ST.HIT; v.t = FEEL.hitstunBase + div(l, FEEL.hitstunDiv); v.launch = l;
         v.ff = 0; v.recov = 0; v.chg = 0;
         if (v.jumps < 1) v.jumps = 1;
         if (v.vx) v.face = v.vx > 0 ? -1 : 1;

@@ -1,5 +1,5 @@
 // Match pacing: runs the game's own bot (lifted from game/main.js) against itself headless and
-// reports KO rate and damage at KO, to compare with the reference (one KO per ~40 s, 150-200%).
+// reports KO rate and damage at KO, to compare with the reference (one KO per ~40 s, median about 162%).
 // usage: node tests/pace.js [fighterA] [fighterB] [minutes] [seed]
 const fs = require("fs"), path = require("path");
 const Sim = require("../game/sim.js");
@@ -23,4 +23,5 @@ for (let k = 0; k < 3600 * mins; k++) {
   if (s.over && s.overT > 60) s = M.create();
 }
 const mean = kos.length ? Math.round(kos.reduce((t, q) => t + q.dmg, 0) / kos.length) : 0;
-console.log(`${a} vs ${b}, ${mins} min: ${kos.length} KOs, one per ${(60 * mins / Math.max(1, kos.length)).toFixed(0)} s, mean damage at KO ${mean}%, off the bottom ${kos.filter((q) => q.bottom).length}`);
+const sorted = kos.map((q) => q.dmg).sort((x, y) => x - y), median = sorted.length ? sorted[sorted.length >> 1] : 0;
+console.log(`${a} vs ${b}, ${mins} min: ${kos.length} KOs, one per ${(60 * mins / Math.max(1, kos.length)).toFixed(0)} s, mean damage at KO ${mean}%, median ${median}%, off the bottom ${kos.filter((q) => q.bottom).length}`);

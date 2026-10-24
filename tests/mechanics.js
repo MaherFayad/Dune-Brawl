@@ -57,5 +57,15 @@ const run = (M, s, n, a = () => 0, b = () => 0) => { for (let k = 0; k < n; k++)
   run(M, s, M.mv[0][0].su + 2);
   ok(s.p[1].dmg === 0 && s.p[0].st === ST.HIT, "hitting a parry stuns the attacker and deals no damage");
 }
+{ // no infinite jab lock: a victim caught in a jab string can dodge out of it
+  const { M, s } = setup();
+  const press = (k) => (k % 2 ? 0 : IN.R | IN.A);
+  let hits = 0, lastHf = s.hf;
+  const count = () => { if (s.hf !== lastHf) { lastHf = s.hf; if (s.hp === 0) hits++; } };
+  for (let k = 0; k < 40; k++) { M.step(s, [press(k), 0]); count(); } // the victim stands in the string
+  const caught = hits;
+  for (let k = 0; k < 300; k++) { M.step(s, [press(k + 40), k % 2 ? IN.X : 0]); count(); } // then mashes dodge
+  ok(caught > 0 && hits - caught < 6, `a victim mashing dodge escapes a jab string (${caught} jabs caught, ${hits - caught} more in 5 s)`);
+}
 console.log(fails ? `${fails} failed` : "all mechanics ok");
 process.exit(fails ? 1 : 0);

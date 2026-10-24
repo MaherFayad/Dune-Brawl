@@ -83,6 +83,18 @@ const recoverAI = (s) => {
   return k;
 };
 out.launchLight50 = launch(1, 50).speed;
+// distance in bodies 30 frames after the hit (about 0.5 s): small hits stay short, big ones grow
+function travel(slot, pct) {
+  const { M, s } = fresh(); const a = s.p[0], v = s.p[1];
+  a.x = 500 * S; a.face = 1; v.x = a.x + 40 * S; v.face = -1; v.dmg = pct;
+  M.step(s, [[IN.A, IN.R | IN.A, IN.D | IN.A, IN.U | IN.A, IN.A, IN.R | IN.B][slot], 0]);
+  let x0 = null;
+  for (let k = 0; k < 120; k++) { M.step(s, [0, 0]); if (x0 === null && v.st === ST.HIT && s.freeze === 0) x0 = { x: v.x, y: v.y, k }; if (x0 && k - x0.k === 30) break; }
+  return x0 ? b(Math.hypot(v.x - x0.x, v.y - x0.y)) : 0;
+}
+out.jabTravel200 = travel(0, 200);
+out.sideHeavyTravel0 = travel(5, 0);
+out.sideHeavyTravel150 = travel(5, 150);
 out.launchHeavy100 = launch(5, 100).speed;
 out.hitstunLight0 = launch(0, 0).stun;
 out.hitstunHeavy100 = launch(5, 100).stun;

@@ -66,6 +66,18 @@
     let v = 0;
     const offL = me.x < m.x1 + 10 * S, offR = me.x > m.x2 - 10 * S;
     const under = !me.ground && me.y > m.y; // below the stage top while airborne means off stage
+    // edge-guard like the reference players: chase an opponent who is off stage, keeping one jump
+    // in reserve for the way back, and hit them with aerials (a spike from above)
+    const foeOff = foe.st !== ST.DEAD && (foe.x < m.x1 - 30 * S || foe.x > m.x2 + 30 * S || foe.y > m.y + 20 * S);
+    const ledgeX = foe.x < (m.x1 + m.x2) / 2 ? m.x1 : m.x2;
+    if (foeOff && me.jumps >= 1 && me.y < m.y + 30 * S && Math.abs(me.x - ledgeX) < 230 * S) {
+      const near = Math.abs(dx) < 80 * S && Math.abs(dy) < 90 * S;
+      v |= dx > 0 ? IN.R : IN.L;
+      if (me.ground && even && Math.random() < 0.5) v |= IN.J;
+      else if (!me.ground && me.jumps > 1 && dy < -40 * S && me.vy > -200 && even) v |= IN.J;
+      if (near && even && Math.random() < 0.25 + 0.1 * level) v |= dy > 30 * S ? IN.D | IN.A : IN.A;
+      return v;
+    }
     if (((me.x < m.x1 - 4 * S || me.x > m.x2 + 4 * S) && !me.ground) || under || (!me.ground && me.y > m.y - 10 * S && (offL || offR))) {
       // under the island: steer out past the nearer ledge first, then back in once above it
       const cx = (m.x1 + m.x2) / 2, outside = me.x < m.x1 || me.x > m.x2;
@@ -74,6 +86,8 @@
       return v;
     }
     if (foe.st === ST.DEAD) return Math.abs(me.x - 640 * S) > 60 * S ? (me.x < 640 * S ? IN.R : IN.L) : 0;
+    // like the reference players: buffer a dodge as hitstun ends to slip out of a string
+    if (me.st === ST.HIT && me.t <= 3 && me.launch < 1800 && even && Math.random() < 0.3 + 0.1 * level) return v | IN.X;
     const close = Math.abs(dx) < 95 * S && Math.abs(dy) < 90 * S;
     if (!close) v |= dx > 0 ? IN.R : IN.L;
     if (!close && me.ground && Math.abs(dx) > 220 * S && even && Math.random() < 0.05) v |= IN.X; // dash in
@@ -85,7 +99,7 @@
       else if (dy < -110 * S && me.ground && Math.random() < 0.12) v |= IN.J;
     }
     if (foe.st === ST.ATK && close && even && Math.random() < 0.04 + 0.04 * level) return v | IN.X;
-    if (close && even && Math.random() < 0.12 + 0.08 * level) {
+    if (close && even && Math.random() < 0.08 + 0.05 * level) {
       if (dx) v |= dx > 0 ? IN.R : IN.L;
       const r = Math.random();
       if (!me.ground) v |= dy > 40 * S ? IN.D | IN.A : r < 0.4 ? IN.A : foe.dmg > 110 && r < 0.6 ? IN.B : IN.A;
