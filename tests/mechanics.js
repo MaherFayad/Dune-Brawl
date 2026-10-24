@@ -24,10 +24,11 @@ const run = (M, s, n, a = () => 0, b = () => 0) => { for (let k = 0; k < n; k++)
   run(M, s, 2, (k) => (k === 0 ? IN.J : 0));
   ok(!s.p[0].ground, "a dash cancels into a jump after the cancel frame");
 }
-{ // spot dodge stays in place
+{ // dodge without a direction: an evasive backstep, away from where the fighter faces
   const { M, s } = setup(); s.p[1].x = 1000 * S;
-  const x0 = s.p[0].x; run(M, s, 10, (k) => (k === 0 ? IN.X : 0));
-  ok(s.p[0].st === ST.DODGE && Math.abs(s.p[0].x - x0) < 2 * S, "dodge without a direction is a spot dodge");
+  const x0 = s.p[0].x; run(M, s, 12, (k) => (k === 0 ? IN.X : 0));
+  const back = (x0 - s.p[0].x) / S;
+  ok(s.p[0].st === ST.DODGE && back > 20 && back < 100, `dodge without a direction backsteps (${back.toFixed(0)} px back)`);
 }
 { // hit-cancel: after the jab connects, jump cuts the recovery
   const { M, s } = setup(); const m = M.mv[0][0];

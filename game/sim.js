@@ -42,7 +42,7 @@
     hitstunDiv: 168,
     hitDecay: 4,         // percent of horizontal launch speed lost per frame in hitstun
     pauseBase: 3, pauseDiv: 5, pauseMax: 7,   // the reference holds 4 frames on a light hit, 6 on a heavy
-    dodgeG: 20, dodgeA: 22, dodgeCdG: 36, dodgeCdA: 60, dodgeInvFrom: 3,
+    dodgeG: 20, dodgeA: 22, dodgeCdG: 36, dodgeCdA: 60, dodgeInvFrom: 3, backstep: 1100,
     dodgeSpeedG: 1250, dodgeSpeedA: 1150, dodgeDragG: 8, dodgeDragA: 6,
     // ground dodge with a direction is a dash: fast, cancelable into a jump or an attack
     dashSpeed: 1500, dashDrag: 4, dashFrames: 14, dashCancelFrom: 5, dashCd: 16,
@@ -218,7 +218,7 @@
         if (take(IN.X) && p.dcd <= 0) {
           p.st = ST.DODGE;
           if (p.ground && dx) { p.st = ST.DASH; p.t = 0; p.vx = FEEL.dashSpeed * dx; p.dcd = FEEL.dashCd; }
-          else if (p.ground) { p.t = FEEL.dodgeG; p.vx = 0; p.dcd = FEEL.dodgeCdG; } // spot dodge
+          else if (p.ground) { p.t = FEEL.dodgeG; p.vx = -p.face * FEEL.backstep; p.dcd = FEEL.dodgeCdG; } // no direction: an evasive backstep
           else {
             const chase = p.chase > 0, sp = chase ? div(FEEL.dodgeSpeedA * FEEL.chaseSpeed, 100) : FEEL.dodgeSpeedA;
             p.t = FEEL.dodgeA; p.dcd = chase ? div(FEEL.dodgeCdA * 2, 3) : FEEL.dodgeCdA; p.chase = 0;

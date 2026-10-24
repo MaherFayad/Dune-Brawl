@@ -172,7 +172,7 @@
    "smear1", "smear2", "smear3", "kick1", "kick2", "kick3", "ko-splash", "ko-cloud"].forEach((n) => { const im = new Image(); im.onload = () => (vfx[n] = im); im.src = `${ROOT}/assets/vfx/${n}.webp`; });
   const fx = {
     sprites: [], parts: [], shake: 0, lastHf: -1, lastKf: -1, koStamp: [0, 0],
-    grounded: [1, 1], wasSt: [0, 0], lastVy: [0, 0],
+    grounded: [1, 1], wasSt: [0, 0], lastVy: [0, 0], after: [[], []],
     reset() { Object.assign(this, { sprites: [], parts: [], shake: 0, lastHf: -1, lastKf: -1, koStamp: [0, 0] }); },
     // a painted sprite: grows from s0 to s1 in `pop` frames, holds, then fades over the rest of `life` frames
     add(name, x, y, opt) { this.sprites.push({ name, x, y, t: 0, rot: 0, flip: 1, s0: 0.6, s1: 1, pop: 3, life: 18, w: 80, ax: 0.5, ay: 0.5, alpha: 1, ...opt }); },
@@ -222,8 +222,13 @@
       if (!p.ground && fx.grounded[i] && p.vy < 0) fx.kick(x, y, body * 0.6, -p.face);
       if (!p.ground && !fx.grounded[i] && p.vy < -1000 && fx.lastVy[i] >= -1000 && p.st === ST.IDLE) fx.puff(x, y + 4, body * 0.5, { s0: 0.4, s1: 1.3, life: 22 }); // air jump ring
       fx.lastVy[i] = p.vy;
+      if (p.st === ST.DODGE || p.st === ST.DASH) { if (s.f % 2 === 0) { fx.after[i].unshift({ x: p.x, y: p.y }); fx.after[i].length = Math.min(fx.after[i].length, 4); } }
+      else fx.after[i].length = 0;
       fx.grounded[i] = p.ground;
-      if ((p.st === ST.DODGE || p.st === ST.DASH) && fx.wasSt[i] !== p.st && p.ground) fx.kick(x, y, body * 0.7, -p.face);
+      if ((p.st === ST.DODGE || p.st === ST.DASH) && fx.wasSt[i] !== p.st) {
+        const back = p.vx ? -Math.sign(p.vx) : -p.face;
+        if (p.ground) fx.kick(x, y, body * 0.7, back); else fx.puff(x, y - body / 2, body * 0.5, { s0: 0.5, s1: 1.3, life: 18 });
+      }
       // the reference's signature: a launched fighter leaves a thick continuous cloud column
       // behind it, drawn under the fighters, gone after about 50 frames
       const sp = Math.hypot(p.vx, p.vy);
@@ -378,7 +383,13 @@
     const blink = p.inv > 0 && Math.floor(s.f / 6) % 2 === 0;
     const jitter = p.st === ST.HIT && s.freeze > 0 ? (rnd() - 0.5) * 4 : 0;
     g.save(); g.translate(jitter, 0);
-    drawSprite(i, p, s.f, p.st === ST.DODGE ? 0.55 : blink ? 0.55 : 1, tint, "rgba(8,3,18,0.7)", tintColor);
+    const evading = p.st === ST.DODGE || p.st === ST.DASH;
+    if (evading) { // afterimages trail behind a dodge or dash so it reads as movement, not a fade
+      const trail = fx.after[i];
+      for (let k = trail.length - 1; k >= 0; k--) drawSprite(i, { ...p, x: trail[k].x, y: trail[k].y }, s.f, 0.32 - k * 0.07, 1, null, TEAM[i]);
+      if (p.st === ST.DODGE && !tint) { tint = 0.18 + 0.14 * Math.sin(s.f * 1.3); tintColor = "#ffffff"; } // invulnerable shimmer
+    }
+    drawSprite(i, p, s.f, blink ? 0.55 : 1, tint, "rgba(8,3,18,0.7)", tintColor);
     g.restore();
     if (showBoxes) {
       g.strokeStyle = "rgba(80,200,255,.9)"; g.lineWidth = 1;
