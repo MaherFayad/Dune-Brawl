@@ -7,3 +7,4 @@
 | Sheet | Job ID kept | Takes | Result | Note |
 |---|---|---|---|---|
 | idle | d33b505b-69ff-4607-be6c-7c53a77e8412 | 1 | pass (spliced) | Raw clip: he breathes, Muzna turns her head and scowls, but at about 1.9 s she hops up off his head for about 0.8 s. The sheet uses source frames 0 to 44 (always perched) played forward then back (`idle_splice.mp4` in the scratch folder), so it loops cleanly; the falcon motion is subtle. 24 f, 256, no trim. |
+| run | 764500f3-823c-4875-b64c-10f5fe36d686 | 1 | pass | Gangly treadmill run, centered, profile, spear level; Muzna stays on his head the whole clip (crouches low on the wrap). Kling added a faint ground shadow (keyed out) and a few frames have ghosted legs. Converted with `--skip=0.3`. clip-check ok. 16 f, 256. |

@@ -1,11 +1,11 @@
 {
   "frameSize": 384,
-  "frames": 16,
+  "frames": 24,
   "pivot": [
     120,
     378
   ],
   "bodyHeight": 128,
-  "source": "jump_c04a632e.mp4",
-  "sourceFrames": 52
+  "source": "side_light.mp4",
+  "sourceFrames": 73
 }
