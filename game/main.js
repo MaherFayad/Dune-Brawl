@@ -5,7 +5,7 @@
   const ROOT = "..";
   // ready: shown on the select screen. art and portrait point at the v2 rework once it lands.
   const FIGHTERS = {
-    "djinn-warrior": { name: "Saif", color: "#3d4fd6", glow: "#36e2d4", ready: 1 },
+    "djinn-warrior": { name: "Saif", color: "#3d4fd6", glow: "#36e2d4", ready: 1, art: "anim-v2", portrait: "source/portrait-v2.png", basePose: "source/base-pose-v2.png" },
     "dune-ghoul": { name: "Abu Sarab", color: "#7fbf3a", glow: "#c6ff3d", ready: 1, art: "anim-v2", portrait: "source/portrait-v2.png", basePose: "source/base-pose-v2.png" },
     "falcon-rider": { name: "Nawaf", color: "#e9dcc0", glow: "#ffcf5a", ready: 1 },
     "sea-siren": { name: "Dana", color: "#1fb5a6", glow: "#8ff5ea", ready: 1, art: "anim-v2", portrait: "source/portrait-v2.png", basePose: "source/base-pose-v2.png" },
