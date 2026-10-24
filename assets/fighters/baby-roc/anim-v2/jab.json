@@ -1,0 +1,11 @@
+{
+  "frameSize": 256,
+  "frames": 16,
+  "pivot": [
+    80,
+    250
+  ],
+  "bodyHeight": 128,
+  "source": "r_jab.mp4",
+  "sourceFrames": 56
+}

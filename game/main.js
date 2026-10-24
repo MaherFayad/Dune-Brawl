@@ -7,7 +7,7 @@
   const FIGHTERS = {
     "djinn-warrior": { name: "Saif", color: "#3d4fd6", glow: "#36e2d4", ready: 1, art: "anim-v2", portrait: "source/portrait-v2.png", basePose: "source/base-pose-v2.png" },
     "dune-ghoul": { name: "Abu Sarab", color: "#7fbf3a", glow: "#c6ff3d", ready: 1, art: "anim-v2", portrait: "source/portrait-v2.png", basePose: "source/base-pose-v2.png" },
-    "falcon-rider": { name: "Nawaf", color: "#e9dcc0", glow: "#ffcf5a", ready: 1 },
+    "falcon-rider": { name: "Nawaf", color: "#e9dcc0", glow: "#ffcf5a", ready: 1, art: "anim-v2", portrait: "source/portrait-v2.png", basePose: "source/base-pose-v2.png" },
     "sea-siren": { name: "Dana", color: "#1fb5a6", glow: "#8ff5ea", ready: 1, art: "anim-v2", portrait: "source/portrait-v2.png", basePose: "source/base-pose-v2.png" },
     "dagger-dancer": { name: "Marjana", color: "#d6337a", glow: "#ffd0e4", ready: 1 },
     "vampire-countess": { name: "Vespera", color: "#b3123a", glow: "#ff5c7a", art: "anim-v2", ready: 1 },
