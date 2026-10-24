@@ -786,8 +786,8 @@
     else if (mode === "local") { a = read(P1) | pad(0); b = read(P2) | pad(1); }
     else if (mode === "demo") { a = bot(st, 0, 2); b = bot(st, 1, 2); }
     // rematch: a human presses jump or light (the bot's own presses never restart the match)
-    const human = mode === "bot" ? a : a | b;
-    if (st.over && st.overT > 60 && (human & (IN.J | IN.A) || mode === "demo")) { st = M.create(); fx.reset(); return; }
+    const human = mode === "bot" ? a : mode === "demo" ? 0 : a | b;
+    if (st.over && st.overT > 60 && (human & (IN.J | IN.A) || (mode === "demo" && st.overT > 420))) { st = M.create(); fx.reset(); return; } // watch mode shows the results first
     M.step(st, [a, b]);
     events(st); stepFx(); updateCam(st);
   }
