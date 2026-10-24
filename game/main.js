@@ -171,7 +171,7 @@
   }
   // the versus screen stays up for at least 1.6 s so the cards register, as in the reference
   const holdCards = (t0) => new Promise((ok) => setTimeout(ok, Math.max(0, 1600 - (performance.now() - t0))));
-  async function startMatch(m) { const t0 = performance.now(); mode = "loading"; hideMenu(); await load(); await holdCards(t0); mode = m; }
+  async function startMatch(m) { if (window.Sfx) { Sfx.init(); Sfx.play("uiConfirm", 0); } const t0 = performance.now(); mode = "loading"; hideMenu(); await load(); await holdCards(t0); mode = m; }
   function rebuild() { if (defs.length) { M = Sim.match(defs[0], defs[1]); } }
 
   // ---------- effects (render only, driven by sim events) ----------
@@ -186,7 +186,7 @@
     grounded: [1, 1], wasSt: [0, 0], lastVy: [0, 0], after: [[], []],
     bats: [], petals: [], marks: [], banner: null, won: 0, stats: [], lastDmg: [0, 0], hitOn: [-1e9, -1e9],
     reset() {
-      Object.assign(this, { sprites: [], parts: [], shake: 0, lastHf: -1, lastKf: -1, koStamp: [0, 0], bats: [], petals: [], marks: [], banner: null, won: 0, koHold: 0,
+      Object.assign(this, { sprites: [], parts: [], shake: 0, lastHf: -1, lastKf: -1, koStamp: [0, 0], bats: [], petals: [], marks: [], banner: null, won: 0, koHold: 0, chain: 0, chainF: -99,
         stats: [0, 1].map(() => ({ kos: 0, falls: 0, acc: 0, done: 0, taken: 0 })), lastDmg: [0, 0], hitOn: [-1e9, -1e9] });
     },
     // a painted sprite: grows from s0 to s1 in `pop` frames, holds, then fades over the rest of `life` frames
@@ -196,7 +196,12 @@
     kick(x, y, w, flip) { this.add(`kick${1 + Math.floor(rnd() * 3)}`, x, y, { w, ay: 0.95, flip, s0: 0.6, s1: 1, pop: 3, life: 16 }); },
   };
   // sounds (game/audio.js), panned by where they happen on screen
-  const sfx = (name, x, o) => { if (window.Sfx && mode !== "loading") Sfx.play(name, Math.max(-1, Math.min(1, (x - cam.x) / 640)), { fighter: o && o.who !== undefined ? pick[o.who] : null, ...o }); };
+  const sfx = (name, x, o) => {
+    if (!window.Sfx || mode === "loading") return;
+    const pan = Math.max(-1, Math.min(1, (x - cam.x) / 640)), opt = { fighter: o && o.who !== undefined ? pick[o.who] : null, ...o };
+    if (dbg.soundLog) dbg.soundLog.push({ f: st ? st.f : 0, name, pan, o: opt }); // test hook: recordings render these offline
+    Sfx.play(name, pan, opt);
+  };
   // ---------- per-fighter flair (game/flair.js) ----------
   const style = (i) => Flair.STYLES[pick[i]] || {};
   const flairApi = {
@@ -225,7 +230,7 @@
   function events(s) {
     // countdown and match end cues
     const cd = FEEL.countdown - s.f;
-    if (cd === 125 || cd === 84 || cd === 42) sfx("count", cam.x); // the first event runs one frame in
+    if (cd === 125 || cd === 84 || cd === 42) sfx("count", cam.x, { n: Math.ceil(cd / 42) }); // the first event runs one frame in
     if (cd === 0) sfx("go", cam.x);
     if (s.over && s.overT === 1) sfx("game", cam.x);
     if (s.hf !== fx.lastHf && s.hf >= 0) {
@@ -239,7 +244,8 @@
       } else {
         fx.hitOn[1 - s.hp] = s.f;
         if (style(s.hp).hit) style(s.hp).hit(flairApi, s.hp, x, y, s.p[s.hp].face, heavy, s.p[s.hp].mv);
-        sfx(heavy ? "hitHeavy" : "hit", x, { k, who: s.hp, mv: s.p[s.hp].mv });
+        fx.chain = s.f - fx.chainF < 12 ? fx.chain + 1 : 0; fx.chainF = s.f; // strings of hits rise in pitch
+        sfx(heavy ? "hitHeavy" : "hit", x, { k, who: s.hp, mv: s.p[s.hp].mv, chain: fx.chain });
         const atk = s.p[s.hp], dir = atk ? atk.face : 1, body = gfx[1 - s.hp] ? gfx[1 - s.hp].h : 64;
         fx.shake = Math.max(fx.shake, heavy ? 6 : 3); // the reference camera barely moves: 0.05 to 0.1 bodies
         // a small flat white starburst at the contact point; colour comes from the victim flash
@@ -788,6 +794,7 @@
   const dbg = { paused: false }; // test hook: freezes the sim for screenshots
   // test hook: advance exactly n frames with fixed inputs while paused, for frame-exact captures
   dbg.su = (i) => M.mv[i][st.p[i].mv].su;
+  dbg.tick = (n = 1) => { for (let k = 0; k < n; k++) tick(); }; // the real loop step (bots, rematch) while paused
   dbg.step = (n, a = 0, b = 0) => { for (let k = 0; k < n; k++) { M.step(st, [a, b]); events(st); stepFx(); updateCam(st); } };
   let acc = 0, last = performance.now();
   function frame(now) {
@@ -957,7 +964,7 @@
         const b = document.createElement("button");
         b.className = "chip" + (pick[i] === id ? " on" : ""); b.setAttribute("aria-pressed", pick[i] === id);
         b.innerHTML = `<i class="disc"><img alt="" src="${portraitSrc(id)}"></i><span>${FIGHTERS[id].name}</span>`;
-        b.onclick = () => { pick[i] = id; buildPickers(); };
+        b.onclick = () => { pick[i] = id; buildPickers(); if (window.Sfx) Sfx.play("uiMove", 0); };
         row.appendChild(b);
       }
     });
