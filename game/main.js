@@ -154,9 +154,12 @@
   // ---------- match ----------
   let mode = "menu", pick = [params.get("p1") || "djinn-warrior", params.get("p2") || "dune-ghoul"];
   let M = null, st = null, defs = [], gfx = [], showBoxes = false;
+  const loading = { done: 0, total: 0 };
   async function load() {
     defs = await Promise.all(pick.map(async (id) => (await fetch(`${ROOT}/assets/fighters/${id}/moves.draft.json`)).json()));
-    gfx = await Promise.all(pick.map((id, i) => Render.loadFighter(id, ROOT, { art: FIGHTERS[id].art, height: (defs[i].stats || {}).height, basePose: FIGHTERS[id].basePose })));
+    loading.done = 0; loading.total = 0;
+    const progress = { onCount: (n) => (loading.total += n), onSheet: () => loading.done++ };
+    gfx = await Promise.all(pick.map((id, i) => Render.loadFighter(id, ROOT, { art: FIGHTERS[id].art, height: (defs[i].stats || {}).height, basePose: FIGHTERS[id].basePose, ...progress })));
     await Promise.all(pick.map((id) => new Promise((ok) => { const im = new Image(); im.onload = () => { portraits[id] = im; ok(); }; im.onerror = ok; im.src = portraitSrc(id); })));
     M = Sim.match(defs[0], defs[1]); st = M.create(); fx.reset();
   }
@@ -566,7 +569,19 @@
     while (acc >= 1000 / 60 && n < 6) { if (mode !== "menu" && mode !== "loading" && !dbg.paused) tick(); acc -= 1000 / 60; n++; }
     if (n === 6) acc = 0;
     draw();
+    if (mode === "loading") drawLoading();
     requestAnimationFrame(frame);
+  }
+  // a click on a mode never looks like a freeze: fighters load behind a progress bar
+  function drawLoading() {
+    const u = Math.min(W / 1280, H / 720), w = 360 * u, x = (W - w) / 2, y = H * 0.55;
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    g.fillStyle = "rgba(11,10,26,0.72)"; g.fillRect(0, 0, W, H);
+    italic("LOADING FIGHTERS", W / 2, H * 0.5, 34 * u, "#ffffff", "center");
+    const k = loading.total ? loading.done / loading.total : 0;
+    g.fillStyle = "#1c1b46"; g.fillRect(x, y, w, 10 * u);
+    g.fillStyle = "#ffd36b"; g.fillRect(x, y, w * k, 10 * u);
+    g.strokeStyle = "#0b0a1a"; g.lineWidth = 3; g.strokeRect(x, y, w, 10 * u);
   }
 
   // ---------- online: rollback over a WebRTC data channel (game/net.js) ----------

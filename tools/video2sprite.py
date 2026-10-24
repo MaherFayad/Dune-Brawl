@@ -117,8 +117,14 @@ sheet = Image.new("RGBA", (size * count, size))
 for i, c in enumerate(cells):
     sheet.alpha_composite(c, (i * size, 0))
 sheet.save(prefix + ".png", optimize=True)
+# per-frame art bounds (alpha above 96, sampled every 2 px), so the game never scans pixels at load
+bounds = []
+for c in cells:
+    al = np.asarray(c)[0::2, 0::2, 3] > 96
+    ys, xs = np.nonzero(al)
+    bounds.append(None if len(xs) == 0 else [int(xs.min()) * 2, int(ys.min()) * 2, int(xs.max()) * 2, int(ys.max()) * 2])
 json.dump({"frameSize": size, "frames": count, "pivot": list(PIVOT), "bodyHeight": BODY, "source": pathlib.Path(clip).name,
-           "sourceFrames": len(src)}, open(prefix + ".json", "w"), indent=2)
+           "sourceFrames": len(src), "bounds": bounds}, open(prefix + ".json", "w"), indent=2)
 
 bg = (34, 22, 52, 255)
 gif = []

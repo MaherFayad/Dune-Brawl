@@ -16,19 +16,27 @@
 
   // ---------- loading ----------
   function loadImage(src) {
-    return new Promise((ok) => { const im = new Image(); im.onload = () => ok(im); im.onerror = () => ok(null); im.src = src; });
+    // decode() unpacks the image off the main thread, so the first draw does not stall
+    return new Promise((ok) => { const im = new Image(); im.onload = () => im.decode().then(() => ok(im), () => ok(im)); im.onerror = () => ok(null); im.src = src; });
   }
 
   async function loadSheet(base, name) {
-    const im = await loadImage(`${base}/${name}.png`);
-    if (!im) return null;
     let meta = {};
     try { meta = await (await fetch(`${base}/${name}.json`)).json(); } catch (e) { /* defaults */ }
+    // the in-game copy (tools/sheet-webp.py): WebP with the colour grade baked in
+    const im = await loadImage(`${base}/${meta.file || name + ".png"}`);
+    if (!im) return null;
     const size = meta.frameSize || im.height;
     const n = Math.max(1, Math.floor(im.width / size));
     const pivot = meta.pivot || [Math.round(size * 5 / 16), size - 6];
-    const body = meta.bodyHeight || 128;
-    // per-frame alpha bounds, used for aerial alignment and strike detection
+    // per-frame alpha bounds, used for aerial alignment and strike detection. Sheets carry them
+    // precomputed (tools/sheet-bounds.py); the pixel scan is only a fallback because reading a
+    // whole sheet back froze the page for about a second per match.
+    const bounds = meta.bounds && meta.bounds.length === n ? meta.bounds : scanBounds(im, size, n);
+    return finishSheet(im, name, size, n, pivot, meta, bounds);
+  }
+
+  function scanBounds(im, size, n) {
     const c = document.createElement("canvas"); c.width = im.width; c.height = im.height;
     const g = c.getContext("2d", { willReadFrequently: true }); g.drawImage(im, 0, 0);
     const data = g.getImageData(0, 0, im.width, im.height).data;
@@ -44,28 +52,39 @@
       }
       bounds.push(x1 < 0 ? null : [x0, y0, x1, y1]);
     }
+    return bounds;
+  }
+
+  async function finishSheet(im, name, size, n, pivot, meta, bounds) {
+    const body = meta.bodyHeight || 128;
     const dy = bounds.map((b) => {
       if (!b) return 0;
       if (ALIGN_FEET.has(name)) return pivot[1] - b[3];
       if (ALIGN_CENTER.has(name)) return pivot[1] - body / 2 - (b[1] + b[3]) / 2;
       return 0;
     });
-    return { mips: ink(im), size, n, pivot, scale: BODY_PX / body, body, bounds, dy };
+    return { mips: await mips(im, meta.inked), size, n, pivot, scale: BODY_PX / body, body, bounds, dy };
   }
 
-  // Bake the fighter look into the sheet once: a little more color, plus smaller copies made
-  // with high quality resampling, so sprites stay crisp when drawn at 60 to 120 px tall.
-  function ink(im) {
-    const out = document.createElement("canvas"); out.width = im.width; out.height = im.height;
-    const o = out.getContext("2d");
-    o.filter = "saturate(1.15) contrast(1.05)"; o.drawImage(im, 0, 0); o.filter = "none";
-    const mips = [out];
-    for (let c = out; c.height >= 64; ) {
-      const h = document.createElement("canvas"); h.width = Math.round(c.width / 2); h.height = Math.round(c.height / 2);
-      const hg = h.getContext("2d"); hg.imageSmoothingEnabled = true; hg.imageSmoothingQuality = "high";
-      hg.drawImage(c, 0, 0, h.width, h.height); mips.push(h); c = h;
+  // The fighter look (a little more colour) plus smaller copies, so sprites stay crisp at 60 to
+  // 120 px tall. Sheets from tools/sheet-webp.py arrive with the colour already baked in. Each
+  // copy halves the one before on a canvas: createImageBitmap with resizeQuality "high" from
+  // the full sheet measured three times slower and blocked the page longer.
+  async function mips(im, inked) {
+    let base = im;
+    if (!inked) {
+      base = document.createElement("canvas"); base.width = im.width; base.height = im.height;
+      const o = base.getContext("2d");
+      o.filter = "saturate(1.15) contrast(1.05)"; o.drawImage(im, 0, 0); o.filter = "none";
     }
-    return mips;
+    const out = [base];
+    for (let c = base, w = base.width, h = base.height; h >= 64; ) {
+      w = Math.round(w / 2); h = Math.round(h / 2);
+      const lvl = document.createElement("canvas"); lvl.width = w; lvl.height = h;
+      const g = lvl.getContext("2d"); g.imageSmoothingEnabled = true; g.imageSmoothingQuality = "high";
+      g.drawImage(c, 0, 0, w, h); out.push(lvl); c = lvl;
+    }
+    return out;
   }
 
   // A still sprite from the base pose, used when a fighter has no idle sheet yet.
@@ -76,7 +95,7 @@
     const c = document.createElement("canvas"); c.width = size; c.height = size;
     c.getContext("2d").drawImage(im, (size - im.width) / 2, size - 6 - im.height);
     const body = im.height;
-    return { mips: ink(c), size, n: 1, pivot: [size / 2, size - 6], scale: BODY_PX / body, body, bounds: [[0, size - 6 - body, size, size - 6]], dy: [0] };
+    return { mips: await mips(c, false), size, n: 1, pivot: [size / 2, size - 6], scale: BODY_PX / body, body, bounds: [[0, size - 6 - body, size, size - 6]], dy: [0] };
   }
 
   function strikeFrame(sheet, axis) {
@@ -101,7 +120,9 @@
     let names = SHEETS;
     try { names = (await (await fetch(`${base}/index.json`)).json()).sheets || SHEETS; } catch (e) { /* probe every sheet */ }
     const sheets = {};
-    await Promise.all(names.filter((n) => SHEETS.includes(n)).map(async (n) => { sheets[n] = await loadSheet(base, n); }));
+    const todo = names.filter((n) => SHEETS.includes(n));
+    if (opts.onCount) opts.onCount(todo.length);
+    await Promise.all(todo.map(async (n) => { sheets[n] = await loadSheet(base, n); if (opts.onSheet) opts.onSheet(); }));
     if (!sheets.idle) sheets.idle = await stillSheet(`${dir}/${opts.basePose || "source/base-pose.png"}`);
     for (let pass = 0; pass < 3; pass++) for (const n in STAND_IN) if (!sheets[n] && sheets[STAND_IN[n]]) sheets[n] = sheets[STAND_IN[n]];
     const h = opts.height || BODY_PX;
