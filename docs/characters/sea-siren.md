@@ -317,3 +317,18 @@ The large round pearl oyster shell from the reference, alone, seen flat from the
   "fighter.sea-siren.tagline": "محارتها تعود إليها دائما."
 }
 ```
+
+## 15. Changelog
+
+### Balance pass 2026-10-24 (bot matches against Saif)
+
+Problem: Dana lost about 59% of stocks to Saif (40 seeds), mostly off the sides. She was not dying early (median KO about 222%), she was losing exchanges: in the sim the shell does not exist yet, so Shell Cast is only its 62 px release sweep with no step, and the bot's side heavy whiffed about 84% of the time (Saif about 65%). She dealt about 30% less damage than she took.
+
+| Slot | Field | Before | After | Why |
+|---|---|---|---|---|
+| 5 Shell Cast | `ix` | none | 600 | The discus release now steps into the throw, so the point-blank sweep reaches what the missing shell would have covered. Hitbox unchanged. |
+| 5 Shell Cast | `dmg` | 15 | 17 | Rewards the committed 13 frame wind-up; matches the baseline side heavy. |
+
+Unchanged: startup 13 (the held wind-up stays her counterplay window), K stays 1220, stats, every hitbox. Damage sum 95 to 97 (budget 90 to 108).
+
+Result: 51% of stocks lost with 8 seeds (51% over 200 seeds), median KO 219%. Feel test: no new out-of-range values. Revisit `ix` once the shell projectile is in the sim, since it then covers this range for her.

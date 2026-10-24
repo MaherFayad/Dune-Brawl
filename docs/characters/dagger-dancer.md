@@ -302,3 +302,19 @@ Not needed: projectiles, armor, command grabs, extra jumps or stances.
   "fighter.dagger-dancer.tagline": "كل خطوة فخ."
 }
 ```
+
+## 15. Changelog
+
+### Balance pass 2026-10-24 (bot matches against Saif)
+
+Problem: Marjana lost about 57 to 60% of stocks to Saif after the fall speed (110 to 102) and recovery (`iy` -1800) fixes. Frame data barely moved the result: the bot attacks at a fixed rate when close, so her speed does not turn into more hits in the sim (the Rhythm hook is not in the sim yet either). What decided it was damage per hit and kill power, where she trailed by too much.
+
+| Slot | Field | Before | After | Why |
+|---|---|---|---|---|
+| 0 Wrist Flick | `dmg` | 5 | 6 | Her most used button; strings now add up. |
+| 1 Crossing Cut | `dmg` | 7 | 8 | Her main approach, now level with the baseline side light. |
+| 5 Closing Thrust | `kg` | 60 | 66 | Her only kill move finishes strings a little earlier. K 1100 to 1160. |
+
+Unchanged: weight 92, run 120, all frame data, the 900 lunge, every hitbox. Damage sum 92 to 94, still at the low end of the 90 to 108 budget.
+
+Result: 51% of stocks lost with 8 seeds (51% over 200 seeds), median KO 223%. Feel test: no new out-of-range values.

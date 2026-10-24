@@ -299,3 +299,19 @@ Same image, recolor only: bone white skin instead of bile green, violet cloth wr
   "fighter.dune-ghoul.tagline": "اتبع فانوسه، ولا تسلك طريقه المختصر."
 }
 ```
+
+## 15. Changelog
+
+### Balance pass 2026-10-24 (bot matches against Saif)
+
+Problem: after his size went from 64 to 76 px (hitboxes scaled x1.19), Abu Sarab won too often: Saif lost 56 to 58% of stocks. Swapping slots to the baseline showed the advantage sat almost entirely in Lost Road: a K of 1320 (the roster's next highest is 1220) plus armor over the whole wind-up, which the bot's random light hits run straight into.
+
+| Slot | Field | Before | After | Why |
+|---|---|---|---|---|
+| 5 Lost Road | `kg` | 72 | 66 | K 1320 to 1260: still the biggest kill move in the cast. Not lower, so the mirror feel test still kills from the ledge by 165%. |
+| 5 Lost Road | `armor.from` | 3 | 10 | Sand Hide now covers the lurch (frames 10 to 14), not the whole wind-up: the early wind-up is a window to hit him. Dune Quake keeps 3 to 15. |
+| 1 Caravan Shove | `dmg` | 9 | 8 | The longer scaled box made it his best poke; now level with the baseline. |
+
+Unchanged: weight, all physics, hurtbox, every hitbox and the art. Damage sum 105 to 104.
+
+Result: 49% of stocks lost with 8 seeds (48% over 200 seeds), median KO 212%. Feel test: no new out-of-range values.

@@ -314,3 +314,20 @@ One clarification for the canon owner, not a change: item 7 above (sim and canon
   "fighter.falcon-rider.tagline": "علو ثم انقضاض"
 }
 ```
+
+## 15. Changelog
+
+### Balance pass 2026-10-24 (bot matches against Saif)
+
+Problem: Nawaf lost about 60% of stocks to Saif even after the fall speed (120 to 108) and recovery (`iy` -1800) fixes, which brought bottom KOs back to normal. Swapping slots and stats to the baseline one at a time showed no single cause: his lighter weight and his weaker side light and side heavy each cost 2 to 3 points. The bot plays side light as his forward air and finishes with side heavy, so those two moves were the levers.
+
+| Slot | Field | Before | After | Why |
+|---|---|---|---|---|
+| 1 Long Thrust | `su` | 5 | 4 | His forward air should be at least as fast as the baseline's (the air is his home). Still no lunge. |
+| 1 Long Thrust | `dmg` | 7 | 9 | Every aerial is meant to beat the baseline; this is the one he uses most. |
+| 5 Roc Lance | `su` | 13 | 11 | Inside the 11 to 14 budget; the 22 frame recovery stays, so whiffs are still punished. |
+| 5 Roc Lance | `kg` | 64 | 68 | Kills a little earlier to offset weight 92. K 1160 to 1200. Capped at 68 so the mirror feel test still survives to 200% at mid stage. |
+
+Unchanged: weight 92, 3 air jumps, all physics, recovery, every hitbox. Damage sum 95 to 97.
+
+Result: 48% of stocks lost with 8 seeds (52% over 200 seeds), median KO 217%. Feel test: no new out-of-range values.
