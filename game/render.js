@@ -126,7 +126,8 @@
     up_light: "jab", down_light: "side_light", dair: "nair", recovery: "jump", down_heavy: "side_heavy" };
 
   // opts.art: sheet folder (anim-test or anim-v2), opts.height: standing height in world px,
-  // opts.basePose: fallback still when there is no idle sheet
+  // opts.basePose: fallback still when there is no idle sheet, opts.victoryHold: the victory frame
+  // to hold (for clips that settle back to the ready stance at the end)
   async function loadFighter(id, root, opts = {}) {
     const dir = `${root}/assets/fighters/${id}`, base = `${dir}/${opts.art || "anim-test"}`;
     let names = SHEETS;
@@ -137,24 +138,29 @@
     await Promise.all(todo.map(async (n) => { sheets[n] = await loadSheet(base, n); if (opts.onSheet) opts.onSheet(); }));
     if (!sheets.idle) sheets.idle = await stillSheet(`${dir}/${opts.basePose || "source/base-pose.png"}`);
     for (let pass = 0; pass < 3; pass++) for (const n in STAND_IN) if (!sheets[n] && sheets[STAND_IN[n]]) sheets[n] = sheets[STAND_IN[n]];
+    // opts.remap: play another sheet for a move, turned by `rot` radians (a lunge turned into a dive)
+    for (const n in opts.remap || {}) {
+      const r = opts.remap[n], src = sheets[r.sheet];
+      if (src) sheets[n] = { ...src, rot: r.rot || 0, axis: r.axis, sized: src.sized };
+    }
     const h = opts.height || BODY_PX;
     for (const n in sheets) if (sheets[n] && !sheets[n].sized) { sheets[n].scale *= h / BODY_PX; sheets[n].sized = 1; }
     for (const n of SLOT_SHEETS) if (sheets[n] && !sheets[n].seq) sheets[n].seq = unhold(sheets[n].bounds);
     // the strike frame, as an index into the attack's frame sequence
     const strike = SLOT_SHEETS.map((n, i) => {
       if (!sheets[n]) return 0;
-      const sf = strikeFrame(sheets[n], SLOT_AXIS[i]), seq = sheets[n].seq;
+      const sf = strikeFrame(sheets[n], sheets[n].axis || SLOT_AXIS[i]), seq = sheets[n].seq;
       let j = 0; while (j + 1 < seq.length && seq[j + 1] <= sf) j++;
       return j;
     });
-    return { id, sheets, strike, h };
+    return { id, sheets, strike, h, victoryHold: opts.victoryHold === undefined ? -1 : opts.victoryHold };
   }
 
   // ---------- pose selection (pure) ----------
   // `win`: frames since this fighter won the match, or -1
   function pose(F, p, f, moves, Sim, win = -1) {
     const S = F.sheets, ST = Sim.ST;
-    const pick = (name, k) => (S[name] ? { sh: S[name], k: Math.max(0, Math.min(S[name].n - 1, k | 0)) } : null);
+    const pick = (name, k) => (S[name] ? { sh: S[name], k: Math.max(0, Math.min(S[name].n - 1, k | 0)), rot: S[name].rot || 0 } : null);
     const loop = (name, rate) => (S[name] ? pick(name, Math.floor(f / rate) % S[name].n) : null);
     const air = () => {
       const sh = S.fall && p.vy > 0 ? "fall" : "jump";
@@ -165,7 +171,7 @@
       const r = Math.max(0, Math.min(1, (p.vy + 1500) / 2800));
       return pick("jump", n * (0.25 + 0.4 * r));
     };
-    if (win >= 0 && p.ground && S.victory) return pick("victory", Math.min(S.victory.n - 1, Math.floor(win / 3))); // plays once, holds the end pose
+    if (win >= 0 && p.ground && S.victory) return pick("victory", Math.min(F.victoryHold >= 0 ? F.victoryHold : S.victory.n - 1, Math.floor(win / 3))); // plays once, holds the pose
     if (p.st === ST.ATK) {
       const m = moves[p.mv], name = SLOT_SHEETS[p.mv], sh = S[name];
       if (!sh) return air();

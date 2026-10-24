@@ -10,7 +10,8 @@
     "falcon-rider": { name: "Nawaf", title: "Falconer of the Heights", color: "#e9dcc0", glow: "#ffcf5a", ready: 1, art: "anim-v2", portrait: "source/portrait-v2.png", basePose: "source/base-pose-v2.png" },
     "sea-siren": { name: "Dana", title: "Bride of the Sea", color: "#1fb5a6", glow: "#8ff5ea", ready: 1, art: "anim-v2", portrait: "source/portrait-v2.png", basePose: "source/base-pose-v2.png" },
     "dagger-dancer": { name: "Marjana", title: "Bane of the Forty", color: "#d6337a", glow: "#ffd0e4", ready: 1 },
-    "vampire-countess": { name: "Vespera", title: "The Countess in the Shade", color: "#b3123a", glow: "#ff5c7a", art: "anim-v2", ready: 1 },
+    "vampire-countess": { name: "Vespera", title: "The Countess in the Shade", color: "#b3123a", glow: "#ff5c7a", art: "anim-v2", ready: 1, victoryHold: 15,
+      remap: { dair: { sheet: "side_light", rot: 1.2, axis: "fwd" } } }, // her down air clip never points down: the lunge, turned into a dive
     "gorilla-lumberjack": { name: "Timber", title: "The Gentle Feller", color: "#c8302c", glow: "#ffb15c", art: "anim-v2" },
     "fennec-host": { name: "Finjan", title: "The Host Who Pours First", color: "#f2b632", glow: "#fff0a0", art: "anim-v2" },
     "clockwork-elephant": { name: "Tiktak", title: "The Brass Hour", color: "#c9973a", glow: "#5ff0d8", art: "anim-v2" },
@@ -164,7 +165,7 @@
     await Promise.all(pick.map(async (id) => { if (!cardArt[id]) cardArt[id] = await img(`${ROOT}/assets/fighters/${id}/${FIGHTERS[id].basePose || "source/base-pose.png"}`); }));
     defs = await Promise.all(pick.map(async (id) => (await fetch(`${ROOT}/assets/fighters/${id}/moves.draft.json`)).json()));
     const progress = { onCount: (n) => (loading.total += n), onSheet: () => loading.done++ };
-    gfx = await Promise.all(pick.map((id, i) => Render.loadFighter(id, ROOT, { art: FIGHTERS[id].art, height: (defs[i].stats || {}).height, basePose: FIGHTERS[id].basePose, ...progress })));
+    gfx = await Promise.all(pick.map((id, i) => Render.loadFighter(id, ROOT, { art: FIGHTERS[id].art, height: (defs[i].stats || {}).height, basePose: FIGHTERS[id].basePose, victoryHold: FIGHTERS[id].victoryHold, remap: FIGHTERS[id].remap, ...progress })));
     await Promise.all(pick.map((id) => new Promise((ok) => { const im = new Image(); im.onload = () => { portraits[id] = im; ok(); }; im.onerror = ok; im.src = portraitSrc(id); })));
     M = Sim.match(defs[0], defs[1]); st = M.create(); fx.reset(); Object.assign(cam, { x: 640, y: 330, z: 0.9 });
   }
@@ -417,7 +418,7 @@
     const F = gfx[i], ps = Render.pose(F, p, f, M.mv[i], Sim, win);
     const x = p.x / S, y = p.y / S;
     if (!ps) return;
-    const { sh, k } = ps, sc = sh.scale;
+    const { sh, k, rot } = ps, sc = sh.scale;
     const screenBody = F.h * cam.z * Math.min(W / 1280, H / 720) * dpr;
     const { im, f: div } = Render.mip(sh, screenBody), cell = sh.size / div;
     let src = im, sx = k * cell;
@@ -429,6 +430,7 @@
       src = tintBuf; sx = 0;
     }
     g.save(); g.globalAlpha = alpha; g.translate(Math.round(x), Math.round(y)); g.scale(p.face, 1);
+    if (rot) { g.translate(0, -F.h / 2); g.rotate(rot); g.translate(0, F.h / 2); } // remapped sheet, turned about the body centre
     if (p.st === ST.HIT && p.launch > 2600 && !F.sheets.tumble) { g.translate(0, -F.h / 2); g.rotate((f % 24) / 24 * Math.PI * 2 * -1); g.translate(0, F.h / 2); }
     if (halo) { g.shadowColor = halo; g.shadowBlur = 3 * dpr; }
     g.imageSmoothingEnabled = true; g.imageSmoothingQuality = "high";
@@ -785,6 +787,7 @@
   }
   const dbg = { paused: false }; // test hook: freezes the sim for screenshots
   // test hook: advance exactly n frames with fixed inputs while paused, for frame-exact captures
+  dbg.su = (i) => M.mv[i][st.p[i].mv].su;
   dbg.step = (n, a = 0, b = 0) => { for (let k = 0; k < n; k++) { M.step(st, [a, b]); events(st); stepFx(); updateCam(st); } };
   let acc = 0, last = performance.now();
   function frame(now) {
