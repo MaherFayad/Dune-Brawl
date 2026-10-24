@@ -183,7 +183,14 @@
       fx.grounded[i] = p.ground;
       if (p.st === ST.DODGE && s.f % 3 === 0) fx.ghosts.push({ i, f: s.f, life: 0.5, p: { ...p } });
       if (p.st === ST.DODGE && fx.wasSt[i] !== ST.DODGE && p.ground) fx.dust(x, y, 60, -p.face);
-      if (p.st === ST.HIT && p.launch > 1800 && s.f % 2 === 0) fx.trails.push({ x, y: y - 32, life: 1, w: Math.min(14, p.launch / 280) });
+      // the reference's signature: a launched fighter leaves a trail of white smoke puffs, and a
+      // dodge leaves a short streak; puffs grow and fade where they were left
+      const sp = Math.hypot(p.vx, p.vy);
+      if (p.st === ST.HIT && p.launch > 1800 && sp > 600 && s.f % 2 === 0) {
+        fx.trails.push({ x, y: y - 32, life: 1, w: Math.min(14, p.launch / 280) });
+        fx.add("dust", x - p.vx / S * 0.5, y - 30, { w: 22 + Math.min(34, p.launch / 120), ay: 0.5, rot: rnd() * 6.28, s0: 0.55, s1: 1.25, pop: 10, life: 30, alpha: 0.8 });
+      }
+      if (p.st === ST.DODGE && sp > 500 && s.f % 2 === 0) fx.add("dust", x, y - (p.ground ? 8 : 30), { w: 30, ay: 0.5, rot: rnd() * 6.28, s0: 0.5, s1: 1.1, pop: 6, life: 18, alpha: 0.6 });
       fx.wasSt[i] = p.st;
     });
   }

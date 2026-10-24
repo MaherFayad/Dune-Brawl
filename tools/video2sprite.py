@@ -1,10 +1,12 @@
 """Turn a green-screen animation clip into a sprite sheet.
 
-usage: python3 video2sprite.py clip.mp4 out_prefix frame_count [frame_size] [--trim] [--motion] [--magenta]
+usage: python3 video2sprite.py clip.mp4 out_prefix frame_count [frame_size] [--trim] [--motion] [--magenta] [--skip=SECONDS]
 
 The clip must be shot on flat pure green (#00FF00), starting from the fighter's ready pose, so the
 first frame sets one scale and foot pivot shared by every sheet. --trim drops the held frames
 before and after the motion (use it for attacks). --motion samples by movement instead of evenly in time (use it for attacks). --magenta keys #FF00FF instead (for green fighters).
+--skip=SECONDS drops the start of the clip (a loop that begins with a transition) but still takes
+the scale from the first frame, which is the ready pose.
 
 Writes out_prefix.png (sheet, one row), out_prefix.json (atlas), out_prefix_preview.gif
 (on a dark background) and out_prefix_64px.png (all frames at in-game height 64 px).
@@ -19,6 +21,11 @@ size = int(sys.argv[4]) if len(sys.argv) > 4 else 256
 tmp = pathlib.Path(tempfile.mkdtemp())
 subprocess.run(["ffmpeg", "-loglevel", "error", "-i", clip, str(tmp / "f%04d.png")], check=True)
 src = sorted(tmp.glob("f*.png"))
+skip = next((float(x.split("=")[1]) for x in sys.argv if x.startswith("--skip=")), 0.0)
+if skip:
+    num, den = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=r_frame_rate",
+                               "-of", "csv=p=0", clip], capture_output=True, text=True, check=True).stdout.strip().split("/")
+    src = src[round(skip * float(num) / float(den)):]
 trim = "--trim" in sys.argv
 if trim:
     # keep only the span where the pose differs from the first frame (drop the held start and end)

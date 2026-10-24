@@ -22,6 +22,7 @@ Kling 3.0, std, 1:1, sound off, from margin start frame `efa3642d-b997-476d-9866
 | tumble | 764b5659-0c36-41a7-8dbf-29fbe1429fe5 | 1 | pass | Knocked back, then a tight heels-over-head tuck spinning in place. Sheet is one clean rotation, source frames 33 to 48 (16 frames, not 24), scaled from the ready frame; a few frames are soft from motion blur. |
 | victory | de70623b-d970-4a99-bd32-478dfbe111b3 | 1 | pass | 5 s, start frame only. Raises an open hand into a swirling ring of water, brings the palm to her shoulder, bows her head with bubbles rising, holds. She shuffles a couple of steps in place in the first second (sheet frames 1 to 10); start the game sheet after that if it looks odd. Ring stays 32 px inside the top edge. |
 | taunt | 65e96b20-6f8f-4f8e-9f93-634fdfba7e95 | 1 | pass | 5 s. Cups her front hand at her mouth, chin up, sings with blue mist curls rising from the hand, returns to stance. The heel-to-toe rocking is subtle. Same pose family as hook_call, which keeps them consistent. |
+| fall | 8e911a4b-f944-43a7-9d5c-fa8885f1078c | 1 | pass (round 1) | 12 f loop, 256 cell, --skip=1.75. The first 1.7 s is a hop from the stance; the loop is the tucked airborne part, shell held at her side. |
 
 Notes:
 - After the coordinator's "bigger attacks" update, every attack sheet made in this session (jab, down_light, up_light, nair, down_heavy, dair, recovery) was reconverted with `--trim --motion`. side_light and side_heavy are from the earlier session and were not touched.
