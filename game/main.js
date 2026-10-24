@@ -5,18 +5,18 @@
   const ROOT = "..";
   // ready: shown on the select screen. art and portrait point at the v2 rework once it lands.
   const FIGHTERS = {
-    "djinn-warrior": { name: "Saif", color: "#3d4fd6", glow: "#36e2d4", ready: 1, art: "anim-v2", portrait: "source/portrait-v2.png", basePose: "source/base-pose-v2.png" },
-    "dune-ghoul": { name: "Abu Sarab", color: "#7fbf3a", glow: "#c6ff3d", ready: 1, art: "anim-v2", portrait: "source/portrait-v2.png", basePose: "source/base-pose-v2.png" },
-    "falcon-rider": { name: "Nawaf", color: "#e9dcc0", glow: "#ffcf5a", ready: 1, art: "anim-v2", portrait: "source/portrait-v2.png", basePose: "source/base-pose-v2.png" },
-    "sea-siren": { name: "Dana", color: "#1fb5a6", glow: "#8ff5ea", ready: 1, art: "anim-v2", portrait: "source/portrait-v2.png", basePose: "source/base-pose-v2.png" },
-    "dagger-dancer": { name: "Marjana", color: "#d6337a", glow: "#ffd0e4", ready: 1 },
-    "vampire-countess": { name: "Vespera", color: "#b3123a", glow: "#ff5c7a", art: "anim-v2", ready: 1 },
-    "gorilla-lumberjack": { name: "Timber", color: "#c8302c", glow: "#ffb15c", art: "anim-v2" },
-    "fennec-host": { name: "Finjan", color: "#f2b632", glow: "#fff0a0", art: "anim-v2" },
-    "clockwork-elephant": { name: "Tiktak", color: "#c9973a", glow: "#5ff0d8", art: "anim-v2" },
-    "melting-yeti": { name: "Brrr", color: "#9fd8ff", glow: "#e8fbff", art: "anim-v2", ready: 1 },
-    "baby-roc": { name: "Rukhayy", color: "#2443b8", glow: "#ffd25a", art: "anim-v2" },
-    "chameleon-slinger": { name: "Hirba", color: "#7ccf2a", glow: "#ff5ad0", art: "anim-v2" },
+    "djinn-warrior": { name: "Saif", title: "The Bound Blade", color: "#3d4fd6", glow: "#36e2d4", ready: 1, art: "anim-v2", portrait: "source/portrait-v2.png", basePose: "source/base-pose-v2.png" },
+    "dune-ghoul": { name: "Abu Sarab", title: "Ghoul of the Dunes", color: "#7fbf3a", glow: "#c6ff3d", ready: 1, art: "anim-v2", portrait: "source/portrait-v2.png", basePose: "source/base-pose-v2.png" },
+    "falcon-rider": { name: "Nawaf", title: "Falconer of the Heights", color: "#e9dcc0", glow: "#ffcf5a", ready: 1, art: "anim-v2", portrait: "source/portrait-v2.png", basePose: "source/base-pose-v2.png" },
+    "sea-siren": { name: "Dana", title: "Bride of the Sea", color: "#1fb5a6", glow: "#8ff5ea", ready: 1, art: "anim-v2", portrait: "source/portrait-v2.png", basePose: "source/base-pose-v2.png" },
+    "dagger-dancer": { name: "Marjana", title: "Bane of the Forty", color: "#d6337a", glow: "#ffd0e4", ready: 1 },
+    "vampire-countess": { name: "Vespera", title: "The Countess in the Shade", color: "#b3123a", glow: "#ff5c7a", art: "anim-v2", ready: 1 },
+    "gorilla-lumberjack": { name: "Timber", title: "The Gentle Feller", color: "#c8302c", glow: "#ffb15c", art: "anim-v2" },
+    "fennec-host": { name: "Finjan", title: "The Host Who Pours First", color: "#f2b632", glow: "#fff0a0", art: "anim-v2" },
+    "clockwork-elephant": { name: "Tiktak", title: "The Brass Hour", color: "#c9973a", glow: "#5ff0d8", art: "anim-v2" },
+    "melting-yeti": { name: "Brrr", title: "The Homesick Snow", color: "#9fd8ff", glow: "#e8fbff", art: "anim-v2", ready: 1 },
+    "baby-roc": { name: "Rukhayy", title: "The Roc Who Cannot Fly Yet", color: "#2443b8", glow: "#ffd25a", art: "anim-v2" },
+    "chameleon-slinger": { name: "Hirba", title: "The Slow Trick Shot", color: "#7ccf2a", glow: "#ff5ad0", art: "anim-v2" },
   };
   const portraitSrc = (id) => `${ROOT}/assets/fighters/${id}/${FIGHTERS[id].portrait || "source/portrait.png"}`;
   const TEAM = ["#2fd5c4", "#ff7a45"];
@@ -36,6 +36,7 @@
     if (["Space", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "F2", "F3"].includes(e.code)) e.preventDefault();
     if (e.code === "F2" && mode !== "online") togglePanel(); // live physics edits would desync an online match
     if (e.code === "F3") showBoxes = !showBoxes;
+    if (e.code === "KeyM" && window.Sfx) Sfx.toggle();
     if (e.code === "Escape") { if (mode === "online") leaveOnline("You left the match."); showMenu(); }
   });
   addEventListener("keyup", (e) => keys.delete(e.code));
@@ -154,16 +155,22 @@
   // ---------- match ----------
   let mode = "menu", pick = [params.get("p1") || "djinn-warrior", params.get("p2") || "dune-ghoul"];
   let M = null, st = null, defs = [], gfx = [], showBoxes = false;
-  const loading = { done: 0, total: 0 };
+  const loading = { done: 0, total: 0, t: 0, tip: 0 };
+  const cardArt = {};
+  const img = (src) => new Promise((ok) => { const im = new Image(); im.onload = () => ok(im); im.onerror = () => ok(null); im.src = src; });
   async function load() {
+    loading.done = 0; loading.total = 0; loading.t = 0; loading.tip = Math.floor(Math.random() * TIPS.length);
+    // the versus cards first (one small image each), so the loading screen has its art at once
+    await Promise.all(pick.map(async (id) => { if (!cardArt[id]) cardArt[id] = await img(`${ROOT}/assets/fighters/${id}/${FIGHTERS[id].basePose || "source/base-pose.png"}`); }));
     defs = await Promise.all(pick.map(async (id) => (await fetch(`${ROOT}/assets/fighters/${id}/moves.draft.json`)).json()));
-    loading.done = 0; loading.total = 0;
     const progress = { onCount: (n) => (loading.total += n), onSheet: () => loading.done++ };
     gfx = await Promise.all(pick.map((id, i) => Render.loadFighter(id, ROOT, { art: FIGHTERS[id].art, height: (defs[i].stats || {}).height, basePose: FIGHTERS[id].basePose, ...progress })));
     await Promise.all(pick.map((id) => new Promise((ok) => { const im = new Image(); im.onload = () => { portraits[id] = im; ok(); }; im.onerror = ok; im.src = portraitSrc(id); })));
-    M = Sim.match(defs[0], defs[1]); st = M.create(); fx.reset();
+    M = Sim.match(defs[0], defs[1]); st = M.create(); fx.reset(); Object.assign(cam, { x: 640, y: 330, z: 0.9 });
   }
-  async function startMatch(m) { mode = "loading"; hideMenu(); await load(); mode = m; }
+  // the versus screen stays up for at least 1.6 s so the cards register, as in the reference
+  const holdCards = (t0) => new Promise((ok) => setTimeout(ok, Math.max(0, 1600 - (performance.now() - t0))));
+  async function startMatch(m) { const t0 = performance.now(); mode = "loading"; hideMenu(); await load(); await holdCards(t0); mode = m; }
   function rebuild() { if (defs.length) { M = Sim.match(defs[0], defs[1]); } }
 
   // ---------- effects (render only, driven by sim events) ----------
@@ -176,21 +183,62 @@
   const fx = {
     sprites: [], parts: [], shake: 0, lastHf: -1, lastKf: -1, koStamp: [0, 0],
     grounded: [1, 1], wasSt: [0, 0], lastVy: [0, 0], after: [[], []],
-    reset() { Object.assign(this, { sprites: [], parts: [], shake: 0, lastHf: -1, lastKf: -1, koStamp: [0, 0] }); },
+    bats: [], petals: [], marks: [], banner: null, won: 0, stats: [], lastDmg: [0, 0], hitOn: [-1e9, -1e9],
+    reset() {
+      Object.assign(this, { sprites: [], parts: [], shake: 0, lastHf: -1, lastKf: -1, koStamp: [0, 0], bats: [], petals: [], marks: [], banner: null, won: 0, koHold: 0,
+        stats: [0, 1].map(() => ({ kos: 0, falls: 0, acc: 0, done: 0, taken: 0 })), lastDmg: [0, 0], hitOn: [-1e9, -1e9] });
+    },
     // a painted sprite: grows from s0 to s1 in `pop` frames, holds, then fades over the rest of `life` frames
     add(name, x, y, opt) { this.sprites.push({ name, x, y, t: 0, rot: 0, flip: 1, s0: 0.6, s1: 1, pop: 3, life: 18, w: 80, ax: 0.5, ay: 0.5, alpha: 1, ...opt }); },
     // flat white cel effects, as in the reference: puffs stay where they were made
     puff(x, y, w, opt) { this.add(`puff${1 + Math.floor(rnd() * 4)}`, x, y, { w, rot: (rnd() - 0.5) * 0.6, s0: 0.7, s1: 1.15, pop: 6, life: 30, ...opt }); },
     kick(x, y, w, flip) { this.add(`kick${1 + Math.floor(rnd() * 3)}`, x, y, { w, ay: 0.95, flip, s0: 0.6, s1: 1, pop: 3, life: 16 }); },
   };
+  // sounds (game/audio.js), panned by where they happen on screen
+  const sfx = (name, x, o) => { if (window.Sfx && mode !== "loading") Sfx.play(name, Math.max(-1, Math.min(1, (x - cam.x) / 640)), { fighter: o && o.who !== undefined ? pick[o.who] : null, ...o }); };
+  // ---------- per-fighter flair (game/flair.js) ----------
+  const style = (i) => Flair.STYLES[pick[i]] || {};
+  const flairApi = {
+    S, ST, rnd: () => rnd(),
+    body: (i) => (gfx[i] ? gfx[i].h : 64),
+    move: (i, mv) => M.mv[i][mv],
+    bat(x, y, a, size, speed) { const v = speed * (2.5 + rnd() * 3); fx.bats.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, size, ph: rnd() * 6.28, life: 1 }); },
+    petal(x, y, dir, power) {
+      const a = (dir > 0 ? 0 : Math.PI) + (rnd() - 0.5) * 1.5, v = (1.5 + rnd() * 3.5) * power;
+      fx.petals.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 1.2, rot: rnd() * 6.28, vr: (rnd() - 0.5) * 0.3, size: 2 + rnd() * 1.6 * Math.min(1.6, power), c: Flair.ROSE[Math.floor(rnd() * 4)], life: 1, fall: 1 });
+    },
+    petalIn(x, y) { const a = rnd() * 6.28; fx.petals.push({ x: x + Math.cos(a) * 28, y: y + Math.sin(a) * 28, vx: -Math.cos(a) * 1.7, vy: -Math.sin(a) * 1.7, rot: a, vr: 0.25, size: 2.2, c: Flair.ROSE[Math.floor(rnd() * 4)], life: 0.45, fall: 0 }); },
+    petalRain(x, y) { fx.petals.push({ x: x + (rnd() - 0.5) * 320, y: y - 120 - rnd() * 220, vx: (rnd() - 0.5) * 0.6, vy: 0.5 + rnd() * 0.6, rot: rnd() * 6.28, vr: (rnd() - 0.5) * 0.12, size: 2.5 + rnd() * 2, c: Flair.ROSE[Math.floor(rnd() * 4)], life: 3, fall: 0.2 }); },
+    mark(m) { fx.marks.push({ t: 0, ...m }); },
+  };
+  // a fighter's swing crescents in their own colour (the reference tints smears by weapon)
+  const tinted = {};
+  function tintedVfx(name, color) {
+    const key = name + color, im = vfx[name];
+    if (tinted[key] || !im) return tinted[key] || null;
+    const c = document.createElement("canvas"); c.width = im.width; c.height = im.height;
+    const x = c.getContext("2d"); x.drawImage(im, 0, 0);
+    x.globalCompositeOperation = "source-atop"; x.globalAlpha = 0.78; x.fillStyle = color; x.fillRect(0, 0, c.width, c.height);
+    return (tinted[key] = c);
+  }
   function events(s) {
+    // countdown and match end cues
+    const cd = FEEL.countdown - s.f;
+    if (cd === 125 || cd === 84 || cd === 42) sfx("count", cam.x); // the first event runs one frame in
+    if (cd === 0) sfx("go", cam.x);
+    if (s.over && s.overT === 1) sfx("game", cam.x);
     if (s.hf !== fx.lastHf && s.hf >= 0) {
       fx.lastHf = s.hf;
       const x = s.hx / S, y = s.hy / S, k = s.hk / 100, heavy = k > 18;
       if (s.ha === 2) { // parry: a bright ring and a hard shake, no damage spark
         fx.add("star2", x, y, { w: 70, rot: rnd() * 6.28, s0: 0.3, s1: 1.4, pop: 3, life: 14 });
         fx.shake = Math.max(fx.shake, 6);
+        if (style(1 - s.hp).parried) style(1 - s.hp).parried(flairApi, 1 - s.hp, x, y);
+        sfx("parry", x);
       } else {
+        fx.hitOn[1 - s.hp] = s.f;
+        if (style(s.hp).hit) style(s.hp).hit(flairApi, s.hp, x, y, s.p[s.hp].face, heavy, s.p[s.hp].mv);
+        sfx(heavy ? "hitHeavy" : "hit", x, { k, who: s.hp, mv: s.p[s.hp].mv });
         const atk = s.p[s.hp], dir = atk ? atk.face : 1, body = gfx[1 - s.hp] ? gfx[1 - s.hp].h : 64;
         fx.shake = Math.max(fx.shake, heavy ? 6 : 3); // the reference camera barely moves: 0.05 to 0.1 bodies
         // a small flat white starburst at the contact point; colour comes from the victim flash
@@ -202,7 +250,12 @@
       }
     }
     if (s.kf !== fx.lastKf && s.kf >= 0) {
-      fx.lastKf = s.kf; fx.shake = 8; fx.koStamp[s.kp] = 70;
+      fx.lastKf = s.kf; fx.shake = 8; fx.koStamp[s.kp] = 70; fx.koHold = 70;
+      // stats for the results screen: a fall within 5 s of being hit is the hitter's KO, else an accident
+      const killer = s.f - fx.hitOn[s.kp] < 300 ? 1 - s.kp : -1;
+      fx.stats[s.kp].falls++; if (killer >= 0) fx.stats[killer].kos++; else fx.stats[s.kp].acc++;
+      fx.banner = { killer, victim: s.kp, t: 0 };
+      sfx("ko", s.kx / S, { scorer: killer >= 0 ? pick[killer] : null });
       // the reference KOs at the screen edge: a white ink splash and a cloud bank burst inward
       // from where the fighter left the view, with speed lines in the attacker's team colour
       const z = Math.min(W / 1280, H / 720) * cam.z, hw = W / 2 / z, hh = H / 2 / z;
@@ -211,19 +264,31 @@
       const x = cam.x - Math.cos(ang) * t, y = cam.y - Math.sin(ang) * t, scr = (H / z);
       fx.add("ko-cloud", x, y, { w: scr * 0.55, ax: 0, ay: 0.5, rot: ang, s0: 0.4, s1: 1.05, pop: 10, life: 70 });
       fx.add("ko-splash", x, y, { w: scr * 0.6, ax: 0, ay: 0.5, rot: ang, s0: 0.5, s1: 1.1, pop: 4, life: 34 });
-      const team = TEAM[1 - s.kp];
+      const team = style(1 - s.kp).ko || TEAM[1 - s.kp];
+      if (style(1 - s.kp).scoredKO) style(1 - s.kp).scoredKO(flairApi, 1 - s.kp, x, y, ang, scr);
       for (let j = 0; j < 18; j++) {
         const a = ang + (rnd() - 0.5) * 1.2, sp = 10 + rnd() * 16;
         fx.parts.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: 0.8 + rnd() * 0.4, size: 2 + rnd() * 3, c: rnd() < 0.6 ? team : "#ffffff", g: 0 });
       }
     }
+    s.p.forEach((p, i) => { // damage dealt and taken, for the results screen
+      const d = p.dmg - fx.lastDmg[i];
+      if (d > 0) { fx.stats[i].taken += d; fx.stats[1 - i].done += d; }
+      fx.lastDmg[i] = p.dmg;
+    });
+    if (s.over && !fx.won) { fx.won = 1; const w = s.p[s.over - 1]; if (style(s.over - 1).won) style(s.over - 1).won(flairApi, s.over - 1, w.x / S, w.y / S); }
     s.p.forEach((p, i) => {
       if (p.st === ST.DEAD) return;
+      if (style(i).frame) style(i).frame(flairApi, i, p, s);
       const x = p.x / S, y = p.y / S;
       const body = gfx[i] ? gfx[i].h : 64;
-      if (p.ground && !fx.grounded[i]) { fx.puff(x - body * 0.3, y - 6, body * 0.35); fx.puff(x + body * 0.3, y - 6, body * 0.35); }
-      if (!p.ground && fx.grounded[i] && p.vy < 0) fx.kick(x, y, body * 0.6, -p.face);
-      if (!p.ground && !fx.grounded[i] && p.vy < -1000 && fx.lastVy[i] >= -1000 && p.st === ST.IDLE) fx.puff(x, y + 4, body * 0.5, { s0: 0.4, s1: 1.3, life: 22 }); // air jump ring
+      if (p.ground && !fx.grounded[i]) {
+        fx.puff(x - body * 0.3, y - 6, body * 0.35); fx.puff(x + body * 0.3, y - 6, body * 0.35);
+        if ((p.st === ST.ATK || fx.wasSt[i] === ST.ATK) && style(i).land) style(i).land(flairApi, i, x, y, p.mv);
+        sfx("land", x);
+      }
+      if (!p.ground && fx.grounded[i] && p.vy < 0) { fx.kick(x, y, body * 0.6, -p.face); sfx("jump", x); }
+      if (!p.ground && !fx.grounded[i] && p.vy < -1000 && fx.lastVy[i] >= -1000 && p.st === ST.IDLE) { fx.puff(x, y + 4, body * 0.5, { s0: 0.4, s1: 1.3, life: 22 }); sfx("airJump", x); } // air jump ring
       fx.lastVy[i] = p.vy;
       if (p.st === ST.DODGE || p.st === ST.DASH) { if (s.f % 2 === 0) { fx.after[i].unshift({ x: p.x, y: p.y }); fx.after[i].length = Math.min(fx.after[i].length, 4); } }
       else fx.after[i].length = 0;
@@ -231,6 +296,8 @@
       if ((p.st === ST.DODGE || p.st === ST.DASH) && fx.wasSt[i] !== p.st) {
         const back = p.vx ? -Math.sign(p.vx) : -p.face;
         if (p.ground) fx.kick(x, y, body * 0.7, back); else fx.puff(x, y - body / 2, body * 0.5, { s0: 0.5, s1: 1.3, life: 18 });
+        if (style(i).dodge) style(i).dodge(flairApi, i, x, y, back);
+        sfx(p.st === ST.DASH ? "dash" : "dodge", x, { who: i });
       }
       // the reference's signature: a launched fighter leaves a thick continuous cloud column
       // behind it, drawn under the fighters, gone after about 50 frames
@@ -241,8 +308,11 @@
       }
       if (p.st === ST.ATK && p.t === M.mv[i][p.mv].su && p.mv <= 4) { // a white swing crescent on every light, hit or miss
         const b = M.box(p, M.mv[i][p.mv]).map((v) => v / S);
-        fx.add(`smear${1 + Math.floor(rnd() * 3)}`, (b[0] + b[1]) / 2, (b[2] + b[3]) / 2, { w: Math.max(18, (b[1] - b[0]) * 0.55), flip: -p.face, rot: (rnd() - 0.5) * 0.4, s0: 0.85, s1: 1, pop: 1, life: 7, alpha: 0.9 });
+        const sm = `smear${1 + Math.floor(rnd() * 3)}`;
+        sfx("swing", x, { who: i, mv: p.mv });
+        fx.add(sm, (b[0] + b[1]) / 2, (b[2] + b[3]) / 2, { w: Math.max(18, (b[1] - b[0]) * 0.55), flip: -p.face, rot: (rnd() - 0.5) * 0.4, s0: 0.85, s1: 1, pop: 1, life: 7, alpha: 0.9, im: style(i).smear && tintedVfx(sm, style(i).smear) });
       }
+      if (p.st === ST.ATK && p.t === M.mv[i][p.mv].su && p.mv > 4 && p.mv !== 9) sfx("swingHeavy", x, { who: i, mv: p.mv });
       fx.wasSt[i] = p.st;
     });
   }
@@ -251,6 +321,14 @@
     fx.parts = fx.parts.filter((q) => q.life > 0);
     for (const e of fx.sprites) e.t++;
     fx.sprites = fx.sprites.filter((e) => e.t < e.life);
+    for (const b of fx.bats) { b.x += b.vx; b.y += b.vy; b.vx *= 0.96; b.vy = b.vy * 0.96 - 0.05 + Math.sin(b.ph * 0.5) * 0.12; b.ph += 0.85; b.life -= 0.022; }
+    fx.bats = fx.bats.filter((b) => b.life > 0);
+    for (const q of fx.petals) { q.x += q.vx + Math.sin(q.rot * 2) * 0.35 * q.fall; q.y += q.vy; q.vx *= 0.95; q.vy = Math.min(1.4, q.vy * 0.96 + 0.07 * q.fall); q.rot += q.vr; q.life -= 0.018; }
+    fx.petals = fx.petals.filter((q) => q.life > 0);
+    for (const m of fx.marks) m.t++;
+    fx.marks = fx.marks.filter((m) => m.t < m.life);
+    if (fx.banner) fx.banner.t++;
+    if (fx.koHold > 0) fx.koHold--;
     fx.shake *= 0.7;
     fx.koStamp = fx.koStamp.map((t) => Math.max(0, t - 1));
   }
@@ -262,6 +340,7 @@
     // (max zoom puts the silhouette at about 12 percent of screen height, as in the reference)
     // around the pair (never narrower than about 10 bodies) that follows them off the ledge and
     // up into the air, with only a light pull toward stage center
+    if (s.f < FEEL.countdown) { cam.x += (640 - cam.x) * 0.2; cam.y += (330 - cam.y) * 0.2; cam.z += (0.9 - cam.z) * 0.2; return; } // the countdown shows the whole stage
     const live = s.over ? [s.p[s.over - 1]] : s.p.filter((p) => p.st !== ST.DEAD);
     if (!live.length) return;
     let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
@@ -270,7 +349,8 @@
     const w = Math.max(s.over ? 420 : 640, x1 - x0), h = Math.max(s.over ? 240 : 340, y1 - y0);
     const z = Math.max(0.62, Math.min(s.over ? 1.7 : 1.28, Math.min(1280 / (w + 160), 720 / (h + 120))));
     const tx = ((x0 + x1) / 2) * 0.85 + 640 * 0.15, ty = ((y0 + y1) / 2) * 0.8 + 400 * 0.2;
-    cam.x += (tx - cam.x) * 0.12; cam.y += (ty - cam.y) * 0.12; cam.z += (z - cam.z) * 0.09;
+    const ease = fx.koHold > 0 ? 0.012 : 1; // after a KO the camera holds still while the splash plays at the edge
+    cam.x += (tx - cam.x) * 0.12 * ease; cam.y += (ty - cam.y) * 0.12 * ease; cam.z += (z - cam.z) * 0.09 * ease;
   }
 
   // ---------- drawing ----------
@@ -389,7 +469,7 @@
     const evading = p.st === ST.DODGE || p.st === ST.DASH;
     if (evading) { // afterimages trail behind a dodge or dash so it reads as movement, not a fade
       const trail = fx.after[i];
-      for (let k = trail.length - 1; k >= 0; k--) drawSprite(i, { ...p, x: trail[k].x, y: trail[k].y }, s.f, 0.32 - k * 0.07, 1, null, TEAM[i]);
+      for (let k = trail.length - 1; k >= 0; k--) drawSprite(i, { ...p, x: trail[k].x, y: trail[k].y }, s.f, 0.32 - k * 0.07, 1, null, style(i).after || TEAM[i]);
       if (p.st === ST.DODGE && !tint) { tint = 0.18 + 0.14 * Math.sin(s.f * 1.3); tintColor = "#ffffff"; } // invulnerable shimmer
     }
     drawSprite(i, p, s.f, blink ? 0.55 : 1, tint, "rgba(8,3,18,0.7)", tintColor);
@@ -410,7 +490,7 @@
   function drawFx(under) {
     for (const e of fx.sprites) {
       if (!e.under !== !under) continue;
-      const im = vfx[e.name];
+      const im = e.im || vfx[e.name];
       if (!im) continue;
       const k = e.t < e.pop ? e.t / e.pop : 1, sc = e.s0 + (e.s1 - e.s0) * (1 - (1 - k) * (1 - k));
       const fade = e.t < e.pop ? 1 : 1 - (e.t - e.pop) / Math.max(1, e.life - e.pop);
@@ -424,6 +504,40 @@
     if (under) return;
     for (const q of fx.parts) { g.globalAlpha = Math.min(1, q.life * 1.5); g.fillStyle = q.c; g.beginPath(); g.arc(q.x, q.y, q.size * 0.7, 0, 7); g.fill(); }
     g.globalAlpha = 1;
+    drawMarks();
+    for (const q of fx.petals) { g.globalAlpha = Math.min(1, q.life * 2); Flair.petal(g, q.x, q.y, q.size, q.rot, q.c, "rgba(190,60,110,0.45)"); }
+    for (const b of fx.bats) { g.globalAlpha = Math.min(1, b.life * 2.2); Flair.bat(g, b.x, b.y, b.size, b.ph, Math.atan2(b.vy, Math.abs(b.vx) + 0.01) * 0.35, "#1a0a14", "#ff3d64"); }
+    g.globalAlpha = 1;
+  }
+  // marks: pierce glints, rings, the parry canopy and ward, KO crests
+  function drawMarks() {
+    for (const m of fx.marks) {
+      const k = m.t / m.life, fade = 1 - k;
+      g.save();
+      if (m.kind === "pierce") { // a long thin glint straight through the target
+        const L = m.len * 64 * (0.6 + 0.4 * Math.min(1, m.t / 3));
+        g.translate(m.x, m.y); g.scale(m.dir, 1); g.globalAlpha = fade;
+        g.fillStyle = "#ff8fb1"; g.beginPath(); g.moveTo(-L * 0.35, 0); g.lineTo(L * 0.1, -2.6 * fade - 0.5); g.lineTo(L * 0.65, 0); g.lineTo(L * 0.1, 2.6 * fade + 0.5); g.closePath(); g.fill();
+        g.fillStyle = "#ffffff"; g.beginPath(); g.moveTo(-L * 0.32, 0); g.lineTo(L * 0.1, -1.3); g.lineTo(L * 0.62, 0); g.lineTo(L * 0.1, 1.3); g.closePath(); g.fill();
+      } else if (m.kind === "ring") {
+        const r = (m.r0 + (m.r1 - m.r0) * (1 - (1 - k) * (1 - k))) * 64 * 0.5;
+        g.translate(m.x, m.y); g.scale(1, m.flat ? 0.28 : 1); g.globalAlpha = fade;
+        g.lineWidth = 7 * fade + 1; g.strokeStyle = "#14060f"; g.beginPath(); g.arc(0, 0, r, 0, 7); g.stroke();
+        g.lineWidth = 4 * fade + 0.5; g.strokeStyle = m.color; g.beginPath(); g.arc(0, 0, r, 0, 7); g.stroke();
+      } else if (m.kind === "crest") { // pops in over the KO cloud, holds, rises and fades
+        const pop = m.t < 7 ? 0.4 + (m.t / 7) * 0.75 : m.t < 12 ? 1.15 - (m.t - 7) * 0.03 : 1;
+        Flair.crest(g, m.x, m.y - Math.max(0, m.t - 40) * 0.5, m.size * pop, m.t > m.life - 30 ? (m.life - m.t) / 30 : 1);
+      } else if ((m.kind === "ward" || m.kind === "canopy") && st) {
+        const p = st.p[m.i], body = gfx[m.i] ? gfx[m.i].h : 64, x = p.x / S + p.face * body * 0.32, y = p.y / S - body * 0.5;
+        g.translate(x, y); g.scale(p.face, 1);
+        if (m.kind === "ward") {
+          g.globalAlpha = 0.55 + 0.3 * Math.sin(st.f * 1.5); g.lineCap = "round";
+          g.lineWidth = 5; g.strokeStyle = "#14060f"; g.beginPath(); g.arc(-body * 0.1, 0, body * 0.5, -1.1, 1.1); g.stroke();
+          g.lineWidth = 3; g.strokeStyle = "#ff3d64"; g.beginPath(); g.arc(-body * 0.1, 0, body * 0.5, -1.1, 1.1); g.stroke();
+        } else Flair.canopy(g, -body * 0.08, 0, body * (0.45 + 0.2 * Math.min(1, m.t / 4)), Math.min(1, fade * 1.6), "#ff3d64");
+      }
+      g.restore();
+    }
   }
   // ---------- HUD: matches the reference layout ----------
   // Top-right corner only: an italic match timer, then one round portrait per fighter. Damage is a
@@ -487,24 +601,132 @@
     portrait(0, s.p[0], cx1, top + r * 0.15, r, s);
     portrait(1, s.p[1], cx2, top + r * 0.15, r, s);
 
-    if (s.f < FEEL.countdown + 30 && !s.over) {
-      const n = Math.ceil((FEEL.countdown - s.f) / 30), go = s.f >= FEEL.countdown, ph = (s.f % 30) / 30;
-      // pop in, hold, then scale up and vanish quickly (never a slow fade through the outline)
-      g.save(); g.globalAlpha = go && ph > 0.7 ? Math.max(0, 1 - (ph - 0.7) / 0.3) : 1;
-      const pop = ph < 0.12 ? 1.25 - ph * 2 : 1;
-      const size = (go ? 120 : 96) * u * pop * (go && ph > 0.7 ? 1 + (ph - 0.7) : 1);
-      italic(go ? "FIGHT!" : String(n), W / 2, H * 0.44, size, go ? "#ffd36b" : "#ffffff", "center");
-      g.restore();
+    // countdown as measured: each numeral 42 frames (ghost slam in, hold, a 1 frame gap), then the
+    // go word for 45 frames that tilts away at the end
+    const CD = 42, go = s.f >= FEEL.countdown;
+    if (!s.over && s.f < FEEL.countdown + 45 && (go || FEEL.countdown - s.f <= 3 * CD)) {
+      const n = Math.ceil((FEEL.countdown - s.f) / CD), ph = go ? s.f - FEEL.countdown : CD - 1 - ((FEEL.countdown - s.f - 1) % CD);
+      if (go || ph < CD - 1) {
+        const ghost = ph < 7, pop = ghost ? 1.6 - (ph / 7) * 0.6 : 1, out = go && ph > 36 ? (ph - 36) / 9 : 0;
+        g.save(); g.translate(W / 2, H * 0.42); g.rotate(out * 0.25); g.scale(pop * (1 + out * 0.3), pop * (1 + out * 0.3));
+        display(go ? "BRAWL!" : String(n), 0, 0, (go ? 150 : 170) * u, { ghost, alpha: ghost ? 0.35 + (ph / 7) * 0.65 : 1 - out, arch: go ? 0.09 : 0 });
+        g.restore();
+      }
     }
-    if (s.over && s.overT < 100) { // GAME! slams in on the last KO, before the winner banner
+    if (fx.banner && fx.banner.t < 170 && !s.over) koBanner(fx.banner, u);
+    if (s.over && s.overT < 110) { // GAME! slams in on the last KO
       const pop = s.overT < 8 ? 1.6 - s.overT * 0.075 : 1;
-      italic("GAME!", W / 2, H * 0.42, 110 * u * pop, "#ffd36b", "center");
-    } else if (s.over) {
-      const wi = s.over - 1;
-      g.fillStyle = "rgba(8,6,20,.45)"; g.fillRect(0, H * 0.08, W, H * 0.2);
-      italic(`${FIGHTERS[pick[wi]].name.toUpperCase()} WINS`, W / 2, H * 0.2, 64 * u, "#ffffff", "center");
-      if (s.overT > 60) italic("SPACE OR J: REMATCH     ESC: MENU", W / 2, H * 0.25, 16 * u, "#ffd36b", "center");
+      g.save(); g.translate(W / 2, H * 0.42); g.scale(pop, pop);
+      display("GAME!", 0, 0, 150 * u, { ghost: s.overT < 6, alpha: s.overT < 6 ? 0.4 + s.overT * 0.1 : 1, arch: 0.08 });
+      g.restore();
+    } else if (s.over) results(s, u);
+  }
+  // Big display words: italic, a yellow to red gradient over a dark red extrusion and a thick
+  // outline, optionally arched; a ghost frame is translucent pale pink with no depth.
+  function display(text, x, y, size, o = {}) {
+    g.save(); g.globalAlpha *= o.alpha === undefined ? 1 : o.alpha;
+    g.font = `${size}px "Lilita One", "Arial Black", system-ui, sans-serif`; g.textBaseline = "middle"; g.lineJoin = "round";
+    const widths = [...text].map((c) => g.measureText(c).width), total = widths.reduce((a, b) => a + b, 0) * 0.98;
+    const letters = []; let cx = x - total / 2;
+    for (let k = 0; k < text.length; k++) {
+      const mid = cx + widths[k] / 2, t = total ? (mid - x) / (total / 2) : 0;
+      letters.push({ c: text[k], x: mid, y: y + (o.arch ? size * o.arch * 4 * t * t : 0) - (o.arch ? size * o.arch * 2 : 0), r: o.arch ? t * o.arch * 2.2 : 0 });
+      cx += widths[k] * 0.98;
     }
+    const each = (fn) => { for (const L of letters) { g.save(); g.translate(L.x, L.y); g.rotate(L.r); g.transform(1, 0, -0.16, 1, 0, 0); fn(L.c); g.restore(); } };
+    const depth = o.ghost ? 0 : Math.max(2, size * 0.075);
+    g.textAlign = "center";
+    each((c) => { g.lineWidth = size * 0.16; g.strokeStyle = "#1a0610"; g.strokeText(c, 0, depth); });
+    for (let d = depth; d > 0; d -= 1) each((c) => { g.fillStyle = "#7d0f14"; g.fillText(c, 0, d); });
+    if (!o.ghost) each((c) => { g.lineWidth = size * 0.1; g.strokeStyle = "#1a0610"; g.strokeText(c, 0, 0); });
+    const grd = g.createLinearGradient(0, -size * 0.42, 0, size * 0.42);
+    if (o.ghost) { grd.addColorStop(0, "#fff4f7"); grd.addColorStop(1, "#ffc2d2"); }
+    else { grd.addColorStop(0, "#ffe873"); grd.addColorStop(0.45, "#ff9a2a"); grd.addColorStop(1, "#e3262e"); }
+    each((c) => { g.fillStyle = grd; g.fillText(c, 0, 0); });
+    if (!o.ghost) each((c) => { g.globalAlpha *= 0.55; g.lineWidth = Math.max(1, size * 0.018); g.strokeStyle = "#fff6c8"; g.strokeText(c, -size * 0.01, -size * 0.015); });
+    g.restore();
+  }
+  // KO feed, as in the reference: the scorer's portrait, their name on a navy plate, an arrow,
+  // then the fighter who fell; it drops in from the top and leaves after about 3 s
+  function koBanner(b, u) {
+    const tIn = Math.min(1, b.t / 8), tOut = b.t > 155 ? (b.t - 155) / 15 : 0, y = (24 - 70 * (1 - tIn) - 70 * tOut) * u + 26 * u;
+    const who = b.killer >= 0 ? b.killer : b.victim, name = FIGHTERS[pick[who]].name.toUpperCase();
+    const w = 300 * u, h = 34 * u, x = W / 2 - w / 2, r = 24 * u;
+    g.save();
+    const plate = g.createLinearGradient(0, y - h / 2, 0, y + h / 2);
+    plate.addColorStop(0, "#22307a"); plate.addColorStop(1, "#111a4d");
+    g.fillStyle = plate; g.strokeStyle = "#0b0a1a"; g.lineWidth = 3;
+    g.beginPath(); g.moveTo(x + 10 * u, y - h / 2); g.lineTo(x + w, y - h / 2); g.lineTo(x + w - 10 * u, y + h / 2); g.lineTo(x, y + h / 2); g.closePath(); g.fill(); g.stroke();
+    g.font = `${22 * u}px "Lilita One", "Arial Black", sans-serif`; g.textAlign = "center"; g.textBaseline = "middle"; g.fillStyle = "#ffffff";
+    g.fillText(b.killer >= 0 ? name : `${name} FELL`, W / 2 - 10 * u, y + 1);
+    if (b.killer >= 0) { g.fillStyle = "#8fc7ff"; g.beginPath(); g.moveTo(x + w - 46 * u, y - 10 * u); g.lineTo(x + w - 30 * u, y); g.lineTo(x + w - 46 * u, y + 10 * u); g.closePath(); g.fill(); }
+    roundPortrait(pick[who], x - 8 * u, y, r);
+    if (b.killer >= 0) roundPortrait(pick[b.victim], x + w + 8 * u, y, r * 0.9);
+    g.restore();
+  }
+  function roundPortrait(id, cx, cy, r) {
+    g.save(); g.fillStyle = "#1c1b46"; g.beginPath(); g.arc(cx, cy, r, 0, 7); g.fill(); g.clip();
+    if (portraits[id]) g.drawImage(portraits[id], cx - r * 1.15, cy - r * 1.35, r * 2.3, r * 2.3);
+    g.restore();
+    g.lineWidth = Math.max(2, r * 0.14); g.strokeStyle = "#8d93b8"; g.beginPath(); g.arc(cx, cy, r, 0, 7); g.stroke();
+    g.lineWidth = 2; g.strokeStyle = "#0b0a1a"; g.beginPath(); g.arc(cx, cy, r + r * 0.07, 0, 7); g.stroke();
+  }
+  // results, as in the reference: a title bar, each fighter on a pillar (the winner's is taller)
+  // in their victory or idle pose, and a stats card with a rank tab
+  function results(s, u) {
+    const t = s.overT - 110, k = Math.min(1, t / 18), wi = s.over - 1;
+    g.save(); g.globalAlpha = k;
+    const sky = g.createLinearGradient(0, 0, 0, H);
+    sky.addColorStop(0, "rgba(46,30,92,0.97)"); sky.addColorStop(1, "rgba(120,70,120,0.95)");
+    g.fillStyle = sky; g.fillRect(0, 0, W, H);
+    const bw = Math.min(W - 40 * u, 620 * u);
+    g.fillStyle = "rgba(14,12,48,0.92)"; g.fillRect(W / 2 - bw / 2, 22 * u, bw, 44 * u);
+    g.font = `${30 * u}px "Lilita One", "Arial Black", sans-serif`; g.textAlign = "center"; g.textBaseline = "middle"; g.fillStyle = "#fff";
+    g.fillText(`${FIGHTERS[pick[wi]].name.toUpperCase()} WINS!`, W / 2, 45 * u);
+    g.fillStyle = "rgba(14,12,48,0.6)"; g.fillRect(W / 2 - bw / 2, 70 * u, bw, 34 * u);
+    g.font = `${15 * u}px "Lilita One", "Arial Black", sans-serif`; g.fillStyle = "#ffd36b";
+    g.fillText("SPACE OR J: REMATCH       ESC: MENU", W / 2, 88 * u);
+    const order = [wi, 1 - wi];
+    order.forEach((i, rank) => {
+      const cx = W / 2 + (rank === 0 ? -1 : 1) * Math.min(W * 0.22, 210 * u), top = H * (rank === 0 ? 0.5 : 0.57) + (1 - k) * 80 * u;
+      pillar(cx, top, 200 * u, i);
+      const p = s.p[i], sc = 2.2 * u;
+      g.save(); g.setTransform(dpr * sc, 0, 0, dpr * sc, dpr * cx, dpr * (top - 6 * u));
+      drawSprite(i, { ...p, x: 0, y: 0, st: ST.IDLE, ground: 1, vx: 0, vy: 0, face: rank === 0 ? 1 : -1, inv: 0 }, s.f, 1, 0, "rgba(8,3,18,0.7)");
+      g.restore();
+      statsCard(cx, top + 70 * u, 210 * u, i, rank, u);
+    });
+    g.restore();
+  }
+  function pillar(cx, top, w, i) {
+    const h = H - top + 10;
+    const body = g.createLinearGradient(cx - w / 2, 0, cx + w / 2, 0);
+    body.addColorStop(0, "#8a5f3c"); body.addColorStop(0.35, "#d2a46b"); body.addColorStop(0.7, "#b8864f"); body.addColorStop(1, "#6e4a2e");
+    g.fillStyle = body; g.strokeStyle = "#1a0e10"; g.lineWidth = 3;
+    g.fillRect(cx - w * 0.44, top + 10, w * 0.88, h); g.strokeRect(cx - w * 0.44, top + 10, w * 0.88, h);
+    g.beginPath(); g.ellipse(cx, top + 14, w / 2, w * 0.13, 0, 0, 7); g.fillStyle = "#c99a62"; g.fill(); g.stroke();
+    g.beginPath(); g.ellipse(cx, top + 4, w / 2, w * 0.13, 0, 0, 7); g.fillStyle = "#e2bb83"; g.fill(); g.stroke();
+    g.save(); g.shadowColor = TEAM[i]; g.shadowBlur = 16; g.lineWidth = 3; g.strokeStyle = TEAM[i];
+    g.beginPath(); g.ellipse(cx, top + 4, w * 0.36, w * 0.085, 0, 0, 7); g.stroke(); g.restore();
+  }
+  function statsCard(cx, y, w, i, rank, u) {
+    const st0 = fx.stats[i], x = cx - w / 2, h = 150 * u;
+    g.fillStyle = "rgba(16,18,62,0.95)"; g.strokeStyle = "#0b0a1a"; g.lineWidth = 3;
+    rr(x, y, w, h, 8 * u); g.fill(); g.stroke();
+    g.fillStyle = "#2a3a8a"; rr(cx - 28 * u, y - 18 * u, 56 * u, 24 * u, 10 * u); g.fill(); g.stroke();
+    g.font = `${15 * u}px "Lilita One", "Arial Black", sans-serif`; g.textAlign = "center"; g.textBaseline = "middle"; g.fillStyle = "#fff";
+    g.fillText(rank === 0 ? "1st" : "2nd", cx, y - 6 * u);
+    roundPortrait(pick[i], x + 26 * u, y + 30 * u, 18 * u);
+    g.textAlign = "left"; g.font = `${19 * u}px "Lilita One", "Arial Black", sans-serif`; g.fillStyle = "#fff";
+    g.fillText(FIGHTERS[pick[i]].name.toUpperCase(), x + 52 * u, y + 24 * u);
+    g.font = `600 ${11 * u}px system-ui, sans-serif`; g.fillStyle = "#8fc7ff";
+    g.fillText(FIGHTERS[pick[i]].title || "", x + 52 * u, y + 41 * u);
+    const rows = [["KOs", st0.kos], ["Falls", st0.falls], ["Accidents", st0.acc], ["Dmg Done", st0.done], ["Dmg Taken", st0.taken]];
+    rows.forEach(([label, v], r) => {
+      const yy = y + 66 * u + r * 16 * u;
+      g.textAlign = "left"; g.font = `700 ${13 * u}px system-ui, sans-serif`; g.fillStyle = "#fff"; g.fillText(label, x + 14 * u, yy);
+      g.textAlign = "right"; g.fillText(String(v), x + w - 14 * u, yy);
+    });
   }
   function rr(x, y, w, h, r) { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); }
 
@@ -562,6 +784,8 @@
     events(st); stepFx(); updateCam(st);
   }
   const dbg = { paused: false }; // test hook: freezes the sim for screenshots
+  // test hook: advance exactly n frames with fixed inputs while paused, for frame-exact captures
+  dbg.step = (n, a = 0, b = 0) => { for (let k = 0; k < n; k++) { M.step(st, [a, b]); events(st); stepFx(); updateCam(st); } };
   let acc = 0, last = performance.now();
   function frame(now) {
     acc += Math.min(250, now - last); last = now;
@@ -569,19 +793,66 @@
     while (acc >= 1000 / 60 && n < 6) { if (mode !== "menu" && mode !== "loading" && !dbg.paused) tick(); acc -= 1000 / 60; n++; }
     if (n === 6) acc = 0;
     draw();
-    if (mode === "loading") drawLoading();
+    if (mode === "loading") { loading.t++; drawLoading(); }
     requestAnimationFrame(frame);
   }
-  // a click on a mode never looks like a freeze: fighters load behind a progress bar
+  // a click on a mode never looks like a freeze: the versus screen from the reference, a card per
+  // fighter (art, name, title, four stat bars) sliding in, a loading bar on top and a tip below
+  const TIPS = ["The more damage you take, the farther each hit sends you.",
+    "Dodge with a direction to dash. Dodge with no direction to step back.",
+    "Hold heavy to charge it. Up and heavy is your recovery move.",
+    "A fighter flashes in their damage colour when hit. Red means one more hit.",
+    "Slide down a wall and jump off it to get back to the stage."];
   function drawLoading() {
-    const u = Math.min(W / 1280, H / 720), w = 360 * u, x = (W - w) / 2, y = H * 0.55;
+    const u = Math.min(W / 1280, H / 720), t = loading.t;
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
-    g.fillStyle = "rgba(11,10,26,0.72)"; g.fillRect(0, 0, W, H);
-    italic("LOADING FIGHTERS", W / 2, H * 0.5, 34 * u, "#ffffff", "center");
-    const k = loading.total ? loading.done / loading.total : 0;
-    g.fillStyle = "#1c1b46"; g.fillRect(x, y, w, 10 * u);
-    g.fillStyle = "#ffd36b"; g.fillRect(x, y, w * k, 10 * u);
-    g.strokeStyle = "#0b0a1a"; g.lineWidth = 3; g.strokeRect(x, y, w, 10 * u);
+    const bg = g.createLinearGradient(0, 0, 0, H);
+    bg.addColorStop(0, "#2a1d5e"); bg.addColorStop(0.6, "#6b4c9a"); bg.addColorStop(1, "#c98a7a");
+    g.globalAlpha = 0.94; g.fillStyle = bg; g.fillRect(0, 0, W, H); g.globalAlpha = 1;
+    // top bar with the progress fill
+    const k = loading.total ? loading.done / loading.total : 0, bw = Math.min(W - 40 * u, 560 * u), bx = (W - bw) / 2;
+    g.fillStyle = "rgba(14,12,48,0.9)"; g.fillRect(bx, 18 * u, bw, 30 * u);
+    g.fillStyle = "rgba(47,213,196,0.35)"; g.fillRect(bx, 18 * u, bw * k, 30 * u);
+    g.font = `${18 * u}px "Lilita One", "Arial Black", sans-serif`; g.textAlign = "center"; g.textBaseline = "middle"; g.fillStyle = "#fff";
+    g.fillText("LOADING...", W / 2, 34 * u);
+    const cw = Math.min(280 * u, W * 0.36), ch = cw * 1.55, gap = Math.min(150 * u, W * 0.1);
+    pick.forEach((id, i) => {
+      const slide = Math.max(0, 1 - t / 16), ease = slide * slide;
+      const cx = W / 2 + (i ? 1 : -1) * (gap / 2 + cw / 2) + (i ? 1 : -1) * ease * W * 0.6, cy = H * 0.52;
+      card(id, i, cx, cy, cw, ch, u);
+    });
+    g.save(); g.translate(W / 2, H * 0.52); display("VS", 0, 0, 90 * u, { alpha: Math.min(1, Math.max(0, (t - 10) / 8)) }); g.restore();
+    g.font = `600 ${15 * u}px system-ui, sans-serif`; g.fillStyle = "#f4ecff"; g.textAlign = "center";
+    g.fillStyle = "rgba(14,12,48,0.7)"; g.fillRect(0, H - 44 * u, W, 44 * u);
+    g.fillStyle = "#f4ecff"; g.fillText(TIPS[loading.tip], W / 2, H - 22 * u);
+  }
+  function card(id, i, cx, cy, w, h, u) {
+    const F = FIGHTERS[id], x = cx - w / 2, y = cy - h / 2, arch = w * 0.5, def = defs[i];
+    const shape = (pad) => { g.beginPath(); g.moveTo(x + pad, y + h - pad); g.lineTo(x + pad, y + arch); g.arc(cx, y + arch, w / 2 - pad, Math.PI, 0); g.lineTo(x + w - pad, y + h - pad); g.closePath(); };
+    g.save();
+    shape(0); g.fillStyle = "#b9a27a"; g.fill(); g.lineWidth = 4; g.strokeStyle = "#0b0a1a"; g.stroke();
+    shape(9 * u); g.fillStyle = "#090a2e"; g.fill(); g.lineWidth = 3; g.strokeStyle = "#e9c27a"; g.stroke();
+    g.save(); shape(9 * u); g.clip();
+    const glow = g.createRadialGradient(cx, cy + h * 0.05, 10, cx, cy + h * 0.05, w * 0.7);
+    glow.addColorStop(0, F.color + "66"); glow.addColorStop(1, "rgba(9,10,46,0)");
+    g.fillStyle = glow; g.fillRect(x, y, w, h);
+    const art = cardArt[id];
+    if (art) { const ah = h * 0.5, aw = art.width / art.height * ah, s2 = Math.min(1, (w * 0.9) / aw); g.drawImage(art, cx - (aw * s2) / 2, cy + h * 0.27 - ah * s2, aw * s2, ah * s2); }
+    g.restore();
+    g.fillStyle = TEAM[i]; g.beginPath(); g.arc(cx, y + 8 * u, 20 * u, 0, 7); g.fill(); g.lineWidth = 4; g.strokeStyle = "#0b0a1a"; g.stroke();
+    g.font = `${34 * u}px "Lilita One", "Arial Black", sans-serif`; g.textAlign = "center"; g.textBaseline = "middle";
+    g.lineWidth = 6 * u; g.strokeStyle = "#0b0a1a"; g.strokeText(F.name.toUpperCase(), cx, y + 58 * u); g.fillStyle = "#fff"; g.fillText(F.name.toUpperCase(), cx, y + 58 * u);
+    g.font = `600 ${13 * u}px system-ui, sans-serif`; g.fillStyle = "#9fc4ff"; g.fillText(F.title || "", cx, y + 84 * u);
+    if (def) {
+      const st0 = def.stats || {}, moves = def.moves || [], dmg = moves.reduce((a, m) => a + (m.dmg || 0), 0);
+      const bars = [["POWER", dmg], ["SPEED", st0.run || 100], ["AIR", ((st0.airSpeed || 100) + (st0.jump || 100)) / 2], ["WEIGHT", st0.weight || 100]];
+      bars.forEach(([label, v], r) => {
+        const yy = y + h - 82 * u + r * 17 * u, n = Math.max(1, Math.min(10, Math.round(5 + (v - 100) / 4))); // baseline 100 = 5 of 10
+        g.font = `700 ${10 * u}px system-ui, sans-serif`; g.textAlign = "left"; g.fillStyle = "#9fc4ff"; g.fillText(label, x + 22 * u, yy);
+        for (let b = 0; b < 10; b++) { g.fillStyle = b < n ? "#2fd5c4" : "#1f2156"; g.fillRect(x + 82 * u + b * 15 * u, yy - 5 * u, 13 * u, 10 * u); }
+      });
+    }
+    g.restore();
   }
 
   // ---------- online: rollback over a WebRTC data channel (game/net.js) ----------
@@ -660,8 +931,8 @@
   }
   async function startOnline() {
     pick = net.me === 0 ? [net.mine, net.theirs] : [net.theirs, net.mine];
-    mode = "loading"; hideMenu();
-    await load();
+    const t0 = performance.now(); mode = "loading"; hideMenu();
+    await load(); await holdCards(t0);
     if (!net.conn) return showMenu();
     net.session = new Net.Session(M, net.me, (msg) => { if (net.conn && net.conn.open) net.conn.send(msg); }, Net.makeStep(Sim, M));
     st = net.session.state;
@@ -719,6 +990,7 @@
 
   buildPickers();
   loadStage();
+  if (document.fonts) document.fonts.load('40px "Lilita One"'); // canvas text alone never triggers the web font download
   if (params.get("join")) { // opened from a friend's link: pick a fighter, then join
     showMenu(); document.getElementById("online").hidden = false;
     document.getElementById("joinCode").value = params.get("join").toUpperCase();

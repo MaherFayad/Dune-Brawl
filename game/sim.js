@@ -51,7 +51,7 @@
     chargeMax: 30,      // heavies with `charge` can be held up to 30 frames for up to +50%
     wallJumps: 3, wallSlide: 500, // touching the island side: slide slowly, jump off it up to 3 times
     spawnDrop: 280, spawnRelease: 32, // pads hang above the soft platforms; the drop falls through them
-    buffer: 7, countdown: 90, stocks: 3, deadFrames: 115, respawnInv: 100,
+    buffer: 7, countdown: 126, stocks: 3, deadFrames: 115, respawnInv: 100, // countdown: 3, 2, 1 at 42 frames each, as measured in the reference
     respawnHang: 150,   // a respawned fighter hangs on its pad until any input, at most this long
   };
 

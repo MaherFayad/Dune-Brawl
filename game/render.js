@@ -108,6 +108,18 @@
     return best;
   }
 
+  // Generated clips often freeze on a pose for many frames (a held extension, a held wind-up).
+  // Attacks play a sequence that keeps at most 2 frames of any held pose, so the time the move
+  // data gives a phase is spent on motion, and the hold reads as a crisp beat, not a stall.
+  function unhold(bounds) {
+    const same = (a, b) => a && b && a.every((v, j) => Math.abs(v - b[j]) <= 2);
+    const seq = [0]; let run = 0;
+    for (let k = 1; k < bounds.length; k++) {
+      if (same(bounds[k], bounds[seq[seq.length - 1]])) { if (++run <= 1) seq.push(k); } else { run = 0; seq.push(k); }
+    }
+    return seq;
+  }
+
   // A sheet that is not made yet borrows the closest one, so a fighter with only the core set
   // (idle, run, jump, hurt, jab, side_light, side_heavy, nair) still animates every move.
   const STAND_IN = { side_heavy: "side_light", side_light: "jab", jab: "side_light", nair: "jab", hurt: "idle",
@@ -127,7 +139,14 @@
     for (let pass = 0; pass < 3; pass++) for (const n in STAND_IN) if (!sheets[n] && sheets[STAND_IN[n]]) sheets[n] = sheets[STAND_IN[n]];
     const h = opts.height || BODY_PX;
     for (const n in sheets) if (sheets[n] && !sheets[n].sized) { sheets[n].scale *= h / BODY_PX; sheets[n].sized = 1; }
-    const strike = SLOT_SHEETS.map((n, i) => (sheets[n] ? strikeFrame(sheets[n], SLOT_AXIS[i]) : 0));
+    for (const n of SLOT_SHEETS) if (sheets[n] && !sheets[n].seq) sheets[n].seq = unhold(sheets[n].bounds);
+    // the strike frame, as an index into the attack's frame sequence
+    const strike = SLOT_SHEETS.map((n, i) => {
+      if (!sheets[n]) return 0;
+      const sf = strikeFrame(sheets[n], SLOT_AXIS[i]), seq = sheets[n].seq;
+      let j = 0; while (j + 1 < seq.length && seq[j + 1] <= sf) j++;
+      return j;
+    });
     return { id, sheets, strike, h };
   }
 
@@ -150,13 +169,14 @@
     if (p.st === ST.ATK) {
       const m = moves[p.mv], name = SLOT_SHEETS[p.mv], sh = S[name];
       if (!sh) return air();
-      const sf = F.strike[p.mv], n = sh.n;
-      if (p.mv === 9 && p.t >= m.su) return pick(name, sf); // ground pound holds the down air strike pose
+      const seq = sh.seq || [...Array(sh.n).keys()], sf = F.strike[p.mv], n = seq.length;
+      const at = (k) => pick(name, seq[Math.max(0, Math.min(n - 1, Math.round(k)))]);
+      if (p.mv === 9 && p.t >= m.su) return at(sf); // ground pound holds the down air strike pose
       let k;
       if (p.t < m.su) k = (p.t / m.su) * sf;
       else if (p.t < m.su + m.ac) k = sf + ((p.t - m.su) / m.ac) * Math.min(2, n - 1 - sf);
       else k = sf + 2 + ((p.t - m.su - m.ac) / Math.max(1, m.re)) * (n - 1 - sf - 2);
-      return pick(name, k);
+      return at(k);
     }
     if (p.st === ST.HIT) {
       if (S.tumble && p.launch > 2600) return loop("tumble", 3);
