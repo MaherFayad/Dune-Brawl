@@ -48,17 +48,20 @@
   }
 
   // ---------- bot (render-side input generator; local modes only) ----------
-  let botTick = 0;
   function bot(s, i, level) {
     const me = s.p[i], foe = s.p[1 - i], m = STAGE.main;
-    botTick++;
     if (me.st === ST.DEAD || s.f < FEEL.countdown) return 0;
-    const even = botTick % 2 === 0, dx = foe.x - me.x, dy = foe.y - me.y;
+    // alternate press and release per bot from the sim frame: a shared counter bumped by two
+    // bots each frame gave each one a constant parity, so one held jump forever and never jumped
+    const even = (s.f + i) % 2 === 0, dx = foe.x - me.x, dy = foe.y - me.y;
     let v = 0;
     const offL = me.x < m.x1 + 10 * S, offR = me.x > m.x2 - 10 * S;
-    if (((me.x < m.x1 - 4 * S || me.x > m.x2 + 4 * S) && !me.ground) || (!me.ground && me.y > m.y - 10 * S && (offL || offR))) {
-      v |= me.x < 640 * S ? IN.R : IN.L;
-      if (me.vy > -200 && even) v |= me.jumps > 0 ? IN.J : me.recov ? 0 : IN.U | IN.B;
+    const under = !me.ground && me.y > m.y; // below the stage top while airborne means off stage
+    if (((me.x < m.x1 - 4 * S || me.x > m.x2 + 4 * S) && !me.ground) || under || (!me.ground && me.y > m.y - 10 * S && (offL || offR))) {
+      // under the island: steer out past the nearer ledge first, then back in once above it
+      const cx = (m.x1 + m.x2) / 2, outside = me.x < m.x1 || me.x > m.x2;
+      v |= under && !outside ? (me.x < cx ? IN.L : IN.R) : me.x < cx ? IN.R : IN.L;
+      if (me.vy > -200 && even) v |= me.wall || me.jumps > 0 ? IN.J : me.recov ? 0 : IN.U | IN.B;
       return v;
     }
     if (foe.st === ST.DEAD) return Math.abs(me.x - 640 * S) > 60 * S ? (me.x < 640 * S ? IN.R : IN.L) : 0;
@@ -85,19 +88,20 @@
     // Value plan: the background is the quietest layer (hazy, soft, desaturated), the stage is
     // calmer than the fighters except for its bright walkable top edge, and the fighters carry
     // the most saturation and the darkest outlines.
-    stageArt.bg = bg && grade(bg, "saturate(0.72) brightness(0.8) contrast(0.85) blur(3px)", null, true);
-    stageArt.island = island && shade(edgeLit(island, "saturate(0.78) brightness(0.72) contrast(0.95)", 0.05));
-    stageArt.plat = plat && edgeLit(plat, "saturate(0.7) brightness(0.66)", 0.2);
+    stageArt.bg = bg && grade(bg, "saturate(0.62) brightness(1.2) contrast(0.8) blur(2px)", null, true);
+    stageArt.island = island && shade(edgeLit(island, "saturate(0.85) brightness(0.56) contrast(1.05)", 0.05));
+    stageArt.plat = plat && edgeLit(plat, "saturate(0.8) brightness(0.56)", 0.2);
   }
   function grade(im, filter, haze, sky) {
     const c = document.createElement("canvas"); c.width = im.width; c.height = im.height;
     const x = c.getContext("2d"); x.filter = filter; x.drawImage(im, 0, 0); x.filter = "none";
     if (haze) { x.fillStyle = haze; x.fillRect(0, 0, c.width, c.height); }
     if (sky) {
-      // cool, darker sky up top where the fighters jump; warm glow kept low on the horizon
+      // high-key sky like the reference: a pale warm haze lifts the area the fighters jump
+      // through, so their darker, saturated colors read against it
       const v = x.createLinearGradient(0, 0, 0, c.height);
-      v.addColorStop(0, "rgba(22,14,64,0.62)"); v.addColorStop(0.45, "rgba(52,30,96,0.34)");
-      v.addColorStop(0.7, "rgba(255,140,80,0.06)"); v.addColorStop(1, "rgba(40,18,40,0.35)");
+      v.addColorStop(0, "rgba(255,240,222,0.34)"); v.addColorStop(0.5, "rgba(255,232,206,0.2)");
+      v.addColorStop(0.8, "rgba(255,200,150,0.08)"); v.addColorStop(1, "rgba(60,30,40,0.2)");
       x.fillStyle = v; x.fillRect(0, 0, c.width, c.height);
     }
     return c;
@@ -201,7 +205,8 @@
     const live = s.p.filter((p) => p.st !== ST.DEAD);
     let x0 = 420, x1 = 860, y0 = 300, y1 = 520;
     for (const p of live) { const x = p.x / S, y = p.y / S; x0 = Math.min(x0, x - 140); x1 = Math.max(x1, x + 140); y0 = Math.min(y0, y - 200); y1 = Math.max(y1, y + 90); }
-    const z = Math.max(0.7, Math.min(1.35, Math.min(1280 / (x1 - x0 + 220), 720 / (y1 - y0 + 180)))) + fx.zoomKick;
+    // reference framing: a body is 8 to 10 percent of screen height up close, about 6 when spread out
+    const z = Math.max(0.62, Math.min(1.1, Math.min(1280 / (x1 - x0 + 220), 720 / (y1 - y0 + 180)))) + fx.zoomKick;
     const tx = ((x0 + x1) / 2) * 0.75 + 160, ty = ((y0 + y1) / 2) * 0.75 + 95;
     cam.x += (tx - cam.x) * 0.1; cam.y += (ty - cam.y) * 0.1; cam.z += (z - cam.z) * 0.08;
   }
@@ -245,7 +250,7 @@
     }
     g.restore();
     const v = g.createRadialGradient(W / 2, H * 0.48, Math.min(W, H) * 0.35, W / 2, H * 0.5, Math.max(W, H) * 0.75);
-    v.addColorStop(0, "rgba(10,4,20,0)"); v.addColorStop(1, "rgba(10,4,20,0.55)");
+    v.addColorStop(0, "rgba(10,4,20,0)"); v.addColorStop(1, "rgba(10,4,20,0.22)");
     g.fillStyle = v; g.fillRect(0, 0, W, H);
   }
   function drawStage() {
@@ -254,7 +259,7 @@
       const im = stageArt.island, w = (x2 - x1) * 1.06, h = (im.height / im.width) * w;
       g.drawImage(im, x1 - (w - (x2 - x1)) / 2, y - h * 0.035, w, h);
     } else {
-      g.fillStyle = "#7b4a3a"; g.fillRect(x1, y, x2 - x1, m.yb / S - y);
+      g.fillStyle = "#7b4a3a"; g.fillRect(x1, y, x2 - x1, m.keel / S);
     }
     g.fillStyle = "rgba(255,226,170,0.9)"; g.fillRect(x1 + 6, y - 1, x2 - x1 - 12, 2); // brightest line: the stage edge
     for (const pl of STAGE.plats) {
@@ -485,5 +490,8 @@
   loadStage();
   if (params.get("mode")) startMatch(params.get("mode")); else showMenu();
   requestAnimationFrame(frame);
-  window.__db = Object.assign(dbg, { get state() { return st; }, get mode() { return mode; }, fx, cam });
+  // defineProperties, not Object.assign: assign would copy the getters' values once at load
+  window.__db = Object.defineProperties(dbg, {
+    state: { get: () => st }, mode: { get: () => mode }, fx: { value: fx }, cam: { value: cam },
+  });
 })();

@@ -5,6 +5,8 @@ import { createRequire } from "node:module";
 const require = createRequire(import.meta.url);
 const Sim = require("../game/sim.js");
 const { S, IN, ST, STAGE, FEEL } = Sim;
+// FEEL_OVERRIDE='{"grav":60}' node tests/feel.mjs  tries values without editing the sim
+if (process.env.FEEL_OVERRIDE) Object.assign(FEEL, JSON.parse(process.env.FEEL_OVERRIDE));
 
 const id = process.argv[2] && !process.argv[2].startsWith("--") ? process.argv[2] : "djinn-warrior";
 const def = (f) => JSON.parse(readFileSync(new URL(`../assets/fighters/${f}/moves.draft.json`, import.meta.url)));
@@ -23,6 +25,8 @@ function run(M, s, frames, inA = () => 0, inB = () => 0) {
 }
 
 const out = {};
+out.stageWidth = b(STAGE.main.x2 - STAGE.main.x1);
+out.platformHeight = b(STAGE.main.y - STAGE.plats[0].y);
 { // run speed and stage crossing
   const { M, s } = fresh();
   run(M, s, 40, () => IN.R);
@@ -67,12 +71,14 @@ function launch(slot, pct, victimAI, mid) {
   }
   return { speed: b(speed), stun, ko, frames };
 }
-// a victim that holds toward the stage and uses its jumps and recovery once hitstun ends
+// a victim that recovers like a player: drift toward the stage, save jumps until it drops to
+// ledge height, recovery move when out of jumps, wall jumps off the island side
 const recoverAI = (s) => {
   const v = s.p[1], m = STAGE.main;
-  if (v.st !== ST.IDLE || v.ground) return 0;
+  if (v.st === ST.HIT || v.st === ST.DEAD || v.ground) return 0;
   let k = v.x > m.x2 ? IN.L : v.x < m.x1 ? IN.R : 0;
-  if (v.vy > 0 && s.f % 2 === 0) k |= v.jumps > 0 ? IN.J : v.recov ? 0 : IN.U | IN.B;
+  const low = v.y > m.y - 40 * S;
+  if (v.st === ST.IDLE && v.vy > 0 && low && s.f % 2 === 0) k |= v.wall || v.jumps > 0 ? IN.J : v.recov ? 0 : IN.U | IN.B;
   return k;
 };
 out.launchLight50 = launch(1, 50).speed;
