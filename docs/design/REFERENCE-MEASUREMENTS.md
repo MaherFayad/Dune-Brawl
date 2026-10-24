@@ -1,6 +1,6 @@
 # Reference measurements
 
-Source: the reference video Maher shared (Brawlhalla, Valencia Elimination Top 16, 1280x720 at 59.94 fps, 14 min 40 s, 4 games). The footage is copyrighted, so frames and clips stay out of the repo; only the numbers below are kept.
+Source: the reference video Maher shared (a 1v1 platform fighter tournament broadcast, 1280x720 at 59.94 fps, 14 min 40 s, 4 games). The footage is copyrighted, so frames and clips stay out of the repo; only the numbers below are kept.
 
 Units: **bodies** (one fighter's standing height) and **frames at 60 fps**. Bodies cancel out the broadcast camera's constant pan and zoom, so a number taken at one zoom compares directly with our sim.
 
@@ -13,7 +13,7 @@ Confidence: **High** means a direct count or a repeated measurement. **Medium** 
 | Game length | 180 to 245 s (mean 214 s) | Set score changes and stage transitions | High | not tested yet |
 | Stocks | 3 each | Stock digit in the top-right HUD | High | 3 |
 | KO rate | about one per 40 s | Stock decrements against time, game 1 | High | one per 42 s (16 bot matches, `tests/pace.js`) |
-| Damage at KO | mostly red ring (150+), some orange (100 to 150) | Ring colour at each stock loss; the Brawlhalla wiki gives most KOs at 150 to 200 | High | mean 184% across 16 matches |
+| Damage at KO | mostly red ring (150+), some orange (100 to 150) | Ring colour at each stock loss; the reference game's community wiki gives most KOs at 150 to 200 | High | mean 184% across 16 matches |
 | Side heavy kill near ledge | 150 to 200 band | Wiki band plus ring colour | Medium | 110 to 140% single hit (traded for match-level pacing, see round 2) |
 | Main stage width | 13.6 to 15.5 bodies | Stage ends against body height, two stages | Medium | 14.1 |
 | Soft platform | 5 bodies wide, 3.3 above the main stage, one or none per stage | Same frames | Medium | two platforms, 4.4 wide, 3.0 up |
