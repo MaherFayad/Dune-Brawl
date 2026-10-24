@@ -1,0 +1,18 @@
+{
+  "id": "chameleon-slinger",
+  "name": "Hirba",
+  "stats": { "run": 100, "airSpeed": 100, "jump": 102, "gravity": 95, "fallSpeed": 95, "airJumps": 2, "weight": 96, "hurtW": 30, "height": 66 },
+  "hook": { "pebbleMove": 1, "pebbleSpawnFrame": 4, "pebbleSpawnX": 30, "pebbleSpawnY": -42, "pebbleVx": 1400, "pebbleLife": 40, "pebbleMaxOnScreen": 1, "pebbleDmg": 7, "tetherMove": 6, "tetherReach": 160, "tetherFrames": 14, "tetherPullSpeed": 1600, "tetherLedgeOnly": 0, "tetherFoePull": 1 },
+  "moves": [
+    { "name": "Tail Flick", "su": 3, "ac": 2, "re": 7, "box": [8, 62, -62, -28], "dmg": 5, "kb": 330, "kg": 12, "ax": 80, "ay": -60 },
+    { "name": "Pebble Shot", "su": 4, "ac": 3, "re": 11, "box": [12, 160, -54, -26], "dmg": 7, "kb": 360, "kg": 24, "ax": 90, "ay": -44 },
+    { "name": "Tongue Trip", "su": 5, "ac": 4, "re": 12, "box": [0, 112, -12, 0], "dmg": 7, "kb": 420, "kg": 14, "ax": 20, "ay": -98 },
+    { "name": "Tongue Snap", "su": 4, "ac": 4, "re": 12, "box": [-12, 20, -152, -60], "dmg": 8, "kb": 410, "kg": 20, "ax": 10, "ay": -100 },
+    { "name": "Coil Spin", "su": 3, "ac": 5, "re": 9, "box": [-48, 48, -70, -6], "dmg": 9, "kb": 370, "kg": 24, "ax": 70, "ay": -71, "away": 1, "air": 1 },
+    { "name": "Tongue Lash", "su": 13, "ac": 4, "re": 24, "box": [16, 142, -52, -30], "dmg": 16, "kb": 520, "kg": 70, "ax": 88, "ay": -47, "charge": 1 },
+    { "name": "Tongue Tether", "su": 5, "ac": 12, "re": 18, "box": [8, 122, -124, -40], "dmg": 9, "kb": 440, "kg": 26, "ax": 50, "ay": -87, "iy": -1500, "ix": 700 },
+    { "name": "Color Burst", "su": 12, "ac": 5, "re": 22, "box": [-88, 88, -32, 0], "dmg": 14, "kb": 500, "kg": 56, "ax": 70, "ay": -71, "away": 1, "charge": 1 },
+    { "name": "Hat Drop", "su": 5, "ac": 4, "re": 11, "box": [-24, 24, -6, 30], "dmg": 10, "kb": 370, "kg": 28, "ax": 35, "ay": 94, "air": 1 },
+    { "name": "Tail Anchor", "su": 9, "ac": 40, "re": 14, "box": [-28, 28, -24, 22], "dmg": 13, "kb": 500, "kg": 44, "ax": 30, "ay": -95, "iy": 2100, "air": 1, "endOnLand": 1 }
+  ]
+}

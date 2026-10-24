@@ -1,0 +1,17 @@
+{
+  "id": "gorilla-lumberjack",
+  "name": "Timber",
+  "stats": { "run": 85, "airSpeed": 88, "jump": 90, "gravity": 110, "fallSpeed": 110, "airJumps": 2, "weight": 108, "hurtW": 48, "height": 72 },
+  "moves": [
+    { "name": "Knuckle Bop", "su": 3, "ac": 2, "re": 9, "box": [8, 62, -66, -30], "dmg": 5, "kb": 350, "kg": 10, "ax": 80, "ay": -60 },
+    { "name": "Haft Shove", "su": 5, "ac": 3, "re": 11, "box": [10, 88, -62, -20], "dmg": 8, "kb": 400, "kg": 20, "ax": 88, "ay": -47, "ix": 300 },
+    { "name": "Stump Sweep", "su": 5, "ac": 4, "re": 11, "box": [0, 80, -26, 0], "dmg": 8, "kb": 450, "kg": 12, "ax": 26, "ay": -97, "ix": 500 },
+    { "name": "Branch Lift", "su": 5, "ac": 4, "re": 11, "box": [-42, 42, -132, -60], "dmg": 7, "kb": 420, "kg": 16, "ax": 12, "ay": -99 },
+    { "name": "Log Roll", "su": 4, "ac": 6, "re": 11, "box": [-54, 54, -78, -4], "dmg": 8, "kb": 390, "kg": 16, "ax": 70, "ay": -71, "away": 1, "air": 1 },
+    { "name": "Timber Fall", "su": 14, "ac": 5, "re": 26, "box": [10, 118, -76, -6], "dmg": 16, "kb": 600, "kg": 58, "ax": 85, "ay": -53, "ix": 400, "armor": [4, 13], "charge": 1 },
+    { "name": "Treetop Climb", "su": 6, "ac": 10, "re": 22, "box": [-34, 44, -124, -20], "dmg": 10, "kb": 500, "kg": 22, "ax": 25, "ay": -97, "iy": -1600, "ix": 200 },
+    { "name": "Splitting Maul", "su": 14, "ac": 5, "re": 24, "box": [-96, 96, -36, 0], "dmg": 14, "kb": 560, "kg": 40, "ax": 66, "ay": -75, "away": 1, "armor": [4, 13], "charge": 1 },
+    { "name": "Bark Stomp", "su": 5, "ac": 4, "re": 13, "box": [-28, 28, -6, 34], "dmg": 8, "kb": 400, "kg": 20, "ax": 30, "ay": 95, "air": 1 },
+    { "name": "Sorry Drop", "su": 10, "ac": 40, "re": 16, "box": [-36, 36, -28, 24], "dmg": 13, "kb": 560, "kg": 32, "ax": 35, "ay": -94, "iy": 2300, "air": 1, "endOnLand": 1 }
+  ]
+}

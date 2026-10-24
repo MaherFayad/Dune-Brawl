@@ -1,0 +1,17 @@
+{
+  "id": "fennec-host",
+  "name": "Finjan",
+  "stats": { "run": 120, "airSpeed": 112, "jump": 108, "gravity": 112, "fallSpeed": 115, "airJumps": 3, "weight": 82, "hurtW": 26, "height": 40 },
+  "moves": [
+    { "name": "Cup Flick", "su": 3, "ac": 2, "re": 5, "box": [6, 46, -38, -14], "dmg": 5, "kb": 300, "kg": 12, "ax": 70, "ay": -71 },
+    { "name": "Dallah Swing", "su": 4, "ac": 3, "re": 8, "box": [6, 66, -36, -8], "dmg": 9, "kb": 340, "kg": 26, "ax": 84, "ay": -54, "ix": 600 },
+    { "name": "Tail Sweep", "su": 4, "ac": 3, "re": 8, "box": [0, 54, -16, 0], "dmg": 8, "kb": 400, "kg": 16, "ax": 26, "ay": -97, "ix": 1100 },
+    { "name": "Ear Flick", "su": 3, "ac": 4, "re": 8, "box": [-26, 26, -78, -30], "dmg": 8, "kb": 380, "kg": 22, "ax": 12, "ay": -99 },
+    { "name": "Saucer Spin", "su": 3, "ac": 5, "re": 7, "box": [-38, 38, -46, 0], "dmg": 8, "kb": 340, "kg": 22, "ax": 70, "ay": -71, "away": 1, "air": 1 },
+    { "name": "Steam Pour", "su": 11, "ac": 6, "re": 16, "box": [8, 86, -52, -4], "dmg": 15, "kb": 480, "kg": 70, "ax": 86, "ay": -51, "ix": 500, "charge": 1 },
+    { "name": "Spout Rocket", "su": 4, "ac": 10, "re": 16, "box": [-24, 30, -82, -10], "dmg": 9, "kb": 440, "kg": 34, "ax": 30, "ay": -95, "iy": -1600, "ix": 360 },
+    { "name": "Coffee Ring", "su": 11, "ac": 5, "re": 18, "box": [-68, 68, -24, 0], "dmg": 13, "kb": 480, "kg": 62, "ax": 74, "ay": -67, "away": 1, "charge": 1 },
+    { "name": "Lid Drop", "su": 4, "ac": 3, "re": 9, "box": [-18, 18, -4, 26], "dmg": 9, "kb": 340, "kg": 28, "ax": 40, "ay": 92, "air": 1 },
+    { "name": "Cardamom Drop", "su": 8, "ac": 40, "re": 12, "box": [-24, 24, -18, 16], "dmg": 13, "kb": 480, "kg": 48, "ax": 30, "ay": -95, "iy": 2300, "air": 1, "endOnLand": 1 }
+  ]
+}

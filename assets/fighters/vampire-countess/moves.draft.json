@@ -1,0 +1,17 @@
+{
+  "id": "vampire-countess",
+  "name": "Vespera",
+  "stats": { "run": 95, "airSpeed": 106, "jump": 110, "gravity": 82, "fallSpeed": 86, "airJumps": 2, "weight": 96, "hurtW": 32, "height": 70 },
+  "moves": [
+    { "name": "Parasol Tap", "su": 3, "ac": 2, "re": 7, "box": [8, 68, -64, -32], "dmg": 5, "kb": 320, "kg": 12, "ax": 80, "ay": -60 },
+    { "name": "Rapier Lunge", "su": 5, "ac": 3, "re": 10, "box": [14, 106, -54, -34], "dmg": 9, "kb": 370, "kg": 28, "ax": 88, "ay": -47, "ix": 380 },
+    { "name": "Shade Snap", "su": 5, "ac": 4, "re": 20, "box": [6, 58, -64, -4], "dmg": 6, "kb": 420, "kg": 14, "ax": 30, "ay": -95, "parry": [2, 7] },
+    { "name": "Rising Point", "su": 4, "ac": 4, "re": 10, "box": [-20, 30, -136, -62], "dmg": 8, "kb": 410, "kg": 20, "ax": 10, "ay": -100 },
+    { "name": "Cape Twirl", "su": 3, "ac": 6, "re": 9, "box": [-52, 52, -76, -6], "dmg": 8, "kb": 370, "kg": 20, "ax": 70, "ay": -71, "away": 1, "air": 1 },
+    { "name": "Countess Thrust", "su": 13, "ac": 4, "re": 22, "box": [16, 130, -54, -30], "dmg": 16, "kb": 530, "kg": 66, "ax": 90, "ay": -44, "ix": 520, "charge": 1 },
+    { "name": "Bat Swarm", "su": 5, "ac": 14, "re": 18, "box": [-36, 36, -112, -10], "dmg": 9, "kb": 460, "kg": 28, "ax": 30, "ay": -95, "iy": -1650, "ix": 260 },
+    { "name": "Parasol Pirouette", "su": 12, "ac": 6, "re": 22, "box": [-92, 92, -36, 0], "dmg": 14, "kb": 500, "kg": 52, "ax": 70, "ay": -71, "away": 1, "charge": 1 },
+    { "name": "Tip Drop", "su": 5, "ac": 4, "re": 11, "box": [-14, 14, -4, 40], "dmg": 10, "kb": 360, "kg": 28, "ax": 30, "ay": 95, "air": 1 },
+    { "name": "Nightfall", "su": 9, "ac": 40, "re": 14, "box": [-28, 28, -26, 22], "dmg": 12, "kb": 480, "kg": 42, "ax": 30, "ay": -95, "iy": 1900, "air": 1, "endOnLand": 1 }
+  ]
+}
