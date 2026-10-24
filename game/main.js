@@ -34,9 +34,9 @@
     if (e.target.tagName === "INPUT") return;
     keys.add(e.code);
     if (["Space", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "F2", "F3"].includes(e.code)) e.preventDefault();
-    if (e.code === "F2") togglePanel();
+    if (e.code === "F2" && mode !== "online") togglePanel(); // live physics edits would desync an online match
     if (e.code === "F3") showBoxes = !showBoxes;
-    if (e.code === "Escape") showMenu();
+    if (e.code === "Escape") { if (mode === "online") leaveOnline("You left the match."); showMenu(); }
   });
   addEventListener("keyup", (e) => keys.delete(e.code));
   addEventListener("blur", () => keys.clear());
@@ -154,13 +154,13 @@
   // ---------- match ----------
   let mode = "menu", pick = [params.get("p1") || "djinn-warrior", params.get("p2") || "dune-ghoul"];
   let M = null, st = null, defs = [], gfx = [], showBoxes = false;
-  async function startMatch(m) {
-    mode = "loading"; hideMenu();
+  async function load() {
     defs = await Promise.all(pick.map(async (id) => (await fetch(`${ROOT}/assets/fighters/${id}/moves.draft.json`)).json()));
     gfx = await Promise.all(pick.map((id, i) => Render.loadFighter(id, ROOT, { art: FIGHTERS[id].art, height: (defs[i].stats || {}).height, basePose: FIGHTERS[id].basePose })));
     await Promise.all(pick.map((id) => new Promise((ok) => { const im = new Image(); im.onload = () => { portraits[id] = im; ok(); }; im.onerror = ok; im.src = portraitSrc(id); })));
-    M = Sim.match(defs[0], defs[1]); st = M.create(); fx.reset(); mode = m;
+    M = Sim.match(defs[0], defs[1]); st = M.create(); fx.reset();
   }
+  async function startMatch(m) { mode = "loading"; hideMenu(); await load(); mode = m; }
   function rebuild() { if (defs.length) { M = Sim.match(defs[0], defs[1]); } }
 
   // ---------- effects (render only, driven by sim events) ----------
@@ -460,6 +460,10 @@
   }
   function hud(s) {
     const u = Math.min(W / 1280, H / 720), r = 19 * u, top = 30 * u;
+    if (mode === "online" && net.session) {
+      const d = net.session.desync;
+      italic(d >= 0 ? `OUT OF SYNC AT FRAME ${d}` : `ONLINE  ${Math.round(net.rtt)} MS`, 18 * u, H - 18 * u, 13 * u, d >= 0 ? "#ff6b6b" : "#ffffff", "left");
+    }
     const right = W - 26 * u;
     const cx2 = right - r, cx1 = cx2 - r * 2.85;
     // match timer: 8 minutes from the end of the countdown
@@ -525,6 +529,13 @@
 
   // ---------- loop ----------
   function tick() {
+    if (mode === "online") {
+      if (!net.session) return;
+      net.session.tick(read(SOLO) | pad(0));
+      st = net.session.state;
+      events(st); stepFx(); updateCam(st);
+      return;
+    }
     if (!st) return;
     let a = 0, b = 0;
     if (mode === "bot") { a = read(SOLO) | pad(0); b = bot(st, 1, 1); }
@@ -545,6 +556,92 @@
     if (n === 6) acc = 0;
     draw();
     requestAnimationFrame(frame);
+  }
+
+  // ---------- online: rollback over a WebRTC data channel (game/net.js) ----------
+  // PeerJS's free public server only introduces the two browsers; the match itself runs peer to
+  // peer. A room is a 5 letter code; the host plays on the left. Add TURN servers in
+  // game/net-config.js if friends on strict networks (mobile hotspots, some ISPs) cannot connect.
+  const ROOM = "dune-brawl-v1-";
+  const ICE = [{ urls: "stun:stun.l.google.com:19302" }, { urls: "stun:stun.cloudflare.com:3478" }].concat(window.DUNE_TURN || []);
+  // both sides must run the same rules: a mismatch would desync, so it refuses to start instead
+  const VERSION = (() => { let h = 5381; for (const c of JSON.stringify([FEEL, Object.keys(FIGHTERS)])) h = (h * 33 + c.charCodeAt(0)) >>> 0; return h.toString(36); })();
+  const net = { peer: null, conn: null, me: 0, session: null, queue: [], rtt: 0, mine: null, theirs: null, started: false, timer: 0 };
+  const say = (t) => { document.getElementById("netStatus").textContent = t; };
+  function newCode() {
+    const a = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; let c = "";
+    for (let k = 0; k < 5; k++) c += a[Math.floor(Math.random() * a.length)];
+    return c;
+  }
+  function leaveOnline(why) {
+    clearInterval(net.timer);
+    const peer = net.peer, conn = net.conn;
+    Object.assign(net, { peer: null, conn: null, session: null, queue: [], theirs: null, started: false });
+    if (conn) conn.close();
+    if (peer) peer.destroy();
+    if (net.mine) pick[0] = net.mine;
+    if (why) say(why);
+  }
+  function hostRoom() {
+    if (!window.Peer) return say("The online library did not load. Check your connection and refresh.");
+    leaveOnline();
+    const code = newCode();
+    net.peer = new Peer(ROOM + code, { config: { iceServers: ICE } });
+    say("Opening a room...");
+    net.peer.on("open", () => {
+      const link = `${location.origin}${location.pathname}?join=${code}`;
+      document.getElementById("netLink").hidden = false;
+      document.getElementById("netLinkText").value = link;
+      say(`Room ${code} is open. Send your friend the link, then wait here.`);
+    });
+    net.peer.on("connection", (c) => { if (net.conn) c.close(); else connected(c, 0); });
+    net.peer.on("error", (e) => (e.type === "unavailable-id" ? hostRoom() : say(`Online error: ${e.type}. Try again.`)));
+  }
+  function joinRoom(raw) {
+    const code = raw.trim().toUpperCase();
+    if (!window.Peer) return say("The online library did not load. Check your connection and refresh.");
+    if (code.length !== 5) return say("Type the 5 letter room code first.");
+    leaveOnline();
+    net.peer = new Peer({ config: { iceServers: ICE } });
+    say(`Joining room ${code}...`);
+    net.peer.on("open", () => connected(net.peer.connect(ROOM + code, { reliable: false, serialization: "json" }), 1));
+    net.peer.on("error", (e) => say(e.type === "peer-unavailable" ? `No room ${code}. Check the code with your friend.` : `Online error: ${e.type}. Try again.`));
+  }
+  function connected(c, me) {
+    net.conn = c; net.me = me; net.mine = pick[0];
+    c.on("open", () => {
+      say("Connected. Loading the match...");
+      // the channel may drop messages: keep saying hello until the friend's match is running
+      net.timer = setInterval(() => {
+        if (!c.open) return;
+        if (!net.started) c.send({ t: "hello", pick: net.mine, ver: VERSION });
+        c.send({ t: "ping", ts: performance.now() });
+      }, 250);
+    });
+    c.on("data", (m) => {
+      if (m.t === "ping") return c.send({ t: "pong", ts: m.ts });
+      if (m.t === "pong") { net.rtt = net.rtt ? net.rtt * 0.8 + (performance.now() - m.ts) * 0.2 : performance.now() - m.ts; return; }
+      if (m.t === "hello") {
+        if (m.ver !== VERSION) return say("Your friend has a different version of the game. Both of you refresh the page.");
+        if (!net.theirs && FIGHTERS[m.pick]) { net.theirs = m.pick; startOnline(); }
+        return;
+      }
+      if (m.t === "i") net.started = true;
+      if (net.session) net.session.receive(m); else net.queue.push(m);
+    });
+    c.on("close", () => { if (net.conn === c) { leaveOnline("Your friend left the match."); showMenu(); } });
+    c.on("error", () => { if (net.conn === c) { leaveOnline("The connection failed. Try again, or add a TURN server (see game/net-config.js)."); showMenu(); } });
+  }
+  async function startOnline() {
+    pick = net.me === 0 ? [net.mine, net.theirs] : [net.theirs, net.mine];
+    mode = "loading"; hideMenu();
+    await load();
+    if (!net.conn) return showMenu();
+    net.session = new Net.Session(M, net.me, (msg) => { if (net.conn && net.conn.open) net.conn.send(msg); }, Net.makeStep(Sim, M));
+    st = net.session.state;
+    for (const m of net.queue) net.session.receive(m);
+    net.queue = [];
+    mode = "online";
   }
 
   // ---------- menu ----------
@@ -568,6 +665,10 @@
   document.getElementById("bBot").onclick = () => startMatch("bot");
   document.getElementById("bLocal").onclick = () => startMatch("local");
   document.getElementById("bDemo").onclick = () => startMatch("demo");
+  document.getElementById("bOnline").onclick = () => { const o = document.getElementById("online"); o.hidden = !o.hidden; };
+  document.getElementById("bHost").onclick = hostRoom;
+  document.getElementById("bJoin").onclick = () => joinRoom(document.getElementById("joinCode").value);
+  document.getElementById("bCopy").onclick = () => { const t = document.getElementById("netLinkText"); t.select(); navigator.clipboard && navigator.clipboard.writeText(t.value); say("Link copied. Send it to your friend."); };
 
   // ---------- F2 tuning panel ----------
   const TUNE = [["kbMul", 100, 600], ["hitstunDiv", 48, 300], ["hitDecay", 0, 10], ["grav", 40, 120], ["hitGrav", 20, 90],
@@ -592,10 +693,14 @@
 
   buildPickers();
   loadStage();
-  if (params.get("mode")) startMatch(params.get("mode")); else showMenu();
+  if (params.get("join")) { // opened from a friend's link: pick a fighter, then join
+    showMenu(); document.getElementById("online").hidden = false;
+    document.getElementById("joinCode").value = params.get("join").toUpperCase();
+    say("Your friend invited you. Pick your fighter in the Player 1 row, then press Join.");
+  } else if (params.get("mode")) startMatch(params.get("mode")); else showMenu();
   requestAnimationFrame(frame);
   // defineProperties, not Object.assign: assign would copy the getters' values once at load
   window.__db = Object.defineProperties(dbg, {
-    state: { get: () => st }, mode: { get: () => mode }, fx: { value: fx }, cam: { value: cam },
+    state: { get: () => st }, mode: { get: () => mode }, fx: { value: fx }, cam: { value: cam }, net: { value: net },
   });
 })();
