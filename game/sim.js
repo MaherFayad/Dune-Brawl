@@ -50,7 +50,7 @@
     parryStun: 40,      // frames an attacker is stunned after hitting a parry
     chargeMax: 30,      // heavies with `charge` can be held up to 30 frames for up to +50%
     wallJumps: 3, wallSlide: 500, // touching the island side: slide slowly, jump off it up to 3 times
-    spawnDrop: 150, spawnRelease: 24, // px above the stage, frames before the go the drop starts
+    spawnDrop: 280, spawnRelease: 32, // pads hang above the soft platforms; the drop falls through them
     buffer: 7, countdown: 90, stocks: 3, deadFrames: 115, respawnInv: 100,
     respawnHang: 150,   // a respawned fighter hangs on its pad until any input, at most this long
   };
@@ -330,6 +330,7 @@
       if (s.over) { s.overT++; stepPlayer(s, s.over - 1, 0); s.f++; return; } // the winner settles onto the ground for the victory pose
       // the reference opening: fighters hang on spawn pads during the countdown and drop in
       if (s.f < FEEL.countdown - FEEL.spawnRelease) { s.f++; return; }
+      if (s.f === FEEL.countdown - FEEL.spawnRelease) for (const p of s.p) p.drop = 40; // fall through the soft platforms
       const ins = s.f < FEEL.countdown ? [0, 0] : inputs;
       if (s.freeze > 0) {
         s.freeze--;
