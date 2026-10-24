@@ -202,6 +202,13 @@
     if (dbg.soundLog) dbg.soundLog.push({ f: st ? st.f : 0, name, pan, o: opt }); // test hook: recordings render these offline
     Sfx.play(name, pan, opt);
   };
+  // music beds (game/audio.js): "battle" under a match, "results" after it, "menu" on the menu, null for
+  // silence (loading screens stay silent, as in the reference); logged like sounds so recordings can follow it
+  const music = (track) => {
+    if (!window.Sfx) return;
+    if (dbg.soundLog) dbg.soundLog.push({ f: st ? st.f : 0, name: "music", pan: 0, o: { track } });
+    if (track) Sfx.music(track); else Sfx.stopMusic();
+  };
   // ---------- per-fighter flair (game/flair.js) ----------
   const style = (i) => Flair.STYLES[pick[i]] || {};
   const flairApi = {
@@ -281,9 +288,11 @@
   function events(s) {
     // countdown and match end cues
     const cd = FEEL.countdown - s.f;
+    if (cd === 125) music("battle"); // the match bed starts with the countdown (rematches too)
     if (cd === 125 || cd === 84 || cd === 42) sfx("count", cam.x, { n: Math.ceil(cd / 42) }); // the first event runs one frame in
     if (cd === 0) sfx("go", cam.x);
-    if (s.over && s.overT === 1) sfx("game", cam.x);
+    if (s.over && s.overT === 1) { sfx("game", cam.x); music(null); } // the announcer calls "Game!" over silence
+    if (s.over && s.overT === 110) { sfx("winner", cam.x); music("results"); } // the results screen: its louder theme and a winner call
     if (s.hf !== fx.lastHf && s.hf >= 0) {
       fx.lastHf = s.hf;
       const x = s.hx / S, y = s.hy / S, k = s.hk / 100, heavy = k > 18;
@@ -1044,8 +1053,8 @@
 
   // ---------- menu ----------
   const menu = document.getElementById("menu");
-  function showMenu() { mode = "menu"; menu.hidden = false; }
-  function hideMenu() { menu.hidden = true; }
+  function showMenu() { mode = "menu"; menu.hidden = false; music("menu"); } // the menu theme (starts after the first click or key)
+  function hideMenu() { menu.hidden = true; music(null); } // leaving the menu goes to loading, which is silent
   function buildPickers() {
     [0, 1].forEach((i) => {
       const row = document.getElementById("pick" + i);

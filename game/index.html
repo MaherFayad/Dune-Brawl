@@ -43,6 +43,7 @@
   .btn:hover { filter:brightness(1.08); } .btn:active { transform:skewX(-10deg) translateY(3px); box-shadow:0 1px 0 var(--rim); }
   .btn:focus-visible { outline:3px solid #fff; outline-offset:3px; }
   .keys { margin-top:18px; display:grid; grid-template-columns:auto 1fr; gap:4px 14px; font-size:13px; color:var(--muted); }
+  .credits { margin:14px 0 0; font-size:11px; color:var(--muted); line-height:1.4; } .credits a { color:inherit; }
   kbd { font:700 12px ui-monospace, monospace; background:#1c1b46; border:2px solid var(--rim); border-radius:4px; padding:1px 6px; color:#fff; }
   #panel { position:fixed; top:80px; right:12px; width:300px; background:var(--panel); border:3px solid var(--rim); border-radius:6px; padding:12px; font-size:12px; }
   #panel label { display:grid; grid-template-columns:90px 1fr 46px; gap:6px; align-items:center; margin-top:6px; }
@@ -91,6 +92,7 @@
       <span><kbd>M</kbd></span><span>Sound on or off</span>
       <span><kbd>F2</kbd> / <kbd>F3</kbd></span><span>Feel tuning panel / hitboxes</span>
     </div>
+    <p class="credits">Announcer voice by Aimee Smith (<a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC-BY 4.0</a>). Music by RandomMind and sound effects by Kenney, qubodup, artisticdude and others, all CC0: see assets/audio/CREDITS.md.</p>
   </div>
 </div>
 <div id="panel" hidden></div>

@@ -1,216 +1,230 @@
-// Dune Brawl sound: every effect is synthesized with the Web Audio API (oscillators, filtered
-// noise and envelopes), so there are no audio files to download and nothing is copied from the
-// reference. Levels, envelopes and spectra follow the measurements in
-// docs/design/REFERENCE-SFX.md: hits stay at nearly one loudness and show strength through sub
-// weight, crack and length; the KO is the only long tail (a low swell peaking at about +240 ms);
-// movement sits 6 to 13 dB under hits; landings are near silent; everything is near mono.
+// Dune Brawl sound: recorded, freely licensed samples (assets/audio, sources and licenses in
+// assets/audio/CREDITS.md), played through the Web Audio API. Levels, envelopes and spectra follow
+// docs/design/REFERENCE-SFX.md and are baked into the files: hits stay at nearly one loudness and show
+// strength through sub weight and crack; the KO is the only long tail; swings sit about 6 dB under
+// hits, jumps about 13, landings about 20; the announcer about 8; the music bed 15 to 20 dB under
+// hits, the results theme 6 to 9 dB louder than that. Everything is near mono. Each sound has 2 to 4
+// recorded variants, picked at random with a +-5% pitch jitter, so repeats never sound identical.
 // A fighter can add or swap layers (FLAVOR). Sound is render-only: it never touches the sim.
 (function (root) {
   "use strict";
-  let ctx = null, master = null, sfxBus = null, noise = null, muted = false;
-  let voices = [], last = {};
+  const DIR = "../assets/audio/";
+  let ctx = null, master = null, sfxBus = null, musicBus = null, muted = false, musicVol = 1;
+  let voices = [], last = {}, song = null, wanted = null;
   try { muted = localStorage.getItem("dune-brawl-muted") === "1"; } catch (e) { /* private mode */ }
+  try { const v = parseFloat(localStorage.getItem("dune-brawl-music")); if (v >= 0 && v <= 1) musicVol = v; } catch (e) { /* private mode */ }
+
+  // ---------- the sample banks: name -> files (without .mp3) ----------
+  const range = (stem, n) => Array.from({ length: n }, (_, k) => stem + (k + 1));
+  const FILES = {
+    hit: range("sfx/hit", 4), heavy: range("sfx/heavy", 4), ko: range("sfx/ko", 2),
+    swing: range("sfx/swing", 4), swingHeavy: range("sfx/swingHeavy", 2), dodge: range("sfx/dodge", 3), dash: range("sfx/dash", 2),
+    jump: range("sfx/jump", 4), land: range("sfx/land", 4), parry: range("sfx/parry", 2),
+    uiMove: ["sfx/uiMove"], uiConfirm: ["sfx/uiConfirm"],
+    vEdge: range("sfx/v_edge", 3), vSwing: range("sfx/v_swing", 3), vFlutter: range("sfx/v_flutter", 3), vParasol: ["sfx/v_parasol"],
+    three: ["voice/vo_three"], two: ["voice/vo_two"], one: ["voice/vo_one"], fight: ["voice/vo_fight"],
+    koCall: ["voice/vo_ko"], gameCall: ["voice/vo_game"], winner: ["voice/vo_winner"],
+  };
+  const MUSIC = { battle: "music/battle", results: "music/results", menu: "music/menu" };
+  // music gain per track (dB), from the files' -16 LUFS: measured in a render, the battle bed plays at
+  // -28 LUFS, about 18 dB under a hit (the reference: -26 to -30 LUFS); the results theme 8 dB louder
+  // (the reference: 6 to 9); the menu between the two
+  const MUSIC_DB = { battle: -11, results: -3.5, menu: -6 };
+
+  // fetch and decode once; AudioBuffers play in any context, so the same buffers serve the live
+  // game and the offline renders. Decoding uses its own OfflineAudioContext, so it needs no gesture.
+  const bufs = {}, decoded = {}; // path -> promise of an AudioBuffer; path -> AudioBuffer once decoded
+  const decoder = () => new (root.OfflineAudioContext || root.webkitOfflineAudioContext)(1, 1, 44100);
+  async function fetchBuf(path) {
+    if (!(path in bufs)) {
+      bufs[path] = fetch(DIR + path + ".mp3").then((r) => { if (!r.ok) throw new Error(r.status); return r.arrayBuffer(); })
+        .then((ab) => decoder().decodeAudioData(ab)).then((b) => (decoded[path] = b))
+        .catch(() => null); // a missing file only drops that variant
+    }
+    return bufs[path];
+  }
+  let sfxReady = null;
+  function loadSfx() { return (sfxReady = sfxReady || Promise.all(Object.values(FILES).flat().map(fetchBuf))); }
+  if (root.fetch && (root.OfflineAudioContext || root.webkitOfflineAudioContext)) loadSfx();
+  const get = (path) => decoded[path];
 
   function init() {
     if (ctx) { if (ctx.state === "suspended") ctx.resume(); return; }
     const AC = root.AudioContext || root.webkitAudioContext;
     if (!AC) return;
     setup(new AC());
+    if (wanted) music(wanted); // a track asked for before the first gesture starts now
   }
-  // sfx bus -> master -> compressor -> limiter, as measured: no ducking, a bus limiter holds peaks
+  // sfx + music -> master (mute) -> soft limiter -> out. The relative levels are baked into the files,
+  // so there is no compressor: nothing ducks the music (the reference has no ducking) and no lookahead
+  // delays a hit off its contact frame. The limiter is a waveshaper, linear up to -3 dBFS and bending
+  // smoothly towards 0 dBFS above it, so only stacked peaks are touched.
+  const LIMIT = (() => {
+    const n = 4096, c = new Float32Array(n), k = 0.708; // -3 dBFS
+    for (let i = 0; i < n; i++) { const x = (i / (n - 1)) * 2 - 1, a = Math.abs(x); c[i] = a <= k ? x : Math.sign(x) * (k + (1 - k) * Math.tanh((a - k) / (1 - k))); }
+    return c;
+  })();
   function setup(c) {
-    ctx = c; voices = []; last = {};
-    const comp = ctx.createDynamicsCompressor();
-    comp.threshold.value = -14; comp.knee.value = 6; comp.ratio.value = 4; comp.attack.value = 0.003; comp.release.value = 0.15;
-    const lim = ctx.createDynamicsCompressor();
-    lim.threshold.value = -2; lim.knee.value = 0; lim.ratio.value = 20; lim.attack.value = 0.001; lim.release.value = 0.08;
-    master = ctx.createGain(); master.gain.value = muted ? 0 : 0.9;
-    sfxBus = ctx.createGain(); sfxBus.gain.value = 0.5; // about 6 dB of headroom for overlaps
-    sfxBus.connect(master); master.connect(comp); comp.connect(lim); lim.connect(ctx.destination);
-    noise = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
-    const d = noise.getChannelData(0);
-    for (let k = 0; k < d.length; k++) d[k] = Math.random() * 2 - 1;
+    ctx = c; voices = []; last = {}; song = null;
+    const lim = ctx.createWaveShaper(); lim.curve = LIMIT; lim.oversample = "none";
+    master = ctx.createGain(); master.gain.value = muted ? 0 : 1;
+    sfxBus = ctx.createGain(); sfxBus.gain.value = 0.93; // a light hit peaks near -5 dBFS, as measured in the reference
+    musicBus = ctx.createGain(); musicBus.gain.value = musicVol;
+    sfxBus.connect(master); musicBus.connect(master); master.connect(lim); lim.connect(ctx.destination);
   }
   // browsers only start audio after a user gesture
   for (const ev of ["keydown", "pointerdown", "touchstart"]) root.addEventListener(ev, init, { passive: true });
 
-  // ---------- building blocks (times in ms after t, as in the recipes) ----------
+  // ---------- the palette: each sound is a list of layers { b: bank, g: dB, d: delay s, r: rate } ----------
   const rnd = (a, b) => a + Math.random() * (b - a);
-  const S = (ms) => ms / 1000;
-  // a gain stage with an attack ramp and an exponential decay; dec is the time to -40 dB, so the
-  // -6, -12 and -20 dB points land at 15, 30 and 50 percent of it, as the reference measures them
-  function amp(dest, t, peak, atk, dec, delay = 0) {
-    const g = ctx.createGain(), t0 = t + S(delay);
-    g.gain.setValueAtTime(0.0001, t0); g.gain.linearRampToValueAtTime(peak, t0 + S(atk)); g.gain.setTargetAtTime(0.0001, t0 + S(atk), S(dec) / 4.6);
-    g.connect(dest); return g;
-  }
-  function osc(dest, t, type, f0, f1, sweep, peak, atk, dec, delay = 0) {
-    const o = ctx.createOscillator(), t0 = t + S(delay);
-    o.type = type; o.frequency.setValueAtTime(f0, t0); if (f1 !== f0) o.frequency.exponentialRampToValueAtTime(f1, t0 + S(sweep));
-    o.connect(amp(dest, t, peak, atk, dec, delay)); o.start(t0); o.stop(t0 + S(atk + dec * 1.6) + 0.05);
-    return o;
-  }
-  // noise through a chain of filters: each [type, f0, f1, sweepMs, Q]
-  function hiss(dest, t, filters, peak, atk, dec, delay = 0) {
-    const s = ctx.createBufferSource(), t0 = t + S(delay);
-    s.buffer = noise; s.playbackRate.value = rnd(0.9, 1.1);
-    let node = s;
-    for (const [type, f0, f1, sweep, q] of filters) {
-      const f = ctx.createBiquadFilter(); f.type = type; f.Q.value = q === undefined ? 0.7 : q;
-      f.frequency.setValueAtTime(f0, t0); if (f1 && f1 !== f0) f.frequency.exponentialRampToValueAtTime(f1, t0 + S(sweep)); // f1 0: no sweep
-      node.connect(f); node = f;
-    }
-    const g = amp(dest, t, peak, atk, dec, delay); node.connect(g);
-    s.start(t0, Math.random() * 0.4); s.stop(t0 + S(atk + dec * 1.6) + 0.05);
-    return g;
-  }
-  // noise gated at wing-beat rate: bats
-  function flutter(dest, t, rate, len, peak, f0, f1) {
-    const s = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain(), lfo = ctx.createOscillator(), depth = ctx.createGain();
-    s.buffer = noise; s.loop = true; f.type = "bandpass"; f.Q.value = 1.5;
-    f.frequency.setValueAtTime(f0, t); f.frequency.exponentialRampToValueAtTime(f1, t + S(len));
-    lfo.type = "square"; lfo.frequency.value = rate; depth.gain.value = peak * 0.5;
-    g.gain.setValueAtTime(peak * 0.5, t); g.gain.linearRampToValueAtTime(0, t + S(len));
-    lfo.connect(depth); depth.connect(g.gain); s.connect(f); f.connect(g); g.connect(dest);
-    s.start(t); lfo.start(t); s.stop(t + S(len) + 0.05); lfo.stop(t + S(len) + 0.05);
-  }
-
-  // ---------- the palette ----------
   const SOUNDS = {
-    hit(d, t, o) { // light: a long low punch, a fast mid smack and a little snap (-20 dB near 360 ms)
-      const p = rnd(0.92, 1.08) * (1 + 0.03 * Math.min(4, o.chain || 0)), punch = o.punch || 1;
-      osc(d, t, "sine", 160 * p, 70 * p, 60, 0.55 * punch, 2, rnd(620, 780));
-      osc(d, t, "triangle", 340 * p, 210 * p, 40, 1.1 * punch, 1, 150);
-      hiss(d, t, [["bandpass", rnd(1400, 2400), 0, 0, 0.9], ["highpass", 600]], 1.8, 1, 80);
-    },
-    hitHeavy(d, t, o) { // heavy: a crack at 0, the sub body peaking near +60 ms, a late mid crunch
-      const p = rnd(0.94, 1.06), k = Math.min(1, (o.k || 20) / 40), punch = o.punch || 1, len = rnd(0.9, 1.15);
-      osc(d, t, "sine", 120 * p, (55 - 15 * k) * p, 130, 0.65 * punch, 30, (560 + 240 * k) * len);
-      hiss(d, t, [["bandpass", rnd(2000, 3500), 0, 0, 0.6], ["peaking", 5000, 0, 0, 1]], 10, 0.5, 80);
-      hiss(d, t, [["lowpass", 4000, 400, 150, 1.2]], (0.6 + 0.4 * k), 3, 420 * len, rnd(3, 15));
-    },
-    ko(d, t) { // a crack, a low boom that swells for 230 ms, a falling sub, debris rumble, air, sand
-      const len = rnd(0.9, 1.1);
-      hiss(d, t, [["bandpass", 1800, 0, 0, 0.5]], 8, 0.5, 140);
-      const boom = ctx.createGain(), bs = ctx.createBufferSource(), l1 = ctx.createBiquadFilter(), l2 = ctx.createBiquadFilter();
-      bs.buffer = noise; bs.loop = true; l1.type = l2.type = "lowpass"; l1.frequency.value = rnd(150, 220); l2.frequency.value = 250; l1.Q.value = 0.7;
-      boom.gain.setValueAtTime(0.0001, t); boom.gain.linearRampToValueAtTime(0.75, t + 0.23); boom.gain.setTargetAtTime(0.0001, t + 0.23, 1.3 * len);
-      bs.connect(l1); l1.connect(l2); l2.connect(boom); boom.connect(d); bs.start(t); bs.stop(t + 3 * len);
-      const sub = ctx.createOscillator(), sg = ctx.createGain();
-      sub.type = "sine"; sub.frequency.setValueAtTime(rnd(60, 75), t); sub.frequency.exponentialRampToValueAtTime(34, t + 1.2 * len);
-      sg.gain.setValueAtTime(0.0001, t); sg.gain.linearRampToValueAtTime(0.42, t + 0.03); sg.gain.setTargetAtTime(0.0001, t + 0.03, 0.8 * len);
-      sub.connect(sg); sg.connect(d); sub.start(t); sub.stop(t + 2.6 * len);
-      flutter(d, t + 0.06, rnd(9, 14), 1500 * len, 0.8, 420, 380);
-      hiss(d, t, [["bandpass", 7000, 0, 0, 0.8]], 0.5, 20, 600);
-      hiss(d, t, [["bandpass", 3000, 1000, 900, 2]], 0.6, 40, 1400); // desert touch: an outgoing sand-blast hiss
-    },
-    swing(d, t, o) { // the miss whoosh: about 6 dB under hits, a band sweeping down
-      const c = o.long ? 0.75 : 1, len = o.long ? 160 : 110;
-      hiss(d, t, [["bandpass", rnd(2200, 3000) * c, rnd(700, 900) * c, len, rnd(1.2, 2)]], 1, 30, o.long ? 320 : 240);
-    },
-    swingHeavy(d, t) { SOUNDS.swing(d, t, { long: 1 }); },
-    jump(d, t) { hiss(d, t, [["highpass", 3000], ["bandpass", rnd(5000, 8000), 0, 0, 0.7]], 1, 10, 280); },
-    airJump(d, t) { // the same puff with a lift and a second flap
-      hiss(d, t, [["highpass", 3000], ["bandpass", 4000, 7000, 80, 0.9]], 1, 10, 260);
-      hiss(d, t, [["highpass", 3000], ["bandpass", 5000, 7500, 80, 0.9]], 0.7, 10, 220, 14);
-    },
-    land(d, t) { // near silent in the reference: a soft thud and a light sand scuff
-      osc(d, t, "sine", 90, 55, 40, 0.3, 2, 180);
-      hiss(d, t, [["bandpass", 3500, 0, 0, 1.5]], 0.3, 4, 160);
-    },
-    dodge(d, t) { // sweeps UP, unlike the swing, with a faint shimmer
-      hiss(d, t, [["bandpass", 600, 2500, 80, 1.5]], 1, 15, 260);
-      const o = osc(d, t, "sine", 1800, 1800, 0, 0.06, 5, 240), v = ctx.createOscillator(), vg = ctx.createGain();
-      v.frequency.value = 30; vg.gain.value = 40; v.connect(vg); vg.connect(o.frequency); v.start(t); v.stop(t + 0.2);
-    },
-    dash(d, t) { SOUNDS.dodge(d, t); hiss(d, t, [["bandpass", 3500, 0, 0, 1.5]], 0.4, 6, 160); },
-    parry(d, t) { // a plate-like clang: lower partials ring longer, a click and a small thump
-      const b = rnd(0.95, 1.05);
-      [[520, 0.3, 1400], [1170, 0.22, 1000], [1930, 0.15, 700], [2810, 0.1, 500], [4100, 0.06, 350]].forEach(([f, m, dec]) => osc(d, t, "sine", f * b, f * b, 0, m * rnd(0.8, 1.2), 1, dec));
-      hiss(d, t, [["highpass", 3000]], 0.6, 1, 40);
-      osc(d, t, "sine", 180, 120, 60, 0.4, 2, 200);
-    },
-    count(d, t, o) { // pitched stinger in place of the reference's announcer: D5, E5, F#5
-      const f = [740, 659, 587][Math.max(0, Math.min(2, (o.n || 3) - 1))];
-      const lp = ctx.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 2500; lp.connect(d);
-      const sq = osc(lp, t, "square", f, f * 1.003, 380, 0.28, 5, 900);
-      osc(d, t, "triangle", f / 2, f / 2, 0, 0.12, 5, 900);
-      return sq;
-    },
-    go(d, t) { // A major chord opening up, with a noise swell
-      const lp = ctx.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.setValueAtTime(1500, t); lp.frequency.exponentialRampToValueAtTime(6000, t + 0.2); lp.connect(d);
-      for (const f of [880, 1109, 1319]) osc(lp, t, "sawtooth", f, f, 0, 0.12, 8, 1400);
-      osc(d, t, "triangle", 440, 440, 0, 0.18, 8, 1400);
-      hiss(d, t, [["highpass", 2000]], 0.5, 150, 600);
-    },
-    game(d, t) { // a short KO-style boom, then a falling arpeggio A5 E5 C5 A4
-      osc(d, t, "sine", 70, 34, 700, 0.9, 20, 1600);
-      hiss(d, t, [["lowpass", 220]], 0.8, 200, 1200);
-      [880, 659, 523, 440].forEach((f, k) => osc(d, t, "triangle", f, f, 0, 0.3, 3, k === 3 ? 1400 : 220, 300 + k * 100));
-    },
-    uiMove(d, t) { osc(d, t, "sine", 1800 * rnd(0.98, 1.02), 1800, 0, 0.3, 1, 80); },
-    uiConfirm(d, t) { osc(d, t, "triangle", 660, 660, 0, 0.4, 2, 160); osc(d, t, "triangle", 880, 880, 0, 0.4, 2, 160, 60); },
+    hit: [{ b: "hit" }],
+    hitHeavy: [{ b: "heavy" }],
+    ko: [{ b: "ko" }, { b: "koCall", d: 0.3, voice: 1 }], // the announcer calls it once the boom has opened
+    swing: [{ b: "swing" }],
+    swingHeavy: [{ b: "swingHeavy" }],
+    jump: [{ b: "jump" }],
+    airJump: [{ b: "jump", r: 1.08 }], // the same puff, lifted a little
+    land: [{ b: "land" }],
+    dodge: [{ b: "dodge" }],
+    dash: [{ b: "dash" }],
+    parry: [{ b: "parry" }],
+    count: [{ b: "count", voice: 1 }], // o.n: 3, 2 or 1
+    go: [{ b: "fight", voice: 1 }],
+    game: [{ b: "gameCall", voice: 1 }],
+    winner: [{ b: "winner", voice: 1 }],
+    uiMove: [{ b: "uiMove" }],
+    uiConfirm: [{ b: "uiConfirm" }],
   };
-
-  // A fighter's own layers. `swap` replaces the shared sound; `punch` softens the shared hit body.
+  // A fighter's own touches: `swap` replaces a shared sound, `add` layers over it. Kept light: the
+  // added layers sit about 12 dB under the shared one, as the reference has no extra loud layers.
   const FLAVOR = {
-    "vampire-countess": {
-      punch: 0.7, // her hits read as precise, not blunt
-      hit(d, t) { const b = rnd(0.97, 1.03); // a thin rapier ring
-        [[2400, 0.2, 700], [3610, 0.13, 480], [5230, 0.08, 320]].forEach(([f, m, dec]) => osc(d, t, "sine", f * b, f * b, 0, m, 1, dec));
-        hiss(d, t, [["highpass", 4000]], 0.4, 0.5, 12); },
-      hitHeavy(d, t) { const b = rnd(0.97, 1.03);
-        [[1800, 0.24, 1200], [2710, 0.15, 850], [3920, 0.09, 550]].forEach(([f, m, dec]) => osc(d, t, "sine", f * b, f * b, 0, m, 1, dec)); },
-      swap: { swing(d, t) { hiss(d, t, [["bandpass", 3500, 1500, 80, 3]], 1.4, 20, 220); } }, // a thinner blade swish
-      dodge(d, t) { flutter(d, t, rnd(14, 18), 380, 0.2 * 2.5, 600, 950); },          // a burst of bats
-      dash(d, t) { flutter(d, t, rnd(14, 18), 300, 0.2 * 2.5, 600, 950); },
-      swingHeavy(d, t, o) { if (o.mv === 6) flutter(d, t, rnd(14, 18), 450, 0.25 * 2.5, 600, 950); }, // Bat Swarm
-      parry(d, t) { hiss(d, t, [["lowpass", 900, 300, 120, 0.8]], 0.7, 4, 360); },   // the canopy snapping open
-      ko(d, t) { // the KO she scores ends on a short minor organ chord
-        for (const f of [220, 261.6, 329.6, 440]) { osc(d, t, "sawtooth", f, f, 0, 0.05, 30, 2200, 120); osc(d, t, "square", f / 2, f / 2, 0, 0.025, 30, 2200, 120); }
+    "vampire-countess": { // Vespera: a rapier inside a parasol, and bats
+      add: {
+        hit: [{ b: "vEdge" }],               // a faint metallic edge on her hits
+        hitHeavy: [{ b: "vEdge", g: 2 }],
+        parry: [{ b: "vParasol", g: -2 }],   // the parasol canopy opens under the clang
+      },
+      swap: {
+        swing: [{ b: "vSwing" }],            // a thinner blade swish with a faint shing
+        dodge: [{ b: "vFlutter" }],          // a soft bat-wing flutter
+        dash: [{ b: "vFlutter" }],
+        swingHeavy: (o) => (o.mv === 6 ? [{ b: "vFlutter", g: 2 }] : null), // Bat Swarm, her recovery
       },
     },
   };
+  const LONG = { ko: 2.2, game: 1, winner: 1, count: 0.7, go: 0.7 }; // voices that are never stolen, with their length
+  const COUNT = { 3: "three", 2: "two", 1: "one" };
+  const lastPick = {};
+  function pick(bank) { // a random variant, never the same one twice in a row
+    const files = (FILES[bank] || []).filter(get);
+    if (!files.length) return null;
+    let k = Math.floor(Math.random() * files.length);
+    if (files.length > 1 && files[k] === lastPick[bank]) k = (k + 1) % files.length;
+    return get((lastPick[bank] = files[k]));
+  }
 
-  const GAIN = { hit: 1, hitHeavy: 1, ko: 1, parry: 1, game: 0.9, go: 0.7, count: 0.67, swing: 1.35, swingHeavy: 1.35, dodge: 1.6, dash: 1.4, jump: 0.32, airJump: 0.3, land: 0.27, uiMove: 0.6, uiConfirm: 0.6 };
-  const LONG = { ko: 2.2, game: 1.6, go: 0.9, parry: 0.8 };
-  // name: one of SOUNDS; pan: -1 to 1 (kept within 0.3: the reference is mono); o: { fighter, scorer, k, mv, n }
+  // name: one of SOUNDS; pan: -1 to 1 (kept within 0.3: the reference is mono); o: { fighter, scorer, k, mv, n, chain }
   function play(name, pan, o = {}, when) {
     if (!ctx || muted || (when === undefined && ctx.state !== "running")) return;
-    const fn = SOUNDS[name];
-    if (!fn) return;
+    let layers = SOUNDS[name];
+    if (!layers) return;
     const t = when === undefined ? ctx.currentTime + 0.005 : when;
     // a 25 ms cooldown per sound so strings do not stack identical transients
     if (last[name] !== undefined && t - last[name] < 0.025 && t >= last[name]) return;
     last[name] = t;
-    // at most 12 voices: steal the oldest that is not a KO tail
-    voices = voices.filter((v) => v.end > t);
-    if (voices.length >= 12) { const v = voices.find((v) => v.name !== "ko"); if (v) { v.g.gain.setTargetAtTime(0, t, 0.01); voices.splice(voices.indexOf(v), 1); } }
     const fl = (o.scorer && FLAVOR[o.scorer]) || (o.fighter && FLAVOR[o.fighter]) || {};
-    const g = ctx.createGain(); g.gain.value = (GAIN[name] || 0.6) * rnd(0.84, 1.18); // about +-1.5 dB
-    if (ctx.createStereoPanner) { const p = ctx.createStereoPanner(); p.pan.value = Math.max(-0.3, Math.min(0.3, (pan || 0) * 0.3)); g.connect(p); p.connect(sfxBus); }
-    else g.connect(sfxBus);
-    const opt = { ...o, punch: fl.punch };
-    (fl.swap && fl.swap[name] ? fl.swap[name] : fn)(g, t, opt);
-    if (fl[name]) fl[name](g, t, opt);
-    voices.push({ name, g, end: t + (LONG[name] || 0.5) });
+    const sw = fl.swap && fl.swap[name], swapped = typeof sw === "function" ? sw(o) : sw;
+    layers = (swapped || layers).concat((fl.add && fl.add[name]) || []);
+    // at most 12 voices: steal the oldest that is not a KO tail or an announcer line
+    voices = voices.filter((v) => v.end > t);
+    while (voices.length >= 12) { const v = voices.find((v) => !v.keep); if (!v) break; v.g.gain.setTargetAtTime(0, t, 0.01); voices.splice(voices.indexOf(v), 1); }
+    const out = ctx.createGain();
+    out.gain.value = Math.pow(10, rnd(-1, 1) / 20); // about +-1 dB
+    if (ctx.createStereoPanner) { const p = ctx.createStereoPanner(); p.pan.value = Math.max(-0.3, Math.min(0.3, (pan || 0) * 0.3)); out.connect(p); p.connect(sfxBus); }
+    else out.connect(sfxBus);
+    // strings rise 3% per hit; bigger knockback lands a touch deeper and up to +2 dB, never louder than that
+    const kn = Math.max(0, Math.min(1, ((o.k || 20) - 18) / 30));
+    const bend = (name === "hit" ? 1 + 0.03 * Math.min(4, o.chain || 0) : 1) * (name === "hitHeavy" ? 1 - 0.05 * kn : 1);
+    if (name === "hitHeavy") out.gain.value *= Math.pow(10, 2 * kn / 20);
+    let end = t;
+    for (const L of layers) {
+      const buf = pick(L.b === "count" ? COUNT[o.n] || "three" : L.b);
+      if (!buf) continue;
+      const s = ctx.createBufferSource(), g = ctx.createGain();
+      s.buffer = buf; s.playbackRate.value = (L.r || 1) * (L.voice ? 1 : bend * rnd(0.95, 1.05)); // +-5% pitch jitter, not on the voice
+      g.gain.value = Math.pow(10, (L.g || 0) / 20);
+      s.connect(g); g.connect(out); s.start(t + (L.d || 0));
+      end = Math.max(end, t + (L.d || 0) + buf.duration / s.playbackRate.value);
+    }
+    voices.push({ g: out, end: Math.max(end, t + (LONG[name] || 0)), keep: name in LONG });
   }
+
+  // ---------- music: one looping bed at a time, crossfaded; loading screens stay silent ----------
+  // c and bus are captured before the fetch, so a render that swaps the context meanwhile cannot steal the song
+  async function startSong(c, bus, name, t, fadeIn) {
+    const buf = await fetchBuf(MUSIC[name]);
+    if (!buf || !c) return null;
+    const s = c.createBufferSource(), g = c.createGain();
+    s.buffer = buf; s.loop = true;
+    const lvl = Math.pow(10, MUSIC_DB[name] / 20);
+    g.gain.setValueAtTime(fadeIn ? 0.0001 : lvl, t); if (fadeIn) g.gain.exponentialRampToValueAtTime(lvl, t + fadeIn);
+    s.connect(g); g.connect(bus); s.start(t);
+    return { name, s, g, c };
+  }
+  function fadeOut(sg, len) { if (!sg) return; const t = sg.c.currentTime; sg.g.gain.setTargetAtTime(0, t, len / 4); sg.s.stop(t + len + 0.05); }
+  // name: "battle", "results" or "menu"; asking for the track already playing does nothing
+  async function music(name) {
+    if (!MUSIC[name]) return;
+    wanted = name;
+    if (!ctx || (song && song.name === name)) return;
+    const old = song; song = { name, pending: true };
+    const sg = await startSong(ctx, musicBus, name, ctx.currentTime + 0.05, 0.6);
+    if (wanted !== name) { fadeOut(sg, 0.2); return; } // a later request won the race
+    fadeOut(old && old.s ? old : null, 0.5);
+    song = sg || null;
+  }
+  function stopMusic() {
+    wanted = null;
+    if (song && song.s) fadeOut(song, 0.4);
+    song = null;
+  }
+  function musicVolume(v) {
+    if (v === undefined) return musicVol;
+    musicVol = Math.max(0, Math.min(1, v));
+    try { localStorage.setItem("dune-brawl-music", String(musicVol)); } catch (e) { /* private mode */ }
+    if (musicBus) musicBus.gain.value = musicVol;
+    return musicVol;
+  }
+
   function toggle() {
     muted = !muted;
     try { localStorage.setItem("dune-brawl-muted", muted ? "1" : "0"); } catch (e) { /* private mode */ }
-    if (master) master.gain.value = muted ? 0 : 0.9;
+    if (master) master.gain.value = muted ? 0 : 1;
     return muted;
   }
-  // Render a list of { t (seconds), name, pan, o } offline, for recordings: returns [left, right]
-  async function render(events, seconds, rate = 44100) {
-    const live = { ctx, master, sfxBus, noise, muted, voices, last };
+  // Render a list of { t (seconds), name, pan, o } offline, for recordings: returns [left, right].
+  // opts.music: a track name to run under the whole render from t = 0, or true to follow
+  // { name: "music", o: { track } } events in the list (track null stops it). Off by default.
+  async function render(events, seconds, rate = 44100, opts = {}) {
+    await loadSfx();
+    const live = { ctx, master, sfxBus, musicBus, muted, voices, last, song, wanted };
     muted = false;
     setup(new OfflineAudioContext(2, Math.ceil(seconds * rate), rate));
-    for (const e of [...events].sort((a, b) => a.t - b.t)) play(e.name, e.pan, e.o || {}, e.t);
+    const sorted = [...events].sort((a, b) => a.t - b.t);
+    const cues = typeof opts.music === "string" ? [{ t: 0, track: opts.music }]
+      : opts.music === true ? sorted.filter((e) => e.name === "music").map((e) => ({ t: e.t, track: (e.o || {}).track })) : [];
+    const c0 = ctx, bus = musicBus; let cur = null;
+    for (const c of cues) {
+      if (cur && cur.name === c.track) continue;
+      if (cur) { cur.g.gain.setTargetAtTime(0, c.t, 0.12); cur.s.stop(c.t + 0.6); cur = null; }
+      if (c.track && MUSIC[c.track]) cur = await startSong(c0, bus, c.track, c.t, c.t > 0 ? 0.6 : 0);
+    }
+    for (const e of sorted) if (e.name !== "music") play(e.name, e.pan, e.o || {}, e.t);
     const buf = await ctx.startRendering();
-    ({ ctx, master, sfxBus, noise, muted, voices, last } = live);
+    ({ ctx, master, sfxBus, musicBus, muted, voices, last, song, wanted } = live);
     return [buf.getChannelData(0), buf.getChannelData(1)];
   }
 
-  root.Sfx = { play, toggle, init, render, get muted() { return muted; } };
+  root.Sfx = { play, toggle, init, render, music, stopMusic, musicVolume, ready: loadSfx, get muted() { return muted; } };
 })(this);
