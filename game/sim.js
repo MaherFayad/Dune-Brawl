@@ -33,13 +33,14 @@
     jumpV: 1640, airJumpV: 1560, jumpCut: 800,
     h: 64, hw: 18,
     kbMul: 350,          // knockback multiplier in percent, applied to base and growth
-    growthDiv: 16,       // launch = kb + kg * damage / growthDiv; higher means later kills
+    growthDiv: 14,       // launch = kb + kg * damage / growthDiv; higher means later kills
     hitstunDiv: 168,     // hitstun = 6 + launch / hitstunDiv (48 x 3.5 keeps the prototype's hitstun)
     hitDecay: 4,         // percent of horizontal launch speed lost per frame in hitstun
     pauseBase: 3, pauseDiv: 5, pauseMax: 7,   // the reference holds 4 frames on a light hit, 6 on a heavy
     dodgeG: 20, dodgeA: 22, dodgeCdG: 36, dodgeCdA: 60, dodgeInvFrom: 3,
     dodgeSpeedG: 1250, dodgeSpeedA: 1150, dodgeDragG: 8, dodgeDragA: 6,
     wallJumps: 3, wallSlide: 500, // touching the island side: slide slowly, jump off it up to 3 times
+    spawnDrop: 150, spawnRelease: 24, // px above the stage, frames before the go the drop starts
     buffer: 7, countdown: 90, stocks: 3, deadFrames: 75, respawnInv: 100,
   };
 
@@ -81,7 +82,7 @@
 
   function player(x, face, ph) {
     return {
-      x, y: STAGE.main.y, vx: 0, vy: 0, face, ground: 1, jumps: ph.airJumps, dmg: 0,
+      x, y: STAGE.main.y - FEEL.spawnDrop * S, vx: 0, vy: 0, face, ground: 0, jumps: ph.airJumps, dmg: 0,
       stocks: FEEL.stocks, st: ST.IDLE, t: 0, mv: 0, hit: 0, inv: 0, dcd: 0, drop: 0, recov: 0,
       ff: 0, cut: 1, prev: 0, buf: 0, bufT: 0, land: 0, launch: 0, wall: 0, wj: FEEL.wallJumps,
     };
@@ -291,7 +292,9 @@
     }
 
     function step(s, inputs) {
-      if (s.over) { s.overT++; s.f++; return; }
+      if (s.over) { s.overT++; stepPlayer(s, s.over - 1, 0); s.f++; return; } // the winner settles onto the ground for the victory pose
+      // the reference opening: fighters hang on spawn pads during the countdown and drop in
+      if (s.f < FEEL.countdown - FEEL.spawnRelease) { s.f++; return; }
       const ins = s.f < FEEL.countdown ? [0, 0] : inputs;
       if (s.freeze > 0) {
         s.freeze--;
@@ -333,7 +336,11 @@
         if (v.vx) v.face = v.vx > 0 ? -1 : 1;
         if (a.mv === 9) { a.st = ST.IDLE; a.t = 0; a.vy = -900; }
         s.freeze = Math.max(s.freeze, Math.min(FEEL.pauseMax, FEEL.pauseBase + div(m.dmg, FEEL.pauseDiv)));
-        s.hf = s.f; s.hx = v.x; s.hy = v.y - 36 * S; s.hk = l; s.hp = i;
+        // spark at the contact point: the hitbox center clamped onto the victim's hurtbox
+        const hb = box(a, m), V = ph[1 - i];
+        s.hf = s.f; s.hk = l; s.hp = i;
+        s.hx = Math.max(v.x - V.hw, Math.min(v.x + V.hw, div(hb[0] + hb[1], 2)));
+        s.hy = Math.max(v.y - V.h, Math.min(v.y - 8 * S, div(hb[2] + hb[3], 2)));
       }
       const B = STAGE.blast;
       for (let i = 0; i < 2; i++) {

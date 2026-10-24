@@ -18,6 +18,7 @@ function fresh(a = id, v = id) {
   const M = Sim.match(def(a), def(v));
   const s = M.create();
   s.f = FEEL.countdown + 1;
+  for (const p of s.p) { p.y = STAGE.main.y; p.ground = 1; } // skip the spawn drop
   return { M, s };
 }
 function run(M, s, frames, inA = () => 0, inB = () => 0) {

@@ -67,12 +67,19 @@
     if (foe.st === ST.DEAD) return Math.abs(me.x - 640 * S) > 60 * S ? (me.x < 640 * S ? IN.R : IN.L) : 0;
     const close = Math.abs(dx) < 95 * S && Math.abs(dy) < 90 * S;
     if (!close) v |= dx > 0 ? IN.R : IN.L;
-    if (dy < -110 * S && me.ground && even && Math.random() < 0.08) v |= IN.J;
+    // the reference fights in the air: hop in from mid range, chase a launched foe upward
+    const chase = foe.st === ST.HIT && dy < -60 * S && Math.abs(dx) < 260 * S;
+    if (even && (me.ground || me.jumps > 0)) {
+      if (chase && Math.random() < 0.3) v |= IN.J;
+      else if (me.ground && !close && Math.abs(dx) < 300 * S && Math.random() < 0.06) v |= IN.J;
+      else if (dy < -110 * S && me.ground && Math.random() < 0.12) v |= IN.J;
+    }
     if (foe.st === ST.ATK && close && even && Math.random() < 0.04 + 0.04 * level) return v | IN.X;
     if (close && even && Math.random() < 0.12 + 0.08 * level) {
       if (dx) v |= dx > 0 ? IN.R : IN.L;
       const r = Math.random();
-      if (dy < -50 * S) v |= IN.U | IN.A;
+      if (!me.ground) v |= dy > 40 * S ? IN.D | IN.A : r < 0.4 ? IN.A : foe.dmg > 110 && r < 0.6 ? IN.B : IN.A;
+      else if (dy < -50 * S) v |= IN.U | IN.A;
       else if (foe.dmg > 90 && r < 0.5) v |= IN.B;
       else v |= r < 0.15 ? IN.D | IN.A : IN.A;
       if (r > 0.6) v &= ~(IN.L | IN.R);
@@ -88,9 +95,9 @@
     // Value plan: the background is the quietest layer (hazy, soft, desaturated), the stage is
     // calmer than the fighters except for its bright walkable top edge, and the fighters carry
     // the most saturation and the darkest outlines.
-    stageArt.bg = bg && grade(bg, "saturate(0.62) brightness(1.2) contrast(0.8) blur(2px)", null, true);
-    stageArt.island = island && shade(edgeLit(island, "saturate(0.85) brightness(0.56) contrast(1.05)", 0.05));
-    stageArt.plat = plat && edgeLit(plat, "saturate(0.8) brightness(0.56)", 0.2);
+    stageArt.bg = bg && grade(bg, "saturate(0.75) brightness(1.12) contrast(0.95) blur(1.5px)", null, true);
+    stageArt.island = island && shade(edgeLit(island, "saturate(0.9) brightness(0.42) contrast(1.15)", 0.05));
+    stageArt.plat = plat && edgeLit(plat, "saturate(0.85) brightness(0.45) contrast(1.1)", 0.2);
   }
   function grade(im, filter, haze, sky) {
     const c = document.createElement("canvas"); c.width = im.width; c.height = im.height;
@@ -100,7 +107,7 @@
       // high-key sky like the reference: a pale warm haze lifts the area the fighters jump
       // through, so their darker, saturated colors read against it
       const v = x.createLinearGradient(0, 0, 0, c.height);
-      v.addColorStop(0, "rgba(255,240,222,0.34)"); v.addColorStop(0.5, "rgba(255,232,206,0.2)");
+      v.addColorStop(0, "rgba(255,240,222,0.24)"); v.addColorStop(0.5, "rgba(255,232,206,0.12)");
       v.addColorStop(0.8, "rgba(255,200,150,0.08)"); v.addColorStop(1, "rgba(60,30,40,0.2)");
       x.fillStyle = v; x.fillRect(0, 0, c.width, c.height);
     }
@@ -209,13 +216,18 @@
   // ---------- camera ----------
   const cam = { x: 640, y: 380, z: 1 };
   function updateCam(s) {
-    const live = s.p.filter((p) => p.st !== ST.DEAD);
-    let x0 = 420, x1 = 860, y0 = 300, y1 = 520;
-    for (const p of live) { const x = p.x / S, y = p.y / S; x0 = Math.min(x0, x - 140); x1 = Math.max(x1, x + 140); y0 = Math.min(y0, y - 200); y1 = Math.max(y1, y + 90); }
-    // reference framing: a body is 8 to 10 percent of screen height up close, about 6 when spread out
-    const z = Math.max(0.62, Math.min(1.1, Math.min(1280 / (x1 - x0 + 220), 720 / (y1 - y0 + 180)))) + fx.zoomKick;
-    const tx = ((x0 + x1) / 2) * 0.75 + 160, ty = ((y0 + y1) / 2) * 0.75 + 95;
-    cam.x += (tx - cam.x) * 0.1; cam.y += (ty - cam.y) * 0.1; cam.z += (z - cam.z) * 0.08;
+    // frame the fighters, not the stage, like the reference broadcast camera: a tight window
+    // around the pair (never narrower than about 10 bodies) that follows them off the ledge and
+    // up into the air, with only a light pull toward stage center
+    const live = s.over ? [s.p[s.over - 1]] : s.p.filter((p) => p.st !== ST.DEAD);
+    if (!live.length) return;
+    let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
+    for (const p of live) { const x = p.x / S, y = p.y / S; x0 = Math.min(x0, x - 110); x1 = Math.max(x1, x + 110); y0 = Math.min(y0, y - 150); y1 = Math.max(y1, y + 70); }
+    // match over: push in on the winner so the victory animation reads
+    const w = Math.max(s.over ? 420 : 640, x1 - x0), h = Math.max(s.over ? 240 : 340, y1 - y0);
+    const z = Math.max(0.62, Math.min(s.over ? 1.7 : 1.15, Math.min(1280 / (w + 160), 720 / (h + 120)))) + fx.zoomKick;
+    const tx = ((x0 + x1) / 2) * 0.85 + 640 * 0.15, ty = ((y0 + y1) / 2) * 0.8 + 400 * 0.2;
+    cam.x += (tx - cam.x) * 0.12; cam.y += (ty - cam.y) * 0.12; cam.z += (z - cam.z) * 0.09;
   }
 
   // ---------- drawing ----------
@@ -278,7 +290,8 @@
   }
   const tintBuf = document.createElement("canvas"), tg = tintBuf.getContext("2d");
   function drawSprite(i, p, f, alpha, tint, halo) {
-    const F = gfx[i], ps = Render.pose(F, p, f, M.mv[i], Sim);
+    const win = st && st.over === i + 1 && st.overT > 20 ? st.overT - 20 : -1;
+    const F = gfx[i], ps = Render.pose(F, p, f, M.mv[i], Sim, win);
     const x = p.x / S, y = p.y / S;
     if (!ps) return;
     const { sh, k } = ps, sc = sh.scale;
@@ -303,6 +316,10 @@
     const p = s.p[i];
     if (p.st === ST.DEAD) return;
     const x = p.x / S, y = p.y / S, m = M.mv[i][p.mv];
+    if (s.f < FEEL.countdown - FEEL.spawnRelease + 4) { // spawn pad glowing under the hanging fighter
+      g.save(); g.globalAlpha = 0.85; g.fillStyle = TEAM[i]; g.shadowColor = TEAM[i]; g.shadowBlur = 14;
+      g.beginPath(); g.ellipse(x, y + 2, 26, 6, 0, 0, 7); g.fill(); g.restore();
+    }
     if (p.ground) { g.fillStyle = "rgba(0,0,0,.28)"; g.beginPath(); g.ellipse(x, y + 1, 20, 4.5, 0, 0, 7); g.fill(); }
     if (p.ground) { g.strokeStyle = TEAM[i]; g.lineWidth = 2.5; g.globalAlpha = 0.9; g.beginPath(); g.ellipse(x, y + 1, 17, 4, 0, 0, 7); g.stroke(); g.globalAlpha = 1; }
     for (const gh of fx.ghosts.filter((q) => q.i === i)) drawSprite(i, gh.p, gh.f, gh.life * 0.5, 0.6);
@@ -406,9 +423,9 @@
     }
     if (s.over) {
       const wi = s.over - 1;
-      g.fillStyle = "rgba(8,6,20,.45)"; g.fillRect(0, H * 0.33, W, H * 0.2);
-      italic(`${FIGHTERS[pick[wi]].name.toUpperCase()} WINS`, W / 2, H * 0.45, 64 * u, "#ffffff", "center");
-      if (s.overT > 60) italic("SPACE OR J: REMATCH     ESC: MENU", W / 2, H * 0.5, 16 * u, "#ffd36b", "center");
+      g.fillStyle = "rgba(8,6,20,.45)"; g.fillRect(0, H * 0.08, W, H * 0.2);
+      italic(`${FIGHTERS[pick[wi]].name.toUpperCase()} WINS`, W / 2, H * 0.2, 64 * u, "#ffffff", "center");
+      if (s.overT > 60) italic("SPACE OR J: REMATCH     ESC: MENU", W / 2, H * 0.25, 16 * u, "#ffd36b", "center");
     }
   }
   function rr(x, y, w, h, r) { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); }

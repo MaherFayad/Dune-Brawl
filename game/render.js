@@ -8,7 +8,7 @@
     "recovery", "down_heavy", "dair", "dair"];
   // which way a slot's strike reaches, used to find its strike frame automatically
   const SLOT_AXIS = ["fwd", "fwd", "wide", "up", "wide", "fwd", "up", "wide", "down", "down"];
-  const SHEETS = ["idle", "run", "jump", "fall", "land", "hurt", "tumble", "victory", "taunt",
+  const SHEETS = ["idle", "run", "jump", "fall", "land", "hurt", "tumble", "victory", // taunt: not used in play yet
     "jab", "side_light", "down_light", "up_light", "nair", "side_heavy", "recovery", "down_heavy", "dair"];
   const ALIGN_CENTER = new Set(["nair", "dair"]);      // aerials: keep the body centered on the fighter
   const ALIGN_FEET = new Set(["jump", "fall", "recovery"]); // the sim moves the body, not the clip
@@ -99,7 +99,8 @@
   }
 
   // ---------- pose selection (pure) ----------
-  function pose(F, p, f, moves, Sim) {
+  // `win`: frames since this fighter won the match, or -1
+  function pose(F, p, f, moves, Sim, win = -1) {
     const S = F.sheets, ST = Sim.ST;
     const pick = (name, k) => (S[name] ? { sh: S[name], k: Math.max(0, Math.min(S[name].n - 1, k | 0)) } : null);
     const loop = (name, rate) => (S[name] ? pick(name, Math.floor(f / rate) % S[name].n) : null);
@@ -112,6 +113,7 @@
       const r = Math.max(0, Math.min(1, (p.vy + 1500) / 2800));
       return pick("jump", n * (0.25 + 0.4 * r));
     };
+    if (win >= 0 && p.ground && S.victory) return pick("victory", Math.min(S.victory.n - 1, Math.floor(win / 3))); // plays once, holds the end pose
     if (p.st === ST.ATK) {
       const m = moves[p.mv], name = SLOT_SHEETS[p.mv], sh = S[name];
       if (!sh) return air();
