@@ -7,3 +7,8 @@
 
 | Sheet | Kept job ID | Takes | Result | Note |
 |---|---|---|---|---|
+| idle | 7c07cc10-c74a-4a4f-9865-1d5dc88ab3c5 | 1 | pass | 24 f, 256 cell. Heavy breathing, the twig bobs, and he scratches his chin with his free knuckles. The axe stays on his shoulder. clip-check: ok. |
+
+Missing: run, jump, hurt, jab, side_light, side_heavy and nair were not made because the lead ended the round before they were shot (the game uses stand-ins).
+Final checks: `tools/edge-check.py` finds 0 cut sprites, and `tools/feather-cuts.py` softened 0 sheets.
+Credits for this fighter: 2 (start pose) + 3.75 (1 clip) = 5.75.

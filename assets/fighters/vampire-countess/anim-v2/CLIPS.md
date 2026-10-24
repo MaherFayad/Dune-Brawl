@@ -9,10 +9,14 @@
 | Sheet | Kept job ID | Takes | Result | Note |
 |---|---|---|---|---|
 | idle | 68858f13-72e8-4a84-9d71-75219952514b | 1 | pass | 24 f, 256 cell. She wafts the furled parasol by her face like a fan, twice, and sighs. The cape sways, and the pomegranate and blade are visible throughout. |
-| run | ed8cf987-1bb7-4546-9f98-b1aae1fc4e48 | 1 | pass | 16 f, 256 cell, start image only, `--skip=0.4` (drops the step out of the ready pose). Gliding treadmill run with the gown and cape billowing. Slight softness on the hem in a few frames. |
+| run | ed8cf987-1bb7-4546-9f98-b1aae1fc4e48 | 1 | pass | 16 f, 288 cell (reconverted with the auto-growing converter because the cape clipped the 256 cell), start image only, `--skip=0.4` (drops the step out of the ready pose). Gliding treadmill run with the gown and cape billowing. Slight softness on the hem in a few frames. |
 | jump | 0c2a05ea-4e31-4d84-8d1f-e997112d7207 | 1 | flagged | 16 f, 384 cell, `--trim`. Crouch, straight-up hop, tuck, land, all inside the frame. In the airborne frames the parasol disappears into the cape, the pomegranate switches to her right hand, and one rising frame is a motion-blur ghost. |
-| hurt | 80d9ed4e-1044-4d34-8393-904c162953ee | 1 | pass | 16 f, 256 cell, `--trim`. Head snaps back, body bends backward, eyes squeezed shut, then a huff back to ready. The flinch is medium-sized rather than huge, with light blur on the two snap frames. |
+| hurt | 80d9ed4e-1044-4d34-8393-904c162953ee | 1 | pass | 16 f, 288 cell (reconverted, same reason), `--trim`. Head snaps back, body bends backward, eyes squeezed shut, then a huff back to ready. The flinch is medium-sized rather than huge, with light blur on the two snap frames. |
 | jab | 1ab1c946-0a16-49b2-8526-2ad17fbcda91 | 1 | pass | 16 f, 256 cell, `--trim --motion`. Small pull-back, then a straight thrust with the arm fully extended and the blade level. It holds the extension for about 1 s (retime in code if needed) and has no smear. |
 | side_light | 670305ad-9595-4e49-8dd4-8fc141774b86 | 1 | pass | 24 f, 384 cell, `--trim --motion`. Raises the parasol, then a deep fencer's lunge with a step, full extension and a thin smear along the blade, then back to ready. One transition frame is blurred, and the extension is held for about 1 s. |
 | side_heavy | d3024cab-f541-4222-bc6b-d0340b906ac6 | 1 | flagged | 40 f, 384 cell, `--trim --motion`. The wind-up is long (about 0.9 s), and during it she turns toward the camera (the cape swings in front of her). The strike is a level thrust at about jab height with a crimson smear at the tip, not the big overhead arc and lunge. |
 | nair | 24e5db92-4ca7-453b-b8a1-0fac2cfdb310 | 1 | pass | 24 f, 384 cell, `--trim --motion`. Hop, then a full white slash ring around her, landing centered. She faces the camera briefly mid-spin, and the parasol smears in two frames. |
+
+Final checks (end of round): `tools/clip-check.py` reports ok for all 8 clips (none CUT). `tools/edge-check.py` finds 0 cut sprites, and `tools/feather-cuts.py` softened 0 sheets.
+The 2 flagged sheets (jump, side_heavy) were not retaken because the round was ended by the lead. A wide start frame for re-shoots was built but not uploaded (`tools/wide-start.py`, 40% height).
+Credits for this fighter: 4 (2 start-pose images) + 30 (8 clips) = 34.
