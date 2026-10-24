@@ -1,0 +1,11 @@
+{
+  "frameSize": 256,
+  "frames": 24,
+  "pivot": [
+    80,
+    250
+  ],
+  "bodyHeight": 128,
+  "source": "idle_splice.mp4",
+  "sourceFrames": 88
+}

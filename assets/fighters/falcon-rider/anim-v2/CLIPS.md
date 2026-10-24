@@ -6,3 +6,4 @@
 
 | Sheet | Job ID kept | Takes | Result | Note |
 |---|---|---|---|---|
+| idle | d33b505b-69ff-4607-be6c-7c53a77e8412 | 1 | pass (spliced) | Raw clip: he breathes, Muzna turns her head and scowls, but at about 1.9 s she hops up off his head for about 0.8 s. The sheet uses source frames 0 to 44 (always perched) played forward then back (`idle_splice.mp4` in the scratch folder), so it loops cleanly; the falcon motion is subtle. 24 f, 256, no trim. |
