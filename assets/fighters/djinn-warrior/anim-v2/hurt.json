@@ -1,11 +1,11 @@
 {
-  "frameSize": 288,
+  "frameSize": 416,
   "frames": 16,
   "pivot": [
-    93,
-    282
+    130,
+    410
   ],
   "bodyHeight": 128,
-  "source": "hurt.mp4",
-  "sourceFrames": 40
+  "source": "saif_hurt_c3760fb3.mp4",
+  "sourceFrames": 67
 }

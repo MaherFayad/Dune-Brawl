@@ -1,0 +1,11 @@
+{
+  "frameSize": 384,
+  "frames": 24,
+  "pivot": [
+    120,
+    378
+  ],
+  "bodyHeight": 128,
+  "source": "side_light_c3317d23.mp4",
+  "sourceFrames": 72
+}

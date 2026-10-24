@@ -18,3 +18,5 @@
 - Start frames: idle, run, hurt and jab use the 55% start frame `6e0ac9c7`. After the lead's clip-check rule, jump, side_light, side_heavy and nair were re-shot from the wide start frame (`tools/wide-start.py`, fighter at 40% height, media `da9de548-7385-41be-887a-00783abe7bc9`).
 
 Credits: 51 for this fighter (2 concepts, 1 start pose, 8 clips plus 4 re-shots at 3.75).
+
+- Fix round: the planned nair re-shoot from the wide start frame `da9de548` (wide spinning claw swipe, arms out, face in profile) was not made; the shared 22-credit cap for this round ran out on Saif re-shoots. The flagged nair sheet `973114f3` stays.
