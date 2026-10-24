@@ -1,0 +1,11 @@
+{
+  "frameSize": 384,
+  "frames": 40,
+  "pivot": [
+    120,
+    378
+  ],
+  "bodyHeight": 128,
+  "source": "side_heavy_7e9d17e7.mp4",
+  "sourceFrames": 54
+}

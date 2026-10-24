@@ -1,9 +1,9 @@
 {
-  "frameSize": 256,
+  "frameSize": 288,
   "frames": 24,
   "pivot": [
-    80,
-    250
+    93,
+    282
   ],
   "bodyHeight": 128,
   "source": "idle.mp4",

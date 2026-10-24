@@ -1,0 +1,11 @@
+{
+  "frameSize": 384,
+  "frames": 16,
+  "pivot": [
+    120,
+    378
+  ],
+  "bodyHeight": 128,
+  "source": "jump.mp4",
+  "sourceFrames": 55
+}
