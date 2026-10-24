@@ -22,7 +22,7 @@
     ],
     blast: { l: -420 * S, r: 1700 * S, t: -420 * S, b: 1060 * S },
     spawnX: [470 * S, 810 * S],
-    respawn: { x: 640 * S, y: 100 * S },
+    respawn: { x: 640 * S, y: 240 * S }, // between the soft platforms, above the stage
   };
 
   // Global feel values. Every fighter's stats are percentages of these.
@@ -46,7 +46,8 @@
     chargeMax: 30,      // heavies with `charge` can be held up to 30 frames for up to +50%
     wallJumps: 3, wallSlide: 500, // touching the island side: slide slowly, jump off it up to 3 times
     spawnDrop: 150, spawnRelease: 24, // px above the stage, frames before the go the drop starts
-    buffer: 7, countdown: 90, stocks: 3, deadFrames: 75, respawnInv: 100,
+    buffer: 7, countdown: 90, stocks: 3, deadFrames: 115, respawnInv: 100,
+    respawnHang: 150,   // a respawned fighter hangs on its pad until any input, at most this long
   };
 
   const isqrt = (n) => (n <= 0 ? 0 : Math.floor(Math.sqrt(n)));
@@ -94,7 +95,7 @@
       x, y: STAGE.main.y - FEEL.spawnDrop * S, vx: 0, vy: 0, face, ground: 0, jumps: ph.airJumps, dmg: 0,
       stocks: FEEL.stocks, st: ST.IDLE, t: 0, mv: 0, hit: 0, inv: 0, dcd: 0, drop: 0, recov: 0,
       ff: 0, cut: 1, prev: 0, buf: 0, bufT: 0, land: 0, launch: 0, wall: 0, wj: FEEL.wallJumps,
-      chase: 0, chg: 0,
+      chase: 0, chg: 0, hang: 0,
     };
   }
   const PKEYS = Object.keys(player(0, 1, { airJumps: 2 }));
@@ -154,8 +155,13 @@
         if (--p.t <= 0) {
           p.x = STAGE.respawn.x; p.y = STAGE.respawn.y; p.vx = 0; p.vy = 0; p.st = ST.IDLE; p.t = 0;
           p.inv = FEEL.respawnInv; p.dmg = 0; p.jumps = P.airJumps; p.ground = 0; p.recov = 0; p.ff = 0; p.wj = FEEL.wallJumps;
+          p.hang = FEEL.respawnHang;
         }
         return;
+      }
+      if (p.hang > 0) {
+        if (input || --p.hang <= 0) { p.hang = 0; p.inv = Math.max(p.inv, FEEL.respawnInv); }
+        else return;
       }
       if (p.inv > 0) p.inv--;
       if (p.dcd > 0) p.dcd--;

@@ -43,3 +43,18 @@ Nano Banana Pro on pure black, converted to transparency by un-premultiplying fr
 | `ko.webp` | `0a5f1df7-73d6-4f15-a098-3a4876c954a6` | KO blast beam, aimed at stage center |
 | `slash.webp` | `faee2a68-364e-4f71-82bd-a1d9adb1d982` | Slash arc behind heavy hits |
 | `dust.webp` | `184f2765-71f0-4dd7-92fe-951f95e13e98` | Landing, jump and dodge dust |
+
+### Effects v2: flat white cel set (from docs/design/REFERENCE-VFX.md)
+
+Painted on pure green and keyed with `tools/key-vfx.py` (same keying as the sprite converter), so the grey cel shades stay opaque.
+
+| Files | Higgsfield job | Use |
+|---|---|---|
+| `star1-3.webp` | `ab0b62ac-b3b3-4fcd-b1a8-810c6c677ebf` | Hit sparks at the contact point (0.45 bodies light, 0.62 heavy) and the parry ring |
+| `puff1-4.webp` | `f264879c-2d11-4a0c-aceb-6f9e12d03b0d` | Launch cloud column (drawn under the fighters), landing and air jump puffs |
+| `smear1-3.webp` | `8446edab-16d7-4898-92e8-a2435f672e3d` | White swing crescent on every light attack, hit or miss |
+| `kick1-3.webp` | `0c68e8a7-1faa-4651-935b-af6325e39e8a` | Jump, dash and dodge take-off splash |
+| `ko-splash.webp` | `0ec9ea16-aaa9-4c5d-ac22-ad35166cf8b6` | KO ink splash at the screen edge |
+| `ko-cloud.webp` | `e6ca030e-f8d1-47d3-ad80-614a94db41f8` | KO cloud bank at the screen edge |
+
+The v1 painted effects (`spark`, `heavy`, `ko`, `slash`, `dust`) are no longer drawn.

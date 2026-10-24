@@ -154,65 +154,73 @@
   let seed = 7;
   const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
   const vfx = {};
-  ["spark", "heavy", "ko", "slash", "dust"].forEach((n) => { const im = new Image(); im.onload = () => (vfx[n] = im); im.src = `${ROOT}/assets/vfx/${n}.webp`; });
+  ["star1", "star2", "star3", "puff1", "puff2", "puff3", "puff4",
+   "smear1", "smear2", "smear3", "kick1", "kick2", "kick3", "ko-splash", "ko-cloud"].forEach((n) => { const im = new Image(); im.onload = () => (vfx[n] = im); im.src = `${ROOT}/assets/vfx/${n}.webp`; });
   const fx = {
-    sprites: [], parts: [], trails: [], ghosts: [], shake: 0, flash: 0, lastHf: -1, lastKf: -1, zoomKick: 0,
-    grounded: [1, 1], wasSt: [0, 0],
-    reset() { Object.assign(this, { sprites: [], parts: [], trails: [], ghosts: [], shake: 0, flash: 0, lastHf: -1, lastKf: -1, zoomKick: 0 }); },
+    sprites: [], parts: [], shake: 0, lastHf: -1, lastKf: -1, koStamp: [0, 0],
+    grounded: [1, 1], wasSt: [0, 0], lastVy: [0, 0],
+    reset() { Object.assign(this, { sprites: [], parts: [], shake: 0, lastHf: -1, lastKf: -1, koStamp: [0, 0] }); },
     // a painted sprite: grows from s0 to s1 in `pop` frames, holds, then fades over the rest of `life` frames
     add(name, x, y, opt) { this.sprites.push({ name, x, y, t: 0, rot: 0, flip: 1, s0: 0.6, s1: 1, pop: 3, life: 18, w: 80, ax: 0.5, ay: 0.5, alpha: 1, ...opt }); },
-    dust(x, y, w, flip) { this.add("dust", x, y, { w, ay: 0.85, s0: 0.5, s1: 1.15, pop: 8, life: 26, flip: flip || 1, alpha: 0.85 }); },
+    // flat white cel effects, as in the reference: puffs stay where they were made
+    puff(x, y, w, opt) { this.add(`puff${1 + Math.floor(rnd() * 4)}`, x, y, { w, rot: (rnd() - 0.5) * 0.6, s0: 0.7, s1: 1.15, pop: 6, life: 30, ...opt }); },
+    kick(x, y, w, flip) { this.add(`kick${1 + Math.floor(rnd() * 3)}`, x, y, { w, ay: 0.95, flip, s0: 0.6, s1: 1, pop: 3, life: 16 }); },
   };
   function events(s) {
     if (s.hf !== fx.lastHf && s.hf >= 0) {
       fx.lastHf = s.hf;
       const x = s.hx / S, y = s.hy / S, k = s.hk / 100, heavy = k > 18;
       if (s.ha === 2) { // parry: a bright ring and a hard shake, no damage spark
-        fx.add("spark", x, y, { w: 110, rot: rnd() * 6.28, s0: 0.3, s1: 1.3, pop: 3, life: 16 });
-        fx.shake = Math.max(fx.shake, 10); fx.flash = Math.max(fx.flash, 0.35);
+        fx.add("star2", x, y, { w: 70, rot: rnd() * 6.28, s0: 0.3, s1: 1.4, pop: 3, life: 14 });
+        fx.shake = Math.max(fx.shake, 6);
       } else {
-        const atk = s.p[s.hp], dir = atk ? atk.face : 1;
-        fx.shake = Math.max(fx.shake, Math.min(14, 1.5 + k * 0.35));
-        if (heavy) {
-          fx.add("heavy", x, y, { w: 64 + k * 0.9, flip: dir, rot: (rnd() - 0.5) * 0.3, s0: 0.45, s1: 1.05, pop: 3, life: 20 });
-          fx.add("slash", x - dir * 8, y, { w: 84, flip: dir, rot: -0.5 * dir, s0: 0.8, s1: 1.1, pop: 2, life: 9, alpha: 0.7 });
-          fx.zoomKick = Math.min(0.08, k * 0.002);
-        } else {
-          fx.add("spark", x, y, { w: 40 + k * 0.9, rot: rnd() * 6.28, s0: 0.5, s1: 1, pop: 2, life: 12 });
-        }
-        const n = heavy ? 10 : 4;
-        for (let j = 0; j < n; j++) {
-          const a = (dir > 0 ? 0 : Math.PI) + (rnd() - 0.5) * 1.6, sp = 3 + rnd() * (4 + k * 0.2);
-          fx.parts.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 1, life: 0.6 + rnd() * 0.4, size: 2 + rnd() * 2.5, c: rnd() < 0.5 ? "#fff1c4" : "#ff9a3c", g: 0.18 });
+        const atk = s.p[s.hp], dir = atk ? atk.face : 1, body = gfx[1 - s.hp] ? gfx[1 - s.hp].h : 64;
+        fx.shake = Math.max(fx.shake, heavy ? 6 : 3); // the reference camera barely moves: 0.05 to 0.1 bodies
+        // a small flat white starburst at the contact point; colour comes from the victim flash
+        fx.add(`star${1 + Math.floor(rnd() * 3)}`, x, y, { w: body * (heavy ? 0.62 : 0.45), rot: rnd() * 6.28, s0: 1, s1: 0.7, pop: 1, life: heavy ? 10 : 7 });
+        for (let j = 0; j < 3; j++) {
+          const a = (dir > 0 ? 0 : Math.PI) + (rnd() - 0.5) * 1.6, sp = 2 + rnd() * 3;
+          fx.parts.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 1, life: 0.4, size: 1.5 + rnd(), c: "#ffffff", g: 0.1 });
         }
       }
     }
     if (s.kf !== fx.lastKf && s.kf >= 0) {
-      fx.lastKf = s.kf; fx.shake = 22; fx.flash = 1;
-      const x = s.kx / S, y = s.ky / S, ang = Math.atan2(360 - y, 640 - x);
-      fx.add("ko", x, y, { w: 620, ax: 0.04, rot: ang, s0: 0.3, s1: 1, pop: 6, life: 42, alpha: 0.92 });
-      fx.add("heavy", x, y, { w: 260, s0: 0.3, s1: 1.2, pop: 4, life: 30 });
-      for (let j = 0; j < 40; j++) {
-        const a = ang + (rnd() - 0.5) * 1.1, sp = 6 + rnd() * 16;
-        fx.parts.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: 1 + rnd() * 0.5, size: 2 + rnd() * 4, c: rnd() < 0.5 ? "#ffffff" : "#ffc86b", g: 0 });
+      fx.lastKf = s.kf; fx.shake = 8; fx.koStamp[s.kp] = 70;
+      // the reference KOs at the screen edge: a white ink splash and a cloud bank burst inward
+      // from where the fighter left the view, with speed lines in the attacker's team colour
+      const z = Math.min(W / 1280, H / 720) * cam.z, hw = W / 2 / z, hh = H / 2 / z;
+      const kx = s.kx / S, ky = s.ky / S, ang = Math.atan2(cam.y - ky, cam.x - kx);
+      const t = Math.min(hw / Math.max(1e-6, Math.abs(Math.cos(ang))), hh / Math.max(1e-6, Math.abs(Math.sin(ang))));
+      const x = cam.x - Math.cos(ang) * t, y = cam.y - Math.sin(ang) * t, scr = (H / z);
+      fx.add("ko-cloud", x, y, { w: scr * 0.55, ax: 0, ay: 0.5, rot: ang, s0: 0.4, s1: 1.05, pop: 10, life: 70 });
+      fx.add("ko-splash", x, y, { w: scr * 0.6, ax: 0, ay: 0.5, rot: ang, s0: 0.5, s1: 1.1, pop: 4, life: 34 });
+      const team = TEAM[1 - s.kp];
+      for (let j = 0; j < 18; j++) {
+        const a = ang + (rnd() - 0.5) * 1.2, sp = 10 + rnd() * 16;
+        fx.parts.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: 0.8 + rnd() * 0.4, size: 2 + rnd() * 3, c: rnd() < 0.6 ? team : "#ffffff", g: 0 });
       }
     }
     s.p.forEach((p, i) => {
       if (p.st === ST.DEAD) return;
       const x = p.x / S, y = p.y / S;
-      if (p.ground && !fx.grounded[i]) fx.dust(x, y, 74);
-      if (!p.ground && fx.grounded[i] && p.vy < 0) fx.dust(x, y, 52);
+      const body = gfx[i] ? gfx[i].h : 64;
+      if (p.ground && !fx.grounded[i]) { fx.puff(x - body * 0.3, y - 6, body * 0.35); fx.puff(x + body * 0.3, y - 6, body * 0.35); }
+      if (!p.ground && fx.grounded[i] && p.vy < 0) fx.kick(x, y, body * 0.6, -p.face);
+      if (!p.ground && !fx.grounded[i] && p.vy < -1000 && fx.lastVy[i] >= -1000 && p.st === ST.IDLE) fx.puff(x, y + 4, body * 0.5, { s0: 0.4, s1: 1.3, life: 22 }); // air jump ring
+      fx.lastVy[i] = p.vy;
       fx.grounded[i] = p.ground;
-      if (p.st === ST.DODGE && s.f % 3 === 0) fx.ghosts.push({ i, f: s.f, life: 0.5, p: { ...p } });
-      if ((p.st === ST.DODGE || p.st === ST.DASH) && fx.wasSt[i] !== p.st && p.ground) fx.dust(x, y, 60, -p.face);
-      // the reference's signature: a launched fighter leaves a trail of white smoke puffs, and a
-      // dodge leaves a short streak; puffs grow and fade where they were left
+      if ((p.st === ST.DODGE || p.st === ST.DASH) && fx.wasSt[i] !== p.st && p.ground) fx.kick(x, y, body * 0.7, -p.face);
+      // the reference's signature: a launched fighter leaves a thick continuous cloud column
+      // behind it, drawn under the fighters, gone after about 50 frames
       const sp = Math.hypot(p.vx, p.vy);
-      if (p.st === ST.HIT && p.launch > 1800 && sp > 600 && s.f % 2 === 0) {
-        fx.trails.push({ x, y: y - 32, life: 1, w: Math.min(14, p.launch / 280) });
-        fx.add("dust", x - p.vx / S * 0.5, y - 30, { w: 22 + Math.min(34, p.launch / 120), ay: 0.5, rot: rnd() * 6.28, s0: 0.55, s1: 1.25, pop: 10, life: 30, alpha: 0.8 });
+      if (p.st === ST.HIT && p.launch > 1800 && sp > 600) {
+        const w = body * (0.42 + Math.min(0.3, p.launch / 12000));
+        fx.puff(x - (p.vx / S) * 0.3, y - body / 2 - (p.vy / S) * 0.3, w, { s0: 0.9, s1: 1.25, pop: 8, life: 50, under: 1 });
       }
-      if ((p.st === ST.DODGE || p.st === ST.DASH) && sp > 500 && s.f % 2 === 0) fx.add("dust", x, y - (p.ground ? 8 : 30), { w: 30, ay: 0.5, rot: rnd() * 6.28, s0: 0.5, s1: 1.1, pop: 6, life: 18, alpha: 0.6 });
+      if (p.st === ST.ATK && p.t === M.mv[i][p.mv].su && p.mv <= 4) { // a white swing crescent on every light, hit or miss
+        const b = M.box(p, M.mv[i][p.mv]).map((v) => v / S);
+        fx.add(`smear${1 + Math.floor(rnd() * 3)}`, (b[0] + b[1]) / 2, (b[2] + b[3]) / 2, { w: Math.max(18, (b[1] - b[0]) * 0.55), flip: -p.face, rot: (rnd() - 0.5) * 0.4, s0: 0.85, s1: 1, pop: 1, life: 7, alpha: 0.9 });
+      }
       fx.wasSt[i] = p.st;
     });
   }
@@ -221,11 +229,8 @@
     fx.parts = fx.parts.filter((q) => q.life > 0);
     for (const e of fx.sprites) e.t++;
     fx.sprites = fx.sprites.filter((e) => e.t < e.life);
-    for (const t of fx.trails) t.life -= 0.06;
-    fx.trails = fx.trails.filter((t) => t.life > 0);
-    for (const gh of fx.ghosts) gh.life -= 0.06;
-    fx.ghosts = fx.ghosts.filter((gh) => gh.life > 0);
-    fx.shake *= 0.85; fx.flash *= 0.88; fx.zoomKick *= 0.88;
+    fx.shake *= 0.7;
+    fx.koStamp = fx.koStamp.map((t) => Math.max(0, t - 1));
   }
 
   // ---------- camera ----------
@@ -241,7 +246,7 @@
     for (const p of live) { const x = p.x / S, y = p.y / S; x0 = Math.min(x0, x - 110); x1 = Math.max(x1, x + 110); y0 = Math.min(y0, y - 150); y1 = Math.max(y1, y + 70); }
     // match over: push in on the winner so the victory animation reads
     const w = Math.max(s.over ? 420 : 640, x1 - x0), h = Math.max(s.over ? 240 : 340, y1 - y0);
-    const z = Math.max(0.62, Math.min(s.over ? 1.7 : 1.28, Math.min(1280 / (w + 160), 720 / (h + 120)))) + fx.zoomKick;
+    const z = Math.max(0.62, Math.min(s.over ? 1.7 : 1.28, Math.min(1280 / (w + 160), 720 / (h + 120))));
     const tx = ((x0 + x1) / 2) * 0.85 + 640 * 0.15, ty = ((y0 + y1) / 2) * 0.8 + 400 * 0.2;
     cam.x += (tx - cam.x) * 0.12; cam.y += (ty - cam.y) * 0.12; cam.z += (z - cam.z) * 0.09;
   }
@@ -305,7 +310,7 @@
     }
   }
   const tintBuf = document.createElement("canvas"), tg = tintBuf.getContext("2d");
-  function drawSprite(i, p, f, alpha, tint, halo) {
+  function drawSprite(i, p, f, alpha, tint, halo, tintColor = "#fff") {
     const win = st && st.over === i + 1 && st.overT > 20 ? st.overT - 20 : -1;
     const F = gfx[i], ps = Render.pose(F, p, f, M.mv[i], Sim, win);
     const x = p.x / S, y = p.y / S;
@@ -317,7 +322,7 @@
     if (tint) { // flash a white overlay on the sprite only, through a small buffer
       tintBuf.width = cell; tintBuf.height = cell;
       tg.drawImage(im, sx, 0, cell, cell, 0, 0, cell, cell);
-      tg.globalCompositeOperation = "source-atop"; tg.globalAlpha = tint; tg.fillStyle = "#fff"; tg.fillRect(0, 0, cell, cell);
+      tg.globalCompositeOperation = "source-atop"; tg.globalAlpha = tint; tg.fillStyle = tintColor; tg.fillRect(0, 0, cell, cell);
       tg.globalCompositeOperation = "source-over"; tg.globalAlpha = 1;
       src = tintBuf; sx = 0;
     }
@@ -338,16 +343,28 @@
     }
     if (p.ground) { g.fillStyle = "rgba(0,0,0,.28)"; g.beginPath(); g.ellipse(x, y + 1, 20, 4.5, 0, 0, 7); g.fill(); }
     if (p.ground) { g.strokeStyle = TEAM[i]; g.lineWidth = 2.5; g.globalAlpha = 0.9; g.beginPath(); g.ellipse(x, y + 1, 17, 4, 0, 0, 7); g.stroke(); g.globalAlpha = 1; }
-    for (const gh of fx.ghosts.filter((q) => q.i === i)) drawSprite(i, gh.p, gh.f, gh.life * 0.5, 0.6);
-    let tint = 0;
+    if (p.hang > 0) { // respawn pad, like the opening
+      g.save(); g.globalAlpha = 0.85; g.fillStyle = TEAM[i]; g.shadowColor = TEAM[i]; g.shadowBlur = 14;
+      g.beginPath(); g.ellipse(x, y + 2, 26, 6, 0, 0, 7); g.fill(); g.restore();
+    }
+    let tint = 0, tintColor = "#fff";
     if (p.st === ST.ATK && m.su - p.t > 0 && m.su - p.t <= 2 && m.su >= 8) tint = 0.55; // heavy startup flash
-    if (p.st === ST.HIT && s.hp === 1 - i && s.f - s.hf < 3) tint = 0.6;                   // hit flash, first frames of hitstop
+    // the reference's strongest cue: a struck fighter flashes as a flat silhouette in their own
+    // damage colour, through the hit pause and the start of a launch
+    const age = s.f - s.hf, launched = p.launch > 1800;
+    if (p.st === ST.HIT && s.hp === 1 - i && s.ha === 0 && age < (launched ? 24 : 9)) { tint = age < (launched ? 18 : 6) ? 1 : 0.55; tintColor = dmgColor(Math.max(45, p.dmg)); } // never white: yellow from the first hit
+    if (p.st === ST.HIT && launched && age < 16 && (p.vx || p.vy)) { // launch smear: two copies trail back along the flight line
+      const v = Math.hypot(p.vx, p.vy), ux = p.vx / v, uy = p.vy / v, len = Math.min(1.4, p.launch / 3000) * gfx[i].h;
+      for (const [k, al] of [[0.6, 0.45], [1, 0.22]]) drawSprite(i, { ...p, x: p.x - ux * len * k * S, y: p.y - uy * len * k * S }, s.f, al, 1, null, dmgColor(Math.max(45, p.dmg)));
+    }
+    if (p.st === ST.ATK && m.su >= 8 && p.t >= m.su && p.t < m.su + m.ac + 2) // heavy attacker: white streak behind the strike
+      drawSprite(i, { ...p, x: p.x - p.face * 14 * S }, s.f, 0.4, 1, null, "#fff");
     if (p.st === ST.ATK && p.chg > 0 && p.t === m.su - 1) tint = 0.25 + 0.25 * Math.sin(s.f * 0.8); // a held heavy pulses while it charges
     if (s.ha === 1 && s.hp === 1 - i && s.f - s.hf < 6) tint = 0.45;                         // armor took the hit
     const blink = p.inv > 0 && Math.floor(s.f / 6) % 2 === 0;
     const jitter = p.st === ST.HIT && s.freeze > 0 ? (rnd() - 0.5) * 4 : 0;
     g.save(); g.translate(jitter, 0);
-    drawSprite(i, p, s.f, p.st === ST.DODGE ? 0.55 : blink ? 0.55 : 1, tint, "rgba(8,3,18,0.7)");
+    drawSprite(i, p, s.f, p.st === ST.DODGE ? 0.55 : blink ? 0.55 : 1, tint, "rgba(8,3,18,0.7)", tintColor);
     g.restore();
     if (showBoxes) {
       g.strokeStyle = "rgba(80,200,255,.9)"; g.lineWidth = 1;
@@ -362,11 +379,9 @@
     const top = y - gfx[i].h - 16;
     g.beginPath(); g.moveTo(x - 5, top); g.lineTo(x + 5, top); g.lineTo(x, top + 6); g.closePath(); g.stroke(); g.fill();
   }
-  function drawFx() {
-    // launch trail: a soft smoke ribbon behind launched fighters
-    for (const t of fx.trails) { g.fillStyle = "rgba(245,226,190,1)"; g.globalAlpha = t.life * 0.35; g.beginPath(); g.arc(t.x, t.y, t.w * (0.4 + t.life * 0.6), 0, 7); g.fill(); }
-    g.globalAlpha = 1;
+  function drawFx(under) {
     for (const e of fx.sprites) {
+      if (!e.under !== !under) continue;
       const im = vfx[e.name];
       if (!im) continue;
       const k = e.t < e.pop ? e.t / e.pop : 1, sc = e.s0 + (e.s1 - e.s0) * (1 - (1 - k) * (1 - k));
@@ -378,6 +393,7 @@
       g.restore();
     }
     g.globalAlpha = 1;
+    if (under) return;
     for (const q of fx.parts) { g.globalAlpha = Math.min(1, q.life * 1.5); g.fillStyle = q.c; g.beginPath(); g.arc(q.x, q.y, q.size * 0.7, 0, 7); g.fill(); }
     g.globalAlpha = 1;
   }
@@ -418,6 +434,14 @@
     g.lineWidth = w + 4; g.strokeStyle = "#0b0a1a"; g.beginPath(); g.arc(cx + jig, cy, r * 0.98, a0, a1, true); g.stroke();
     g.lineWidth = w; g.strokeStyle = dead ? "#5a5670" : dmgColor(d); g.beginPath(); g.arc(cx + jig, cy, r * 0.98, a0, a1, true); g.stroke();
     italic(String(Math.max(0, p.stocks)), cx - r * 1.02, cy + r * 1.02, r * 0.95, "#ffffff", "center");
+    const ko = fx.koStamp[i];
+    if (ko > 0) { // red KO stamp slams onto the portrait
+      const sc = ko > 64 ? 1 + (ko - 64) * 0.12 : 1;
+      g.save(); g.globalAlpha = Math.min(1, ko / 12); g.translate(cx, cy); g.rotate(-0.25); g.scale(sc, sc);
+      g.lineWidth = r * 0.22; g.strokeStyle = "#e0242f"; g.beginPath(); g.arc(0, 0, r * 0.82, 0, 7); g.stroke();
+      g.beginPath(); g.moveTo(-r * 0.58, -r * 0.58); g.lineTo(r * 0.58, r * 0.58); g.stroke();
+      g.restore();
+    }
     if (showBoxes) italic(d + "%", cx, cy + r * 2.0, r * 0.6, dmgColor(d), "center");
   }
   function hud(s) {
@@ -431,7 +455,7 @@
     portrait(0, s.p[0], cx1, top + r * 0.15, r, s);
     portrait(1, s.p[1], cx2, top + r * 0.15, r, s);
 
-    if (s.f < FEEL.countdown + 30) {
+    if (s.f < FEEL.countdown + 30 && !s.over) {
       const n = Math.ceil((FEEL.countdown - s.f) / 30), go = s.f >= FEEL.countdown, ph = (s.f % 30) / 30;
       // pop in, hold, then scale up and vanish quickly (never a slow fade through the outline)
       g.save(); g.globalAlpha = go && ph > 0.7 ? Math.max(0, 1 - (ph - 0.7) / 0.3) : 1;
@@ -440,7 +464,10 @@
       italic(go ? "FIGHT!" : String(n), W / 2, H * 0.44, size, go ? "#ffd36b" : "#ffffff", "center");
       g.restore();
     }
-    if (s.over) {
+    if (s.over && s.overT < 100) { // GAME! slams in on the last KO, before the winner banner
+      const pop = s.overT < 8 ? 1.6 - s.overT * 0.075 : 1;
+      italic("GAME!", W / 2, H * 0.42, 110 * u * pop, "#ffd36b", "center");
+    } else if (s.over) {
       const wi = s.over - 1;
       g.fillStyle = "rgba(8,6,20,.45)"; g.fillRect(0, H * 0.08, W, H * 0.2);
       italic(`${FIGHTERS[pick[wi]].name.toUpperCase()} WINS`, W / 2, H * 0.2, 64 * u, "#ffffff", "center");
@@ -449,6 +476,22 @@
   }
   function rr(x, y, w, h, r) { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); }
 
+  // a fighter outside the view shows in a glass bubble at the screen edge, as in the reference
+  function bubble(s, i, z) {
+    const p = s.p[i];
+    if (p.st === ST.DEAD || p.hang > 0) return;
+    const F = gfx[i], hw = W / 2 / z, hh = H / 2 / z, x = p.x / S, y = p.y / S - F.h / 2;
+    const r = (H * 0.09) / z, pad = r + 8 / z;
+    if (Math.abs(x - cam.x) < hw + F.h * 0.3 && Math.abs(y - cam.y) < hh + F.h * 0.5) return;
+    const cx = Math.max(cam.x - hw + pad, Math.min(cam.x + hw - pad, x)), cy = Math.max(cam.y - hh + pad, Math.min(cam.y + hh - pad, y));
+    g.save();
+    g.fillStyle = "rgba(205,210,225,0.35)"; g.strokeStyle = "#0b0a1a"; g.lineWidth = 3 / z;
+    g.beginPath(); g.arc(cx, cy, r, 0, 7); g.fill(); g.stroke(); g.clip();
+    g.translate(cx, cy); g.scale(0.55, 0.55); g.translate(-cx, -cy);
+    const age = s.f - s.hf, hitNow = p.st === ST.HIT && s.hp === 1 - i && age < 24;
+    drawSprite(i, { ...p, x: cx * S, y: (cy + F.h / 2) * S }, s.f, 1, hitNow ? 1 : 0, null, dmgColor(p.dmg));
+    g.restore();
+  }
   function draw() {
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
     drawBackground();
@@ -457,11 +500,12 @@
     g.save();
     g.translate(W / 2 + (rnd() - 0.5) * fx.shake, H / 2 + (rnd() - 0.5) * fx.shake); g.scale(z, z); g.translate(-cam.x, -cam.y);
     drawStage();
+    drawFx(true);
     for (const t of [0, 1]) drawFighter(st, t);
     drawFx();
+    for (const t of [0, 1]) bubble(st, t, z);
     g.restore();
     drawAtmosphere();
-    if (fx.flash > 0.02) { g.fillStyle = `rgba(255,240,220,${0.3 * fx.flash})`; g.fillRect(0, 0, W, H); }
     hud(st);
   }
 
@@ -472,7 +516,9 @@
     if (mode === "bot") { a = read(SOLO) | pad(0); b = bot(st, 1, 1); }
     else if (mode === "local") { a = read(P1) | pad(0); b = read(P2) | pad(1); }
     else if (mode === "demo") { a = bot(st, 0, 2); b = bot(st, 1, 2); }
-    if (st.over && st.overT > 60 && ((a | b) & (IN.J | IN.A) || mode === "demo")) { st = M.create(); fx.reset(); return; }
+    // rematch: a human presses jump or light (the bot's own presses never restart the match)
+    const human = mode === "bot" ? a : a | b;
+    if (st.over && st.overT > 60 && (human & (IN.J | IN.A) || mode === "demo")) { st = M.create(); fx.reset(); return; }
     M.step(st, [a, b]);
     events(st); stepFx(); updateCam(st);
   }
