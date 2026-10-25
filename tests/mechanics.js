@@ -227,5 +227,18 @@ const kit = (da, db) => { da.kit = 1; db.kit = 1; };
   let k = 0; while (!p.hb && k++ < 30) M.step(s, [0, 0]);
   ok(p.hb && p.vy < -1500 && o.st === ST.HIT && o.dmg === FEEL.kit.stompDmg, "kit: landing on a head stomps it and bounces high");
 }
+// ---- four fighters ----
+{ // free for all: four spawns, one swing can hit two foes, the last fighter standing wins
+  const d = def("djinn-warrior"), M = Sim.match([d, d, d, d]), s = M.create();
+  ok(s.p.length === 4 && new Set(s.p.map((p) => p.x)).size === 4, "four fighters spawn at four places");
+  s.f = FEEL.countdown + 1;
+  for (const p of s.p) { p.y = STAGE.main.y; p.ground = 1; p.x = 900 * S; p.face = -1; }
+  s.p[0].x = 600 * S; s.p[0].face = 1; s.p[1].x = 640 * S; s.p[2].x = 645 * S;
+  M.step(s, [IN.R | IN.A, 0, 0, 0]); let k = 0; while (s.p[0].st === ST.ATK && k++ < 40) M.step(s, [0, 0, 0, 0]);
+  ok(s.p[1].dmg > 0 && s.p[2].dmg > 0 && s.p[3].dmg === 0, `one side light hits both foes in reach (${s.p.map((p) => p.dmg)})`);
+  for (const j of [1, 2]) s.p[j].stocks = 0;
+  s.p[3].stocks = 1; s.p[3].x = 2000 * S; M.step(s, [0, 0, 0, 0]);
+  ok(s.over === 1, `with one fighter left, the match ends for them (over ${s.over})`);
+}
 console.log(fails ? `${fails} failed` : "all mechanics ok");
 process.exit(fails ? 1 : 0);

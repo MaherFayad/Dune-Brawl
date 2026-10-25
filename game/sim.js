@@ -22,6 +22,7 @@
     ],
     blast: { l: -420 * S, r: 1700 * S, t: -420 * S, b: 1060 * S },
     spawnX: [470 * S, 810 * S],
+    spawns: { 3: [400 * S, 640 * S, 880 * S], 4: [380 * S, 545 * S, 735 * S, 900 * S] }, // three or four fighters spread across the stage
     respawn: { x: 640 * S, y: 240 * S }, // between the soft platforms, above the stage
   };
 
@@ -146,18 +147,20 @@
     };
   }
   const PKEYS = Object.keys(player(0, 1, { airJumps: 2 }));
-  const GKEYS = ["f", "freeze", "over", "overT", "hf", "hx", "hy", "hk", "hp", "ha", "kf", "kx", "ky", "kp", "fin", "fa"];
+  const GKEYS = ["f", "freeze", "over", "overT", "hf", "hx", "hy", "hk", "hp", "hv", "ha", "kf", "kx", "ky", "kp", "fin", "fa", "fv"];
 
-  // A match binds two fighter definitions; the returned object steps a plain state.
-  function match(defA, defB) {
-    const ph = [physics(defA), physics(defB)];
-    const mv = [moves(defA), moves(defB)];
+  // A match binds two to four fighter definitions (match(a, b) or match([a, b, c, d])); the
+  // returned object steps a plain state. Free for all: the last fighter with stocks wins.
+  function match(...args) {
+    const defs = Array.isArray(args[0]) ? args[0] : args, N = defs.length;
+    const ph = defs.map(physics), mv = defs.map(moves);
+    const spawnX = N === 2 ? STAGE.spawnX : STAGE.spawns[N];
 
     function create() {
       return {
-        f: 0, freeze: 0, over: 0, overT: 0, hf: -1, hx: 0, hy: 0, hk: 0, hp: 0, ha: 0, // ha: 0 hit, 1 armored, 2 parried
-        kf: -1, kx: 0, ky: 0, kp: 0, fin: 0, fa: 0, // fin: frames left of a finisher, fa: who lands it
-        p: [player(STAGE.spawnX[0], 1, ph[0]), player(STAGE.spawnX[1], -1, ph[1])],
+        f: 0, freeze: 0, over: 0, overT: 0, hf: -1, hx: 0, hy: 0, hk: 0, hp: 0, hv: 1, ha: 0, // the last hit: hp hit hv; ha: 0 hit, 1 armored, 2 parried
+        kf: -1, kx: 0, ky: 0, kp: 0, fin: 0, fa: 0, fv: 1, // fin: frames left of a finisher, fa lands it on fv
+        p: defs.map((d, i) => player(spawnX[i], spawnX[i] < 640 * S ? 1 : -1, ph[i])),
       };
     }
 
@@ -200,6 +203,15 @@
     function vaultable(p, P) {
       const reach = div(P.jumpV * P.jumpV, 2 * P.grav);
       return STAGE.plats.some((pl) => p.x > pl.x1 - 30 * S && p.x < pl.x2 + 30 * S && pl.y < p.y - 20 * S && p.y - pl.y < reach);
+    }
+    // the distance to the nearest living foe ahead of p (0 when there is none)
+    function nearestAhead(s, i, p) {
+      let best = 0;
+      for (let j = 0; j < s.p.length; j++) {
+        const o = s.p[j], d = (o.x - p.x) * p.face;
+        if (j !== i && o.st !== ST.DEAD && d > 0 && (!best || d < best)) best = d;
+      }
+      return best;
     }
     function stepPlayer(s, i, input) {
       const p = s.p[i], P = ph[i], M = mv[i];
@@ -346,7 +358,7 @@
               p.cmb = K && light && p.cmbT > 0 ? Math.min(2, p.cmb + 1) : 0; p.cmbT = 0;
               if (K && p.cmb === 1) p.t = div(M[m].su * (100 - K.combo2Speed), 100); // hit 2 skips into its startup
               if (K && p.cmb) { // each follow-up steps in just far enough to keep the string in reach
-                const o = s.p[1 - i], gap = (o.x - p.x) * p.face - div(M[m].box[1] * S * 6, 10);
+                const gap = nearestAhead(s, i, p) - div(M[m].box[1] * S * 6, 10);
                 let travel = 0, w = 1000;
                 for (let f = p.t; f < M[m].su; f++) { if (p.ground) w -= div(12 * w, 100); travel += w; }
                 p.vx = gap > 0 && travel > 0 ? p.face * Math.min(p.cmb === 2 ? K.comboLunge : K.comboStep, div(gap * 1000, travel)) : 0;
@@ -388,10 +400,11 @@
       move(p, P, M);
       if (p.ground && !wasGround) land(p, M, P, dx, fallV);
       if (K && !p.ground && !p.hb && p.vy > 300 && p.st !== ST.HIT) { // landing on a foe's head: a stomp and a big bounce
-        const o = s.p[1 - i], O = ph[1 - i], top = o.y - O.h;
-        if (o.st !== ST.DEAD && o.inv <= 0 && Math.abs(p.x - o.x) < P.hw + O.hw && p.y >= top - 6 * S && p.y <= top + 16 * S) {
+        for (let j = 0; j < s.p.length && !p.hb; j++) {
+          const o = s.p[j], O = ph[j], top = o.y - O.h;
+          if (j === i || o.st === ST.DEAD || o.inv > 0 || Math.abs(p.x - o.x) >= P.hw + O.hw || p.y < top - 6 * S || p.y > top + 16 * S) continue;
           p.vy = -K.bounceV; p.hb = 1; p.adash = 0; p.ff = 0; p.cut = 1; p.y = top - 6 * S;
-          o.dmg += K.stompDmg; if (o.st !== ST.ATK || !mv[1 - i][o.mv].armor) { o.st = ST.HIT; o.t = K.stompStun; o.launch = 0; o.vx = 0; if (!o.ground) o.vy = Math.max(o.vy, 600); }
+          o.dmg += K.stompDmg; if (o.st !== ST.ATK || !mv[j][o.mv].armor) { o.st = ST.HIT; o.t = K.stompStun; o.launch = 0; o.vx = 0; if (!o.ground) o.vy = Math.max(o.vy, 600); }
         }
       }
       if (K && wasGround && !p.ground && p.vy >= 0) p.coy = K.coyote; // ran off a ledge: a short grace jump
@@ -459,50 +472,55 @@
       // the reference opening: fighters hang on spawn pads during the countdown and drop in
       if (s.f < FEEL.countdown - FEEL.spawnRelease) { s.f++; return; }
       if (s.f === FEEL.countdown - FEEL.spawnRelease) for (const p of s.p) p.drop = 40; // fall through the soft platforms
-      const ins = s.f < FEEL.countdown ? [0, 0] : inputs;
+      const N = s.p.length, ins = s.p.map((_, i) => (s.f < FEEL.countdown ? 0 : inputs[i] || 0));
       if (s.fin > 0) { // the finisher cinematic: everything holds while it plays
         s.fin--;
-        for (let i = 0; i < 2; i++) bufferPress(s.p[i], 0);
+        for (let i = 0; i < N; i++) bufferPress(s.p[i], 0);
         s.f++;
         return;
       }
       if (s.freeze > 0) {
         s.freeze--;
-        for (let i = 0; i < 2; i++) bufferPress(s.p[i], ins[i]);
+        for (let i = 0; i < N; i++) bufferPress(s.p[i], ins[i]);
         s.f++;
         return;
       }
-      for (let i = 0; i < 2; i++) {
+      for (let i = 0; i < N; i++) {
         const before = s.p[i].ground;
         stepPlayer(s, i, ins[i]);
         if (s.p[i].ground && !before) s.p[i].jumps = ph[i].airJumps;
       }
-      const hits = [];
-      for (let i = 0; i < 2; i++) {
+      const hits = []; // [attacker, victim]; a.hit is a bitmask of who this swing already hit
+      for (let i = 0; i < N; i++) {
         const a = s.p[i];
-        if (a.st !== ST.ATK || a.hit) continue;
+        if (a.st !== ST.ATK) continue;
         const m = mv[i][a.mv];
         if (a.t < m.su || a.t >= m.su + m.ac) continue;
-        const v = s.p[1 - i], V = ph[1 - i];
-        if (v.st === ST.DEAD || v.inv > 0) continue;
-        if (v.st === ST.DODGE && v.dt - v.t >= FEEL.dodgeStart) continue;
-        const b = box(a, m), vh = v.st === ST.DASH && v.slide === 1 ? div(V.h, 2) : V.h; // a slide ducks under
-        if (b[0] < v.x + V.hw && b[1] > v.x - V.hw && b[2] < v.y && b[3] > v.y - vh) hits.push(i);
+        const b = box(a, m);
+        for (let j = 0; j < N; j++) {
+          const v = s.p[j], V = ph[j];
+          if (j === i || a.hit & (1 << j) || v.st === ST.DEAD || v.inv > 0) continue;
+          if (v.st === ST.DODGE && v.dt - v.t >= FEEL.dodgeStart) continue;
+          const vh = v.st === ST.DASH && v.slide === 1 ? div(V.h, 2) : V.h; // a slide ducks under
+          if (b[0] < v.x + V.hw && b[1] > v.x - V.hw && b[2] < v.y && b[3] > v.y - vh) hits.push([i, j]);
+        }
       }
-      for (const i of hits) {
-        const a = s.p[i], v = s.p[1 - i], m = mv[i][a.mv], V = ph[1 - i];
-        a.hit = 1;
-        const vm = v.st === ST.ATK ? mv[1 - i][v.mv] : null;
+      const parried = [];
+      for (const [i, j] of hits) {
+        const a = s.p[i], v = s.p[j], m = mv[i][a.mv], V = ph[j];
+        if (parried[i]) continue; // a parry this frame stops the rest of that swing; trades still land both ways
+        a.hit |= 1 << j;
+        const vm = v.st === ST.ATK ? mv[j][v.mv] : null;
         const within = (w) => w && v.t >= w[0] && v.t <= w[1];
         const hb = box(a, m);
         // spark at the contact point: the hitbox center clamped onto the victim's hurtbox
-        s.hf = s.f; s.hp = i; s.ha = 0;
+        s.hf = s.f; s.hp = i; s.hv = j; s.ha = 0;
         s.hx = Math.max(v.x - V.hw, Math.min(v.x + V.hw, div(hb[0] + hb[1], 2)));
         s.hy = Math.max(v.y - V.h, Math.min(v.y - 8 * S, div(hb[2] + hb[3], 2)));
         if (vm && within(vm.parry)) {
           // parried: no damage, the attacker is knocked back and stunned
           a.st = ST.HIT; a.t = FEEL.parryStun; a.launch = 0; a.vx = -a.face * 600; a.vy = a.ground ? 0 : -300;
-          s.ha = 2; s.hk = 0; s.freeze = Math.max(s.freeze, FEEL.pauseMax);
+          s.ha = 2; s.hk = 0; s.freeze = Math.max(s.freeze, FEEL.pauseMax); parried[i] = 1;
           continue;
         }
         const kitA = ph[i].kit ? FEEL.kit : null, fin3 = kitA && a.cmb === 2;
@@ -537,20 +555,23 @@
           const L = div(l * 5, 2);
           v.vx = dir * div(L * 70, 100); v.vy = -div(L * 71, 100); v.t = 90; v.launch = L; v.ground = 0;
           a.st = ST.IDLE; a.t = 0; a.vx = 0; a.vy = 0; a.x = v.x + dir * 55 * S; a.face = dir;
-          s.fin = FEEL.finFrames; s.fa = i; s.freeze = 0;
+          s.fin = FEEL.finFrames; s.fa = i; s.fv = j; s.freeze = 0;
           continue;
         }
         s.freeze = Math.max(s.freeze, Math.min(FEEL.pauseMax, FEEL.pauseBase + div(dmg, FEEL.pauseDiv)) + (fin3 ? kitA.finPause : 0));
         if (fin3) a.cmb = 3; // marks the landed finisher for the renderer until the move ends
       }
       const B = STAGE.blast;
-      for (let i = 0; i < 2; i++) {
+      for (let i = 0; i < N; i++) {
         const p = s.p[i];
         if (p.st === ST.DEAD) continue;
         if (p.x < B.l || p.x > B.r || p.y > B.b || p.y < B.t) {
           s.kf = s.f; s.kx = Math.max(B.l, Math.min(B.r, p.x)); s.ky = Math.max(B.t, Math.min(B.b, p.y)); s.kp = i;
           p.stocks--; p.st = ST.DEAD; p.t = FEEL.deadFrames; p.vx = 0; p.vy = 0;
-          if (p.stocks <= 0) { s.over = 2 - i; s.overT = 0; }
+          if (p.stocks <= 0) { // the last fighter with stocks wins
+            const alive = s.p.map((q, k) => (q.stocks > 0 ? k : -1)).filter((k) => k >= 0);
+            if (alive.length <= 1) { s.over = alive.length ? alive[0] + 1 : N === 2 ? 2 - i : i + 1; s.overT = 0; }
+          }
         }
       }
       s.f++;
