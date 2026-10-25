@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Dune Brawl test build</title>
 <style>
-  :root { --bg:#0b0a1a; --ink:#ffffff; --muted:#aab0d6; --panel:rgba(16,15,44,.92); --rim:#0b0a1a; --gold:#ffd36b; --p1:#2fd5c4; --p2:#ff7a45; }
+  :root { --bg:#0b0a1a; --ink:#ffffff; --muted:#aab0d6; --panel:rgba(16,15,44,.92); --rim:#0b0a1a; --gold:#ffd36b; --p1:#2fd5c4; --p2:#ff7a45; --p3:#b07cff; --p4:#8fe04a; }
   * { box-sizing: border-box; }
   html, body { margin:0; height:100%; background:var(--bg); color:var(--ink); font-family: "Segoe UI", system-ui, -apple-system, Roboto, sans-serif; overflow:hidden; }
   canvas { position:fixed; inset:0; width:100vw; height:100vh; display:block; }
@@ -18,7 +18,14 @@
   .sub { color:var(--muted); margin:6px 0 16px; font-size:14px; }
   .row { margin:12px 0; }
   .row b { display:block; font-size:16px; margin-bottom:8px; }
-  .row.p0 b { color:var(--p1); } .row.p1 b { color:var(--p2); }
+  .row.p0 b { color:var(--p1); } .row.p1 b { color:var(--p2); } .row.p2 b { color:var(--p3); } .row.p3 b { color:var(--p4); }
+  .row[hidden] { display:none; }
+  .count { display:flex; align-items:center; gap:8px; margin:10px 0 4px; }
+  .count b { font-size:16px; margin-right:6px; }
+  .count button { font:italic 900 16px "Arial Black",system-ui,sans-serif; min-width:48px; min-height:44px; color:#fff; background:#2a2960; border:3px solid var(--rim); border-radius:4px; cursor:pointer; }
+  .count button[aria-pressed="true"] { background:var(--gold); color:#1a1030; }
+  .count button:focus-visible { outline:3px solid #fff; outline-offset:2px; }
+  .card { max-height:calc(100vh - 32px); overflow:auto; }
   .chips { display:flex; flex-wrap:wrap; gap:14px; }
   .chip { position:relative; width:96px; padding:0; background:none; border:0; cursor:pointer; color:var(--ink); text-align:center; }
   .chip .disc { display:block; width:72px; height:72px; margin:10px auto 6px; border-radius:50%; background:#1c1b46; border:3px solid var(--rim); position:relative; overflow:visible; }
@@ -27,6 +34,8 @@
   .chip:hover .disc img, .chip.on .disc img { filter:none; transform:translateX(-50%) scale(1.06); }
   .row.p0 .chip.on .disc { border-color:var(--p1); box-shadow:0 0 0 3px var(--rim), 0 0 18px rgba(47,213,196,.6); }
   .row.p1 .chip.on .disc { border-color:var(--p2); box-shadow:0 0 0 3px var(--rim), 0 0 18px rgba(255,122,69,.6); }
+  .row.p2 .chip.on .disc { border-color:var(--p3); box-shadow:0 0 0 3px var(--rim), 0 0 18px rgba(176,124,255,.6); }
+  .row.p3 .chip.on .disc { border-color:var(--p4); box-shadow:0 0 0 3px var(--rim), 0 0 18px rgba(143,224,74,.6); }
   .chip:focus-visible { outline:3px solid #fff; outline-offset:4px; border-radius:8px; }
   .btns { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-top:20px; }
   .online { margin-top:16px; padding:14px; border:2px solid var(--rim); border-radius:6px; background:rgba(11,10,26,.45); }
@@ -37,6 +46,13 @@
   .online input { font:700 16px ui-monospace, monospace; color:#fff; background:#1c1b46; border:3px solid var(--rim); border-radius:4px; padding:10px 12px; min-width:0; text-transform:uppercase; letter-spacing:2px; }
   .online input:focus-visible { outline:3px solid #fff; outline-offset:2px; }
   .online .sub { margin:10px 0 0; }
+  .lobby { list-style:none; margin:12px 0 0; padding:0; display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:8px; }
+  .lobby[hidden] { display:none; }
+  .lobby li { padding:8px 10px; background:#1c1b46; border:3px solid var(--rim); border-left:6px solid var(--c); border-radius:4px; font-weight:800; font-style:italic; }
+  .lobby b { color:var(--c); margin-right:6px; }
+  #bStart { margin-top:12px; width:100%; }
+  #bStart[hidden] { display:none; }
+  #bStart:disabled { filter:grayscale(1) brightness(.7); cursor:not-allowed; }
   .btn { font:italic 900 16px "Arial Black","Segoe UI Black",system-ui,sans-serif; text-transform:uppercase; color:#1a1030; background:var(--gold); border:3px solid var(--rim); border-radius:4px; padding:12px 14px; cursor:pointer; transform:skewX(-10deg); box-shadow:0 4px 0 var(--rim); }
   .btn > * { display:inline-block; transform:skewX(10deg); }
   .btn.ghost { background:#2a2960; color:#fff; }
@@ -61,11 +77,14 @@
   <div class="card">
     <h1 class="it">DUNE <span>BRAWL</span></h1>
     <p class="sub">Test build on Dune Island.</p>
+    <div class="count" id="count" role="group" aria-label="Fighters"><b class="it">FIGHTERS</b><button data-n="2" aria-pressed="true">2</button><button data-n="3">3</button><button data-n="4">4</button></div>
     <div class="row p0"><b class="it">PLAYER 1</b><div class="chips" id="pick0"></div></div>
     <div class="row p1"><b class="it">PLAYER 2 / BOT</b><div class="chips" id="pick1"></div></div>
+    <div class="row p2" hidden><b class="it">PLAYER 3 / BOT</b><div class="chips" id="pick2"></div></div>
+    <div class="row p3" hidden><b class="it">PLAYER 4 / BOT</b><div class="chips" id="pick3"></div></div>
     <div class="btns">
       <button class="btn" id="bBot"><span>Vs bot</span></button>
-      <button class="btn ghost" id="bLocal"><span>2 players</span></button>
+      <button class="btn ghost" id="bLocal"><span>Local</span></button>
       <button class="btn ghost" id="bDemo"><span>Watch</span></button>
       <button class="btn ghost" id="bOnline" aria-controls="online"><span>Online</span></button>
     </div>
@@ -79,7 +98,9 @@
         <input id="netLinkText" readonly aria-label="Invite link">
         <button class="btn ghost" id="bCopy"><span>Copy link</span></button>
       </div>
-      <p class="sub" id="netStatus" role="status" aria-live="polite">Your fighter is the one picked in the Player 1 row.</p>
+      <ul class="lobby" id="netLobby" hidden></ul>
+      <button class="btn" id="bStart" hidden><span>Start match</span></button>
+      <p class="sub" id="netStatus" role="status" aria-live="polite">Up to 4 players. Your fighter is the one picked in the Player 1 row.</p>
     </div>
     <div class="keys">
       <span><kbd>WASD</kbd> / <kbd>Arrows</kbd></span><span>Move and aim</span>
@@ -88,7 +109,7 @@
       <span><kbd>L</kbd> / <kbd>Shift</kbd></span><span>Dodge (with a direction on the ground: dash)</span>
       <span>2 players, left</span><span><kbd>WASD</kbd> move, <kbd>Space</kbd> jump, <kbd>F</kbd> light, <kbd>G</kbd> heavy, <kbd>H</kbd> dodge</span>
       <span>2 players, right</span><span><kbd>Arrows</kbd> move, <kbd>Right Shift</kbd> jump, <kbd>.</kbd> light, <kbd>/</kbd> heavy, <kbd>,</kbd> dodge (or numpad 0 to 3)</span>
-      <span>Gamepads</span><span>Plug in two and each player uses one</span>
+      <span>Gamepads</span><span>Each player uses one; in Local play, players 3 and 4 are bots unless their gamepad is plugged in</span>
       <span><kbd>M</kbd></span><span>Sound on or off</span>
       <span><kbd>F2</kbd> / <kbd>F3</kbd></span><span>Feel tuning panel / hitboxes</span>
     </div>

@@ -29,7 +29,7 @@
     if (FIGHTERS[id].stick) return (stickArt[id] = stickArt[id] || Stick.still(id, 160, true).toDataURL());
     return `${ROOT}/assets/fighters/${id}/${FIGHTERS[id].portrait || "source/portrait.png"}`;
   };
-  const TEAM = ["#2fd5c4", "#ff7a45"];
+  const TEAM = ["#2fd5c4", "#ff7a45", "#b07cff", "#8fe04a"]; // player colours: teal, orange, violet, lime
   const params = new URLSearchParams(location.search);
 
   // ---------- canvas ----------
@@ -68,8 +68,14 @@
   }
 
   // ---------- bot (render-side input generator; local modes only) ----------
+  // the foe a bot (or the camera) cares about: the nearest fighter still in the match
+  function foeOf(s, i) {
+    let best = null, bd = Infinity;
+    s.p.forEach((q, j) => { if (j === i || q.stocks <= 0) return; const d = Math.hypot(q.x - s.p[i].x, q.y - s.p[i].y) + (q.st === ST.DEAD ? 1e9 : 0); if (d < bd) { bd = d; best = q; } });
+    return best || s.p[(i + 1) % s.p.length];
+  }
   function bot(s, i, level) {
-    const me = s.p[i], foe = s.p[1 - i], m = STAGE.main;
+    const me = s.p[i], foe = foeOf(s, i), m = STAGE.main;
     if (me.st === ST.DEAD || s.f < FEEL.countdown) return 0;
     // alternate press and release per bot from the sim frame: a shared counter bumped by two
     // bots each frame gave each one a constant parity, so one held jump forever and never jumped
@@ -168,7 +174,10 @@
   }
 
   // ---------- match ----------
-  let mode = "menu", pick = [params.get("p1") || "djinn-warrior", params.get("p2") || "dune-ghoul"];
+  // the menu holds four slots; `count` of them play (2 to 4), as `pick`
+  const slots = [params.get("p1") || "djinn-warrior", params.get("p2") || "dune-ghoul", params.get("p3") || "stick-saif", params.get("p4") || "stick-vespera"];
+  let count = Math.max(2, Math.min(4, +params.get("n") || 2));
+  let mode = "menu", pick = slots.slice(0, count);
   let M = null, st = null, defs = [], gfx = [], showBoxes = false;
   const loading = { done: 0, total: 0, t: 0, tip: 0 };
   const cardArt = {};
@@ -181,7 +190,7 @@
     }));
     // stick fighters move with the stick kit (FEEL.kit in sim.js); painted fighters keep the reference tuning
     defs = await Promise.all(pick.map(async (id) => ({ ...(await (await fetch(`${ROOT}/assets/fighters/${kin(id)}/moves.draft.json`)).json()), kit: FIGHTERS[id].stick ? 1 : 0 })));
-    M = Sim.match(defs[0], defs[1]);
+    M = Sim.match(defs);
     const progress = { onCount: (n) => (loading.total += n), onSheet: () => loading.done++ };
     gfx = await Promise.all(pick.map((id, i) => FIGHTERS[id].stick ? Stick.create(id, (defs[i].stats || {}).height || 64, M.ph[i])
       : Render.loadFighter(id, ROOT, { art: FIGHTERS[id].art, height: (defs[i].stats || {}).height, basePose: FIGHTERS[id].basePose, victoryHold: FIGHTERS[id].victoryHold, remap: FIGHTERS[id].remap, ...progress })));
@@ -190,8 +199,8 @@
   }
   // the versus screen stays up for at least 1.6 s so the cards register, as in the reference
   const holdCards = (t0) => new Promise((ok) => setTimeout(ok, Math.max(0, 1600 - (performance.now() - t0))));
-  async function startMatch(m) { if (window.Sfx) { Sfx.init(); Sfx.play("uiConfirm", 0); } const t0 = performance.now(); mode = "loading"; hideMenu(); await load(); await holdCards(t0); mode = m; }
-  function rebuild() { if (defs.length) { M = Sim.match(defs[0], defs[1]); } }
+  async function startMatch(m) { if (window.Sfx) { Sfx.init(); Sfx.play("uiConfirm", 0); } pick = slots.slice(0, count); const t0 = performance.now(); mode = "loading"; hideMenu(); await load(); await holdCards(t0); mode = m; }
+  function rebuild() { if (defs.length) { M = Sim.match(defs); } }
 
   // ---------- effects (render only, driven by sim events) ----------
   // Painted effect sprites (assets/vfx) do the heavy lifting; a few embers add motion.
@@ -201,12 +210,13 @@
   ["star1", "star2", "star3", "puff1", "puff2", "puff3", "puff4",
    "smear1", "smear2", "smear3", "kick1", "kick2", "kick3", "ko-splash", "ko-cloud"].forEach((n) => { const im = new Image(); im.onload = () => (vfx[n] = im); im.src = `${ROOT}/assets/vfx/${n}.webp`; });
   const fx = {
-    sprites: [], parts: [], shake: 0, lastHf: -1, lastKf: -1, koStamp: [0, 0],
-    grounded: [1, 1], wasSt: [0, 0], lastVy: [0, 0], after: [[], []], landF: [-99, -99], landVy: [0, 0], jumpF: [-99, -99], turnF: [-99, -99], lastFace: [1, -1], lastVx: [0, 0], walled: [0, 0],
-    bats: [], petals: [], marks: [], banner: null, won: 0, stats: [], lastDmg: [0, 0], hitOn: [-1e9, -1e9],
+    sprites: [], parts: [], marks: [], bats: [], petals: [], shake: 0,
+    // per fighter state is rebuilt for 2 to 4 fighters by reset()
     reset() {
-      Object.assign(this, { sprites: [], parts: [], shake: 0, lastHf: -1, lastKf: -1, koStamp: [0, 0], bats: [], petals: [], marks: [], banner: null, won: 0, koHold: 0, chain: 0, chainF: -99, landF: [-99, -99], landVy: [0, 0], jumpF: [-99, -99], turnF: [-99, -99], lastFace: [1, -1], lastVx: [0, 0], walled: [0, 0],
-        stats: [0, 1].map(() => ({ kos: 0, falls: 0, acc: 0, done: 0, taken: 0 })), lastDmg: [0, 0], hitOn: [-1e9, -1e9] });
+      const n = Math.max(2, pick.length), per = (v) => Array.from({ length: n }, () => (typeof v === "function" ? v() : v));
+      Object.assign(this, { sprites: [], parts: [], shake: 0, lastHf: -1, lastKf: -1, koStamp: per(0), bats: [], petals: [], marks: [], banner: null, won: 0, koHold: 0, chain: 0, chainF: -99,
+        grounded: per(1), wasSt: per(0), lastVy: per(0), after: per(() => []), landF: per(-99), landVy: per(0), jumpF: per(-99), turnF: per(-99), lastFace: per(1), lastVx: per(0), walled: per(0),
+        stats: per(() => ({ kos: 0, falls: 0, acc: 0, done: 0, taken: 0 })), lastDmg: per(0), hitOn: per(-1e9), lastBy: per(-1), outF: per(-1) });
     },
     // a painted sprite: grows from s0 to s1 in `pop` frames, holds, then fades over the rest of `life` frames
     add(name, x, y, opt) { this.sprites.push({ name, x, y, t: 0, rot: 0, flip: 1, s0: 0.6, s1: 1, pop: 3, life: 18, w: 80, ax: 0.5, ay: 0.5, alpha: 1, ...opt }); },
@@ -214,6 +224,7 @@
     puff(x, y, w, opt) { this.add(`puff${1 + Math.floor(rnd() * 4)}`, x, y, { w, rot: (rnd() - 0.5) * 0.6, s0: 0.7, s1: 1.15, pop: 6, life: 30, ...opt }); },
     kick(x, y, w, flip) { this.add(`kick${1 + Math.floor(rnd() * 3)}`, x, y, { w, ay: 0.95, flip, s0: 0.6, s1: 1, pop: 3, life: 16 }); },
   };
+  fx.reset();
   // sounds (game/audio.js), panned by where they happen on screen
   const sfx = (name, x, o) => {
     if (!window.Sfx || mode === "loading") return;
@@ -261,7 +272,7 @@
   const SMEAR_KIND = ["thrust", "thrust", null, "up", "spin", "thrust", "up", "flat", "down", "down"];
   function drawSmears() {
     if (!st) return;
-    for (const i of [0, 1]) {
+    for (let i = 0; i < st.p.length; i++) {
       const p = st.p[i], col = style(i).trail;
       if (!col || p.st !== ST.ATK) continue;
       const m = M.mv[i][p.mv], kind = SMEAR_KIND[p.mv], k = p.t - m.su;
@@ -306,7 +317,7 @@
   }
   function events(s) {
     if (s.fin > 0) { // finisher cues, keyed to its frames so they replay identically
-      const T = finT(s), V = s.p[1 - s.fa], vx = V.x / S, vy = V.y / S - (gfx[1 - s.fa] ? gfx[1 - s.fa].h : 64) * 0.5;
+      const T = finT(s), V = s.p[s.fv], vx = V.x / S, vy = V.y / S - (gfx[s.fv] ? gfx[s.fv].h : 64) * 0.5;
       if (T === 1) { sfx("parry", vx, { who: s.fa }); for (let k = 0; k < 16; k++) flairApi.bat(vx, vy, rnd() * 6.28, 8 + rnd() * 8, 1.2); fx.shake = 6; }
       if (T >= FIN.open && (T - FIN.open) % FIN.slash === 0 && (T - FIN.open) / FIN.slash < FIN.count) {
         sfx("hitHeavy", vx, { who: s.fa, k: 40 }); fx.shake = 7;
@@ -328,11 +339,11 @@
       if (s.ha === 2) { // parry: a bright ring and a hard shake, no damage spark
         fx.add("star2", x, y, { w: 70, rot: rnd() * 6.28, s0: 0.3, s1: 1.4, pop: 3, life: 14 });
         fx.shake = Math.max(fx.shake, 6);
-        if (style(1 - s.hp).parried) style(1 - s.hp).parried(flairApi, 1 - s.hp, x, y);
+        if (style(s.hv).parried) style(s.hv).parried(flairApi, s.hv, x, y);
         sfx("parry", x);
       } else {
-        fx.hitOn[1 - s.hp] = s.f;
-        const cmb = s.p[s.hp].cmb, vb = gfx[1 - s.hp] ? gfx[1 - s.hp].h : 64;
+        fx.hitOn[s.hv] = s.f; fx.lastBy[s.hv] = s.hp; // a fall soon after is this hitter's KO
+        const cmb = s.p[s.hp].cmb, vb = gfx[s.hv] ? gfx[s.hv].h : 64;
         if (cmb === 1) fx.marks.push({ t: 0, kind: "text", x, y: y - vb * 0.7, text: "x2", size: 22, life: 34 });
         if (cmb === 3) { // the combo finisher lands: a shockwave bubble, a callout, a harder shake
           fx.marks.push({ t: 0, kind: "text", x, y: y - vb * 0.8, text: "FINISH!", size: 30, life: 46 });
@@ -342,7 +353,7 @@
         if (style(s.hp).hit) style(s.hp).hit(flairApi, s.hp, x, y, s.p[s.hp].face, heavy, s.p[s.hp].mv);
         fx.chain = s.f - fx.chainF < 12 ? fx.chain + 1 : 0; fx.chainF = s.f; // strings of hits rise in pitch
         sfx(heavy ? "hitHeavy" : "hit", x, { k, who: s.hp, mv: s.p[s.hp].mv, chain: fx.chain });
-        const atk = s.p[s.hp], dir = atk ? atk.face : 1, body = gfx[1 - s.hp] ? gfx[1 - s.hp].h : 64;
+        const atk = s.p[s.hp], dir = atk ? atk.face : 1, body = gfx[s.hv] ? gfx[s.hv].h : 64;
         fx.shake = Math.max(fx.shake, heavy ? 6 : 3); // the reference camera barely moves: 0.05 to 0.1 bodies
         // a small flat white starburst at the contact point; colour comes from the victim flash
         fx.add(`star${1 + Math.floor(rnd() * 3)}`, x, y, { w: body * (heavy ? 0.62 : 0.45), rot: rnd() * 6.28, s0: 1, s1: 0.7, pop: 1, life: heavy ? 10 : 7 });
@@ -357,7 +368,8 @@
     if (s.kf !== fx.lastKf && s.kf >= 0) {
       fx.lastKf = s.kf; fx.shake = 8; fx.koStamp[s.kp] = 70; fx.koHold = 70;
       // stats for the results screen: a fall within 5 s of being hit is the hitter's KO, else an accident
-      const killer = s.f - fx.hitOn[s.kp] < 300 ? 1 - s.kp : -1;
+      const killer = s.f - fx.hitOn[s.kp] < 300 ? fx.lastBy[s.kp] : -1;
+      if (s.p[s.kp].stocks <= 0) fx.outF[s.kp] = s.f; // out of the match: ranks the results
       fx.stats[s.kp].falls++; if (killer >= 0) fx.stats[killer].kos++; else fx.stats[s.kp].acc++;
       fx.banner = { killer, victim: s.kp, t: 0 };
       sfx("ko", s.kx / S, { scorer: killer >= 0 ? kin(pick[killer]) : null });
@@ -369,8 +381,8 @@
       const x = cam.x - Math.cos(ang) * t, y = cam.y - Math.sin(ang) * t, scr = (H / z);
       fx.add("ko-cloud", x, y, { w: scr * 0.55, ax: 0, ay: 0.5, rot: ang, s0: 0.4, s1: 1.05, pop: 10, life: 70 });
       fx.add("ko-splash", x, y, { w: scr * 0.6, ax: 0, ay: 0.5, rot: ang, s0: 0.5, s1: 1.1, pop: 4, life: 34 });
-      const team = style(1 - s.kp).ko || TEAM[1 - s.kp];
-      if (style(1 - s.kp).scoredKO) style(1 - s.kp).scoredKO(flairApi, 1 - s.kp, x, y, ang, scr);
+      const team = killer >= 0 ? style(killer).ko || TEAM[killer] : "#ffffff";
+      if (killer >= 0 && style(killer).scoredKO) style(killer).scoredKO(flairApi, killer, x, y, ang, scr);
       for (let j = 0; j < 18; j++) {
         const a = ang + (rnd() - 0.5) * 1.2, sp = 10 + rnd() * 16;
         fx.parts.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: 0.8 + rnd() * 0.4, size: 2 + rnd() * 3, c: rnd() < 0.6 ? team : "#ffffff", g: 0 });
@@ -378,7 +390,7 @@
     }
     s.p.forEach((p, i) => { // damage dealt and taken, for the results screen
       const d = p.dmg - fx.lastDmg[i];
-      if (d > 0) { fx.stats[i].taken += d; fx.stats[1 - i].done += d; }
+      if (d > 0) { fx.stats[i].taken += d; if (fx.lastBy[i] >= 0) fx.stats[fx.lastBy[i]].done += d; }
       fx.lastDmg[i] = p.dmg;
     });
     if (s.over && !fx.won) { fx.won = 1; const w = s.p[s.over - 1]; if (style(s.over - 1).won) style(s.over - 1).won(flairApi, s.over - 1, w.x / S, w.y / S); }
@@ -475,7 +487,7 @@
   const cam = { x: 640, y: 380, z: 1 };
   function updateCam(s) {
     if (s.fin > 0) { // a finisher pushes in tight on the victim
-      const v = s.p[1 - s.fa], tx = v.x / S, ty = v.y / S - (gfx[1 - s.fa] ? gfx[1 - s.fa].h : 64) * 0.6;
+      const v = s.p[s.fv], tx = v.x / S, ty = v.y / S - (gfx[s.fv] ? gfx[s.fv].h : 64) * 0.6;
       cam.x += (tx - cam.x) * 0.2; cam.y += (ty - cam.y) * 0.2; cam.z += (2.3 - cam.z) * 0.15;
       return;
     }
@@ -695,7 +707,7 @@
     // the reference's strongest cue: a struck fighter flashes as a flat silhouette in their own
     // damage colour, through the hit pause and the start of a launch
     const age = s.f - s.hf, launched = p.launch > 1800;
-    if (p.st === ST.HIT && s.hp === 1 - i && s.ha === 0 && age < (launched ? 24 : 9)) { tint = age < (launched ? 18 : 6) ? 1 : 0.55; tintColor = dmgColor(Math.max(45, p.dmg)); } // never white: yellow from the first hit
+    if (p.st === ST.HIT && s.hv === i && s.ha === 0 && age < (launched ? 24 : 9)) { tint = age < (launched ? 18 : 6) ? 1 : 0.55; tintColor = dmgColor(Math.max(45, p.dmg)); } // never white: yellow from the first hit
     if (p.st === ST.HIT && launched && age < 16 && (p.vx || p.vy)) { // launch smear: two copies trail back along the flight line
       const v = Math.hypot(p.vx, p.vy), ux = p.vx / v, uy = p.vy / v, len = Math.min(1.4, p.launch / 3000) * gfx[i].h;
       for (const [k, al] of [[0.6, 0.45], [1, 0.22]]) drawSprite(i, { ...p, x: p.x - ux * len * k * S, y: p.y - uy * len * k * S }, s.f, al, 1, null, dmgColor(Math.max(45, p.dmg)));
@@ -703,7 +715,7 @@
     if (p.st === ST.ATK && m.su >= 8 && p.t >= m.su && p.t < m.su + m.ac + 2) // heavy attacker: white streak behind the strike
       drawSprite(i, { ...p, x: p.x - p.face * 14 * S }, s.f, 0.4, 1, null, "#fff");
     if (p.st === ST.ATK && p.chg > 0 && p.t === m.su - 1) tint = 0.25 + 0.25 * Math.sin(s.f * 0.8); // a held heavy pulses while it charges
-    if (s.ha === 1 && s.hp === 1 - i && s.f - s.hf < 6) tint = 0.45;                         // armor took the hit
+    if (s.ha === 1 && s.hv === i && s.f - s.hf < 6) tint = 0.45;                         // armor took the hit
     const blink = p.inv > 0 && Math.floor(s.f / 6) % 2 === 0;
     const jitter = p.st === ST.HIT && s.freeze > 0 ? (rnd() - 0.5) * 4 : 0;
     g.save(); g.translate(jitter, 0);
@@ -723,7 +735,6 @@
         g.fillStyle = "rgba(255,60,60,.35)"; g.fillRect(b[0], b[2], b[1] - b[0], b[3] - b[2]);
       }
     }
-    const label = mode === "bot" ? (i === 0 ? "YOU" : "BOT") : mode === "demo" ? FIGHTERS[pick[i]].name.toUpperCase() : "P" + (i + 1);
     g.textAlign = "center"; g.fillStyle = TEAM[i]; g.strokeStyle = "#140b1f"; g.lineWidth = 3;
     const top = y - gfx[i].h - 16;
     g.beginPath(); g.moveTo(x - 5, top); g.lineTo(x + 5, top); g.lineTo(x, top + 6); g.closePath(); g.stroke(); g.fill();
@@ -859,7 +870,7 @@
     g.lineWidth = Math.max(2, r * 0.09); g.strokeStyle = "#0b0a1a"; g.beginPath(); g.arc(cx, cy, r, 0, 7); g.stroke();
     // damage arc: dark under-stroke then the colored arc, from about 7 o'clock round to 2 o'clock
     const a0 = Math.PI * 0.62, a1 = -Math.PI * 0.14, w = r * 0.34, d = dead ? 0 : p.dmg;
-    const hit = s.hf >= 0 && s.f - s.hf < 8 && s.p[1 - s.hp] === p, jig = hit ? (rnd() - 0.5) * r * 0.25 : 0;
+    const hit = s.hf >= 0 && s.f - s.hf < 8 && s.p[s.hv] === p, jig = hit ? (rnd() - 0.5) * r * 0.25 : 0;
     g.lineCap = "round";
     g.lineWidth = w + 4; g.strokeStyle = "#0b0a1a"; g.beginPath(); g.arc(cx + jig, cy, r * 0.98, a0, a1, true); g.stroke();
     g.lineWidth = w; g.strokeStyle = dead ? "#5a5670" : dmgColor(d); g.beginPath(); g.arc(cx + jig, cy, r * 0.98, a0, a1, true); g.stroke();
@@ -880,14 +891,13 @@
       const d = net.session.desync;
       italic(d >= 0 ? `OUT OF SYNC AT FRAME ${d}` : `ONLINE  ${Math.round(net.rtt)} MS`, 18 * u, H - 18 * u, 13 * u, d >= 0 ? "#ff6b6b" : "#ffffff", "left");
     }
-    const right = W - 26 * u;
-    const cx2 = right - r, cx1 = cx2 - r * 2.85;
+    const right = W - 26 * u, n = s.p.length;
+    const cxOf = (i) => right - r - (n - 1 - i) * r * 2.85, cx1 = cxOf(0);
     // match timer: 8 minutes from the end of the countdown
     const left = Math.max(0, 8 * 60 - Math.max(0, s.f - FEEL.countdown) / 60);
     const mm = String(Math.floor(left / 60)).padStart(2, "0"), ss = String(Math.floor(left % 60)).padStart(2, "0");
     italic(`${mm}:${ss}`, cx1 - r * 1.55, top + r * 0.45, 17 * u, "#ffffff", "right");
-    portrait(0, s.p[0], cx1, top + r * 0.15, r, s);
-    portrait(1, s.p[1], cx2, top + r * 0.15, r, s);
+    s.p.forEach((p, i) => portrait(i, p, cxOf(i), top + r * 0.15, r, s));
 
     // countdown as measured: each numeral 42 frames (ghost slam in, hold, a 1 frame gap), then the
     // go word for 45 frames that tilts away at the end
@@ -974,15 +984,17 @@
     g.fillStyle = "rgba(14,12,48,0.6)"; g.fillRect(W / 2 - bw / 2, 70 * u, bw, 34 * u);
     g.font = `${15 * u}px "Lilita One", "Arial Black", sans-serif`; g.fillStyle = "#ffd36b";
     g.fillText("SPACE OR J: REMATCH       ESC: MENU", W / 2, 88 * u);
-    const order = [wi, 1 - wi];
+    // the winner first, then whoever lasted longest (fewest damage breaks a tie)
+    const n = s.p.length, order = [wi, ...s.p.map((_, i) => i).filter((i) => i !== wi).sort((a, b) => (fx.outF[b] < 0 ? 1e9 : fx.outF[b]) - (fx.outF[a] < 0 ? 1e9 : fx.outF[a]) || s.p[a].dmg - s.p[b].dmg)];
+    const gap = n === 2 ? Math.min(W * 0.22, 210 * u) * 2 : Math.min((W - 40 * u) / n, 230 * u), cu = n === 2 ? u : Math.min(u, gap / (230 * u) * u);
     order.forEach((i, rank) => {
-      const cx = W / 2 + (rank === 0 ? -1 : 1) * Math.min(W * 0.22, 210 * u), top = H * (rank === 0 ? 0.5 : 0.57) + (1 - k) * 80 * u;
-      pillar(cx, top, 200 * u, i);
-      const p = s.p[i], sc = 2.2 * u;
+      const cx = W / 2 + (rank - (n - 1) / 2) * gap, top = H * (rank === 0 ? 0.5 : 0.57) + (1 - k) * 80 * u;
+      pillar(cx, top, 200 * cu, i);
+      const p = s.p[i], sc = 2.2 * cu;
       g.save(); g.setTransform(dpr * sc, 0, 0, dpr * sc, dpr * cx, dpr * (top - 6 * u));
       drawSprite(i, { ...p, x: 0, y: 0, st: ST.IDLE, ground: 1, vx: 0, vy: 0, face: rank === 0 ? 1 : -1, inv: 0 }, s.f, 1, 0, "rgba(8,3,18,0.7)");
       g.restore();
-      statsCard(cx, top + 70 * u, 210 * u, i, rank, u);
+      statsCard(cx, top + 70 * u, 210 * cu, i, rank, cu);
     });
     g.restore();
   }
@@ -1003,7 +1015,7 @@
     rr(x, y, w, h, 8 * u); g.fill(); g.stroke();
     g.fillStyle = "#2a3a8a"; rr(cx - 28 * u, y - 18 * u, 56 * u, 24 * u, 10 * u); g.fill(); g.stroke();
     g.font = `${15 * u}px "Lilita One", "Arial Black", sans-serif`; g.textAlign = "center"; g.textBaseline = "middle"; g.fillStyle = "#fff";
-    g.fillText(rank === 0 ? "1st" : "2nd", cx, y - 6 * u);
+    g.fillText(["1st", "2nd", "3rd", "4th"][rank], cx, y - 6 * u);
     roundPortrait(pick[i], x + 26 * u, y + 30 * u, 18 * u);
     g.textAlign = "left"; g.font = `${19 * u}px "Lilita One", "Arial Black", sans-serif`; g.fillStyle = "#fff";
     g.fillText(FIGHTERS[pick[i]].name.toUpperCase(), x + 52 * u, y + 24 * u);
@@ -1030,7 +1042,7 @@
     g.fillStyle = "rgba(205,210,225,0.35)"; g.strokeStyle = "#0b0a1a"; g.lineWidth = 3 / z;
     g.beginPath(); g.arc(cx, cy, r, 0, 7); g.fill(); g.stroke(); g.clip();
     g.translate(cx, cy); g.scale(0.55, 0.55); g.translate(-cx, -cy);
-    const age = s.f - s.hf, hitNow = p.st === ST.HIT && s.hp === 1 - i && age < 24;
+    const age = s.f - s.hf, hitNow = p.st === ST.HIT && s.hv === i && age < 24;
     drawSprite(i, { ...p, x: cx * S, y: (cy + F.h / 2) * S }, s.f, 1, hitNow ? 1 : 0, null, dmgColor(p.dmg));
     g.restore();
   }
@@ -1044,9 +1056,9 @@
     drawStage();
     if (!st.fin) drawFx(true); // dust under the fighters would only read as a grey lump in the darkened finisher
     if (st.fin > 0) finisherWorld(st);
-    else { for (const t of [0, 1]) drawFighter(st, t); drawSmears(); }
+    else { for (let t = 0; t < st.p.length; t++) drawFighter(st, t); drawSmears(); }
     drawFx();
-    for (const t of [0, 1]) bubble(st, t, z);
+    for (let t = 0; t < st.p.length; t++) bubble(st, t, z);
     g.restore();
     drawAtmosphere();
     hud(st);
@@ -1062,11 +1074,11 @@
   // where the attacker strikes from on pass k: alternating sides, always from above the ground
   const FIN_ANG = [-0.12, -0.88, -0.38, -0.62, -0.02, -0.98].map((t) => t * Math.PI);
   function finSpot(s, k) {
-    const v = s.p[1 - s.fa], body = gfx[1 - s.fa].h, a = FIN_ANG[k % FIN_ANG.length];
+    const v = s.p[s.fv], body = gfx[s.fv].h, a = FIN_ANG[k % FIN_ANG.length];
     return { x: v.x / S + Math.cos(a) * body * 1.1, y: v.y / S + Math.sin(a) * body * 0.9 + body * 0.15 };
   }
   function finisherWorld(s) {
-    const T = finT(s), a = s.fa, vi = 1 - a, A = s.p[a], V = s.p[vi], mvA = M.mv[a][5];
+    const T = finT(s), a = s.fa, vi = s.fv, A = s.p[a], V = s.p[vi], mvA = M.mv[a][5];
     const k = Math.floor((T - FIN.open) / FIN.slash), local = (T - FIN.open) % FIN.slash, slashing = T >= FIN.open && k < FIN.count;
     // the world behind the two fighters falls into shadow
     g.save(); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.fillStyle = `rgba(12,4,20,${Math.min(0.62, T / 10 * 0.62)})`; g.fillRect(0, 0, W, H); g.restore();
@@ -1118,21 +1130,31 @@
       return;
     }
     if (!st) return;
-    let a = 0, b = 0;
-    if (mode === "bot") { a = read(SOLO) | pad(0); b = bot(st, 1, 1); }
-    else if (mode === "local") { a = read(P1) | pad(0); b = read(P2) | pad(1); }
-    else if (mode === "demo") { a = bot(st, 0, 2); b = bot(st, 1, 2); }
-    // rematch: a human presses jump or light (the bot's own presses never restart the match)
-    const human = mode === "bot" ? a : mode === "demo" ? 0 : a | b;
+    // every fighter's input: the humans' keys and pads, bots for the rest (players 3 and 4 are
+    // humans in local play when a gamepad is plugged in for them)
+    const ins = st.p.map((_, i) => {
+      if (mode === "demo" || !isHuman(i)) return bot(st, i, mode === "demo" ? 2 : 1);
+      if (mode === "bot") return read(SOLO) | pad(0);
+      return (i === 0 ? read(P1) : i === 1 ? read(P2) : 0) | pad(i);
+    });
+    // rematch: a human presses jump or light (the bots' own presses never restart the match)
+    const human = ins.reduce((v, x, i) => (mode !== "demo" && isHuman(i) ? v | x : v), 0);
     if (st.over && st.overT > 60 && (human & (IN.J | IN.A) || (mode === "demo" && st.overT > 420))) { st = M.create(); fx.reset(); return; } // watch mode shows the results first
-    M.step(st, [a, b]);
+    M.step(st, ins);
     events(st); stepFx(); updateCam(st);
+  }
+  // who plays which slot in local modes: vs bot is one human; local play is two on the keyboard
+  // plus anyone with a gamepad in slots 3 and 4
+  function isHuman(i) {
+    if (mode === "bot") return i === 0;
+    if (mode === "local") return i < 2 || !!(navigator.getGamepads && navigator.getGamepads()[i]);
+    return false;
   }
   const dbg = { paused: false }; // test hook: freezes the sim for screenshots
   // test hook: advance exactly n frames with fixed inputs while paused, for frame-exact captures
   dbg.su = (i) => M.mv[i][st.p[i].mv].su;
   dbg.tick = (n = 1) => { for (let k = 0; k < n; k++) tick(); }; // the real loop step (bots, rematch) while paused
-  dbg.step = (n, a = 0, b = 0) => { for (let k = 0; k < n; k++) { M.step(st, [a, b]); events(st); stepFx(); updateCam(st); } };
+  dbg.step = (n, ...ins) => { for (let k = 0; k < n; k++) { M.step(st, st.p.map((_, i) => ins[i] || 0)); events(st); stepFx(); updateCam(st); } };
   let acc = 0, last = performance.now();
   function frame(now) {
     acc += Math.min(250, now - last); last = now;
@@ -1167,13 +1189,13 @@
     g.fillStyle = "rgba(47,213,196,0.35)"; g.fillRect(bx, 18 * u, bw * k, 30 * u);
     g.font = `${18 * u}px "Lilita One", "Arial Black", sans-serif`; g.textAlign = "center"; g.textBaseline = "middle"; g.fillStyle = "#fff";
     g.fillText("LOADING...", W / 2, 34 * u);
-    const cw = Math.min(280 * u, W * 0.36), ch = cw * 1.55, gap = Math.min(150 * u, W * 0.1);
+    const n = pick.length, cw = n === 2 ? Math.min(280 * u, W * 0.36) : Math.min(260 * u, (W - 40 * u) / n - 14 * u), ch = cw * 1.55, gap = n === 2 ? Math.min(150 * u, W * 0.1) : 14 * u;
     pick.forEach((id, i) => {
-      const slide = Math.max(0, 1 - t / 16), ease = slide * slide;
-      const cx = W / 2 + (i ? 1 : -1) * (gap / 2 + cw / 2) + (i ? 1 : -1) * ease * W * 0.6, cy = H * 0.52;
-      card(id, i, cx, cy, cw, ch, u);
+      const slide = Math.max(0, 1 - t / 16), ease = slide * slide, side = i < n / 2 ? -1 : 1;
+      const cx = n === 2 ? W / 2 + (i ? 1 : -1) * (gap / 2 + cw / 2) + (i ? 1 : -1) * ease * W * 0.6 : W / 2 + (i - (n - 1) / 2) * (cw + gap) + side * ease * W * 0.6, cy = H * 0.52;
+      card(id, i, cx, cy, cw, ch, cw / 280);
     });
-    g.save(); g.translate(W / 2, H * 0.52); display("VS", 0, 0, 90 * u, { alpha: Math.min(1, Math.max(0, (t - 10) / 8)) }); g.restore();
+    g.save(); g.translate(W / 2, n === 2 ? H * 0.52 : H * 0.14); display(n === 2 ? "VS" : "FREE FOR ALL", 0, 0, (n === 2 ? 90 : 52) * u, { alpha: Math.min(1, Math.max(0, (t - 10) / 8)) }); g.restore();
     g.font = `600 ${15 * u}px system-ui, sans-serif`; g.fillStyle = "#f4ecff"; g.textAlign = "center";
     g.fillStyle = "rgba(14,12,48,0.7)"; g.fillRect(0, H - 44 * u, W, 44 * u);
     g.fillStyle = "#f4ecff"; g.fillText(TIPS[loading.tip], W / 2, H - 22 * u);
@@ -1207,16 +1229,20 @@
     g.restore();
   }
 
-  // ---------- online: rollback over a WebRTC data channel (game/net.js) ----------
-  // PeerJS's free public server only introduces the two browsers; the match itself runs peer to
-  // peer. A room is a 5 letter code; the host plays on the left. Add TURN servers in
-  // game/net-config.js if friends on strict networks (mobile hotspots, some ISPs) cannot connect.
-  const ROOM = "dune-brawl-v1-";
+  // ---------- online: rollback over WebRTC data channels (game/net.js), 2 to 4 players ----------
+  // PeerJS's free public server only introduces the browsers; the match itself runs peer to peer.
+  // A room is a 5 letter code. The host is a hub: each guest connects to the host only, and the
+  // host relays every guest's input packets to the others. The host plays slot 0 and starts the
+  // match once at least one friend is in the lobby. Add TURN servers in game/net-config.js if
+  // friends on strict networks (mobile hotspots, some ISPs) cannot connect.
+  const ROOM = "dune-brawl-v1-", MAX_PLAYERS = 4;
   const ICE = [{ urls: "stun:stun.l.google.com:19302" }, { urls: "stun:stun.cloudflare.com:3478" }].concat(window.DUNE_TURN || []);
-  // both sides must run the same rules: a mismatch would desync, so it refuses to start instead
+  // every player must run the same rules: a mismatch would desync, so it refuses to start instead
   const VERSION = (() => { let h = 5381; for (const c of JSON.stringify([FEEL, Object.keys(FIGHTERS)])) h = (h * 33 + c.charCodeAt(0)) >>> 0; return h.toString(36); })();
-  const net = { peer: null, conn: null, me: 0, session: null, queue: [], rtt: 0, mine: null, theirs: null, started: false, timer: 0 };
+  // host: guests[] = { c, slot, pick, live }; guest: host = the connection to the host
+  const net = { peer: null, host: null, guests: [], me: 0, picks: null, session: null, queue: [], rtt: 0, started: false, loading: false, timer: 0, code: "" };
   const say = (t) => { document.getElementById("netStatus").textContent = t; };
+  const lobbyEl = () => document.getElementById("netLobby"), startBtn = () => document.getElementById("bStart");
   function newCode() {
     const a = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; let c = "";
     for (let k = 0; k < 5; k++) c += a[Math.floor(Math.random() * a.length)];
@@ -1224,72 +1250,147 @@
   }
   function leaveOnline(why) {
     clearInterval(net.timer);
-    const peer = net.peer, conn = net.conn;
-    Object.assign(net, { peer: null, conn: null, session: null, queue: [], theirs: null, started: false });
-    if (conn) conn.close();
+    const peer = net.peer, conns = net.guests.map((q) => q.c).concat(net.host ? [net.host] : []);
+    for (const c of conns) { try { if (c.open) c.send({ t: "bye" }); c.close(); } catch (e) { /* already gone */ } }
+    Object.assign(net, { peer: null, host: null, guests: [], session: null, queue: [], picks: null, started: false, loading: false, code: "" });
     if (peer) peer.destroy();
-    if (net.mine) pick[0] = net.mine;
+    showLobby(null);
     if (why) say(why);
   }
+  // the lobby list under the online buttons: who is in, in slot order
+  function showLobby(picks) {
+    const el = lobbyEl();
+    if (!picks) { el.hidden = true; startBtn().hidden = true; return; }
+    el.hidden = false;
+    el.innerHTML = picks.map((id, i) => `<li style="--c:${TEAM[i]}"><b>P${i + 1}</b> ${FIGHTERS[id] ? FIGHTERS[id].name : "?"}${i === net.me ? " (you)" : i === 0 ? " (host)" : ""}</li>`).join("");
+    startBtn().hidden = net.me !== 0;
+    startBtn().disabled = picks.length < 2;
+  }
+  const lobbyPicks = () => [slots[0], ...net.guests.map((q) => q.pick)];
+  function broadcast(msg, except) { for (const q of net.guests) if (q.c !== except && q.c.open) q.c.send(msg); }
   function hostRoom() {
     if (!window.Peer) return say("The online library did not load. Check your connection and refresh.");
     leaveOnline();
     const code = newCode();
+    net.code = code; net.me = 0;
     net.peer = new Peer(ROOM + code, { config: { iceServers: ICE } });
     say("Opening a room...");
     net.peer.on("open", () => {
       const link = `${location.origin}${location.pathname}?join=${code}`;
       document.getElementById("netLink").hidden = false;
       document.getElementById("netLinkText").value = link;
-      say(`Room ${code} is open. Send your friend the link, then wait here.`);
+      say(`Room ${code} is open for up to ${MAX_PLAYERS} players. Send friends the link, then press Start.`);
+      showLobby(lobbyPicks());
+      // keep the lobby fresh on every guest: the channel may drop messages
+      net.timer = setInterval(() => {
+        const picks = lobbyPicks();
+        for (const q of net.guests) if (q.c.open) {
+          q.c.send(net.started || net.loading ? { t: "start", picks: net.picks, you: q.slot, ver: VERSION } : { t: "lobby", picks, you: q.slot, ver: VERSION });
+          q.c.send({ t: "ping", ts: performance.now() });
+        }
+      }, 250);
     });
-    net.peer.on("connection", (c) => { if (net.conn) c.close(); else connected(c, 0); });
+    net.peer.on("connection", (c) => {
+      if (net.guests.length >= MAX_PLAYERS - 1 || net.started || net.loading) { c.on("open", () => { c.send({ t: "full" }); setTimeout(() => c.close(), 500); }); return; }
+      const q = { c, slot: -1, pick: null };
+      c.on("data", (m) => hostData(q, m));
+      c.on("close", () => guestGone(q));
+      c.on("error", () => guestGone(q));
+    });
     net.peer.on("error", (e) => (e.type === "unavailable-id" ? hostRoom() : say(`Online error: ${e.type}. Try again.`)));
+  }
+  function hostData(q, m) {
+    const c = q.c;
+    if (m.t === "ping") return c.send({ t: "pong", ts: m.ts });
+    if (m.t === "pong") { net.rtt = net.rtt ? net.rtt * 0.8 + (performance.now() - m.ts) * 0.2 : performance.now() - m.ts; return; }
+    if (m.t === "bye") return guestGone(q);
+    if (m.t === "hello") {
+      if (m.ver !== VERSION) { c.send({ t: "old" }); return; }
+      if (q.slot < 0 && FIGHTERS[m.pick] && !net.started && !net.loading) {
+        q.pick = m.pick; net.guests.push(q); q.slot = net.guests.length;
+        showLobby(lobbyPicks());
+        say(`${net.guests.length + 1} of ${MAX_PLAYERS} players in room ${net.code}. Press Start when everyone is in.`);
+      }
+      return;
+    }
+    if (m.t === "i" || m.t === "h") { // a guest's input or hash: use it, and pass it on to the other guests
+      broadcast(m, c);
+      if (net.session) net.session.receive(m); else net.queue.push(m);
+    }
+  }
+  function guestGone(q) {
+    if (!net.guests.includes(q)) return;
+    if (net.started || net.loading) { // a player left mid-match: the match cannot go on without their inputs
+      broadcast({ t: "end", why: `Player ${q.slot + 1} left the match.` });
+      leaveOnline(`Player ${q.slot + 1} left the match.`); showMenu(); return;
+    }
+    net.guests = net.guests.filter((x) => x !== q);
+    net.guests.forEach((x, k) => (x.slot = k + 1)); // close the gap in the lobby
+    showLobby(lobbyPicks());
+    say(`${net.guests.length + 1} of ${MAX_PLAYERS} players in room ${net.code}.`);
+  }
+  function hostStart() {
+    if (net.me !== 0 || !net.peer || net.guests.length < 1 || net.loading || net.started) return;
+    net.picks = lobbyPicks(); net.loading = true;
+    broadcast({ t: "start", picks: net.picks, ver: VERSION });
+    startOnline();
   }
   function joinRoom(raw) {
     const code = raw.trim().toUpperCase();
     if (!window.Peer) return say("The online library did not load. Check your connection and refresh.");
     if (code.length !== 5) return say("Type the 5 letter room code first.");
     leaveOnline();
+    net.code = code;
     net.peer = new Peer({ config: { iceServers: ICE } });
     say(`Joining room ${code}...`);
-    net.peer.on("open", () => connected(net.peer.connect(ROOM + code, { reliable: false, serialization: "json" }), 1));
+    net.peer.on("open", () => {
+      const c = net.peer.connect(ROOM + code, { reliable: false, serialization: "json" });
+      net.host = c;
+      c.on("open", () => {
+        say("Connected. Waiting for the host to start...");
+        net.timer = setInterval(() => {
+          if (!c.open) return;
+          if (!net.started) c.send({ t: "hello", pick: slots[0], ver: VERSION }); // repeated: the channel may drop it
+          c.send({ t: "ping", ts: performance.now() });
+        }, 250);
+      });
+      c.on("data", (m) => {
+        if (m.t === "ping") return c.send({ t: "pong", ts: m.ts });
+        if (m.t === "pong") { net.rtt = net.rtt ? net.rtt * 0.8 + (performance.now() - m.ts) * 0.2 : performance.now() - m.ts; return; }
+        if (m.t === "full") return say(`Room ${code} is full or already playing.`);
+        if (m.t === "old") return say("The host has a different version of the game. Both of you refresh the page.");
+        if (m.t === "end" || m.t === "bye") { leaveOnline(m.why || "The host closed the room."); showMenu(); return; }
+        if (m.t === "lobby") {
+          if (m.ver !== VERSION) return say("The host has a different version of the game. Both of you refresh the page.");
+          net.me = m.you; showLobby(m.picks);
+          return say(`In room ${code} as player ${m.you + 1} of ${m.picks.length}. Waiting for the host to start...`);
+        }
+        if (m.t === "start") {
+          if (net.loading || net.started || m.ver !== VERSION) return;
+          if (m.you !== undefined) net.me = m.you;
+          if (!(net.me > 0)) return; // the slot comes with the lobby; wait for it
+          net.picks = m.picks; net.loading = true; startOnline();
+          return;
+        }
+        if (m.t === "i" || m.t === "h") { net.started = true; if (net.session) net.session.receive(m); else net.queue.push(m); }
+      });
+      c.on("close", () => { if (net.host === c) { leaveOnline("The host left the match."); showMenu(); } });
+      c.on("error", () => { if (net.host === c) { leaveOnline("The connection failed. Try again, or add a TURN server (see game/net-config.js)."); showMenu(); } });
+    });
     net.peer.on("error", (e) => say(e.type === "peer-unavailable" ? `No room ${code}. Check the code with your friend.` : `Online error: ${e.type}. Try again.`));
   }
-  function connected(c, me) {
-    net.conn = c; net.me = me; net.mine = pick[0];
-    c.on("open", () => {
-      say("Connected. Loading the match...");
-      // the channel may drop messages: keep saying hello until the friend's match is running
-      net.timer = setInterval(() => {
-        if (!c.open) return;
-        if (!net.started) c.send({ t: "hello", pick: net.mine, ver: VERSION });
-        c.send({ t: "ping", ts: performance.now() });
-      }, 250);
-    });
-    c.on("data", (m) => {
-      if (m.t === "ping") return c.send({ t: "pong", ts: m.ts });
-      if (m.t === "pong") { net.rtt = net.rtt ? net.rtt * 0.8 + (performance.now() - m.ts) * 0.2 : performance.now() - m.ts; return; }
-      if (m.t === "hello") {
-        if (m.ver !== VERSION) return say("Your friend has a different version of the game. Both of you refresh the page.");
-        if (!net.theirs && FIGHTERS[m.pick]) { net.theirs = m.pick; startOnline(); }
-        return;
-      }
-      if (m.t === "i") net.started = true;
-      if (net.session) net.session.receive(m); else net.queue.push(m);
-    });
-    c.on("close", () => { if (net.conn === c) { leaveOnline("Your friend left the match."); showMenu(); } });
-    c.on("error", () => { if (net.conn === c) { leaveOnline("The connection failed. Try again, or add a TURN server (see game/net-config.js)."); showMenu(); } });
-  }
   async function startOnline() {
-    pick = net.me === 0 ? [net.mine, net.theirs] : [net.theirs, net.mine];
+    if (window.Sfx) Sfx.init();
+    pick = net.picks.slice();
     const t0 = performance.now(); mode = "loading"; hideMenu();
     await load(); await holdCards(t0);
-    if (!net.conn) return showMenu();
-    net.session = new Net.Session(M, net.me, (msg) => { if (net.conn && net.conn.open) net.conn.send(msg); }, Net.makeStep(Sim, M));
+    if (!net.peer) return showMenu();
+    // the host sends to every guest; a guest sends to the host, which passes it on
+    const send = net.me === 0 ? (msg) => broadcast(msg) : (msg) => { if (net.host && net.host.open) net.host.send(msg); };
+    net.session = new Net.Session(M, net.me, send, Net.makeStep(Sim, M), pick.length);
     st = net.session.state;
     for (const m of net.queue) net.session.receive(m);
-    net.queue = [];
+    net.queue = []; net.started = true; net.loading = false;
     mode = "online";
   }
 
@@ -1298,26 +1399,30 @@
   function showMenu() { mode = "menu"; menu.hidden = false; music("menu"); } // the menu theme (starts after the first click or key)
   function hideMenu() { menu.hidden = true; music(null); } // leaving the menu goes to loading, which is silent
   function buildPickers() {
-    [0, 1].forEach((i) => {
+    [0, 1, 2, 3].forEach((i) => {
       const row = document.getElementById("pick" + i);
       row.innerHTML = "";
+      row.parentElement.hidden = i >= count;
       for (const id in FIGHTERS) {
         if (!FIGHTERS[id].ready) continue;
         const b = document.createElement("button");
-        b.className = "chip" + (pick[i] === id ? " on" : ""); b.setAttribute("aria-pressed", pick[i] === id);
+        b.className = "chip" + (slots[i] === id ? " on" : ""); b.setAttribute("aria-pressed", slots[i] === id);
         b.innerHTML = `<i class="disc"><img alt="" src="${portraitSrc(id)}"></i><span>${FIGHTERS[id].name}${FIGHTERS[id].stick ? "<small> stick</small>" : ""}</span>`;
-        b.onclick = () => { pick[i] = id; buildPickers(); if (window.Sfx) Sfx.play("uiMove", 0); };
+        b.onclick = () => { slots[i] = id; buildPickers(); if (window.Sfx) Sfx.play("uiMove", 0); };
         row.appendChild(b);
       }
     });
+    document.querySelectorAll("#count button").forEach((b) => b.setAttribute("aria-pressed", +b.dataset.n === count));
   }
+  document.querySelectorAll("#count button").forEach((b) => (b.onclick = () => { count = +b.dataset.n; buildPickers(); if (window.Sfx) Sfx.play("uiMove", 0); }));
   document.getElementById("bBot").onclick = () => startMatch("bot");
   document.getElementById("bLocal").onclick = () => startMatch("local");
   document.getElementById("bDemo").onclick = () => startMatch("demo");
   document.getElementById("bOnline").onclick = () => { const o = document.getElementById("online"); o.hidden = !o.hidden; };
   document.getElementById("bHost").onclick = hostRoom;
   document.getElementById("bJoin").onclick = () => joinRoom(document.getElementById("joinCode").value);
-  document.getElementById("bCopy").onclick = () => { const t = document.getElementById("netLinkText"); t.select(); navigator.clipboard && navigator.clipboard.writeText(t.value); say("Link copied. Send it to your friend."); };
+  document.getElementById("bStart").onclick = hostStart;
+  document.getElementById("bCopy").onclick = () => { const t = document.getElementById("netLinkText"); t.select(); navigator.clipboard && navigator.clipboard.writeText(t.value); say("Link copied. Send it to your friends."); };
 
   // ---------- F2 tuning panel ----------
   const TUNE = [["kbMul", 100, 600], ["hitstunDiv", 48, 300], ["hitDecay", 0, 10], ["grav", 40, 120], ["hitGrav", 20, 90],
