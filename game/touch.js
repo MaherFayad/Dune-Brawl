@@ -31,8 +31,8 @@
   #touch button { position:absolute; pointer-events:auto; touch-action:none; border-radius:50%; border:3px solid #0b0a1a; color:#fff; font:italic 900 13px "Arial Black",system-ui,sans-serif; text-transform:uppercase; letter-spacing:.5px;
     background:rgba(42,41,96,.72); box-shadow:0 3px 0 #0b0a1a; -webkit-tap-highlight-color:transparent; }
   #touch button.on { background:rgba(255,211,107,.95); color:#1a1030; transform:translateY(2px); box-shadow:0 1px 0 #0b0a1a; }
-  #touch .jump { width:84px; height:84px; right:0; bottom:0; background:rgba(47,213,196,.75); color:#0b0a1a; }
-  #touch .light { width:72px; height:72px; right:96px; bottom:6px; }
+  #touch .light { width:84px; height:84px; right:0; bottom:0; background:rgba(47,213,196,.75); color:#0b0a1a; } /* the main button: light attack (the stick flicks to jump) */
+  #touch .jump { width:72px; height:72px; right:96px; bottom:6px; }
   #touch .heavy { width:72px; height:72px; right:8px; bottom:96px; }
   #touch .dodge { width:68px; height:68px; right:100px; bottom:96px; }
   #touch .throw { width:64px; height:64px; right:180px; bottom:150px; font-size:11px; }
@@ -46,8 +46,8 @@
     el = document.createElement("div"); el.id = "touch"; el.hidden = true;
     el.innerHTML = `<div class="zone" aria-hidden="true"></div><div class="base idle"></div><div class="knob idle"></div>
       <div class="pad">
-        <button class="jump" data-bit="J" aria-label="Jump">Jump</button>
         <button class="light" data-bit="A" aria-label="Light attack">Light</button>
+        <button class="jump" data-bit="J" aria-label="Jump">Jump</button>
         <button class="heavy" data-bit="B" aria-label="Heavy attack">Heavy</button>
         <button class="dodge" data-bit="X" aria-label="Dodge">Dodge</button>
         <button class="throw" data-bit="T" aria-label="Throw weapon">Throw</button>
