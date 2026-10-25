@@ -38,6 +38,30 @@ The sim rolls a deterministic seed (`p.vr`, from the frame, the slot and the pos
 
 A dash strike (an air dash cancels into an attack from its third frame and keeps its speed), running attacks that slide into the strike (`carryDrag`), and a head stomp: landing on a foe's head bounces you high (`bounceV`), gives the air dashes back and makes them flinch for 2 damage, once per airtime. The kit jump clears a platform in one leap.
 
+## Throws and clashes
+
+Throw (I or V; T and ' in local play; Y on a gamepad; the Throw button on a phone) sends the weapon flying point first, aimed up, straight, or down in the air (`throwSpeed`, `throwGrav` in `FEEL.kit`). It hits the first foe in its path (`throwDmg`, a launch along the throw), is knocked away by a swing or a parry, and sticks where it meets the island or a platform, with a glint and a ring in the owner's colour. Walk over it to take it back; it also comes back after `stuckMax` frames, or at once if it leaves the stage. Until then fists deal `unarmedDmg` percent. The blade is part of the player state, so rollback and replays need nothing extra.
+
+Two swings whose hitboxes meet, both active or within `clashEarly` frames of it, clash: neither lands, both fighters recoil apart for `clashFrames`, the game freezes briefly, and a starburst, rings, sparks, a clang and a CLASH! callout mark it.
+
+## Roster
+
+| Fighter | Weapon | Moves borrowed from |
+|---|---|---|
+| Vespera | Rapier | The countess |
+| Saif | Shamshir | The djinn warrior |
+| Marjana | Twin daggers | The dagger dancer: quick and close |
+| Dana | War fan (opens for every strike; thrown, it spins like a disc) | The sea siren |
+| Nawaf | Spear (blue-steel shaft, leaf head, tassel) | The falconer: long reach |
+
+## Up to four fighters
+
+Two to four fighters, free for all, last one standing (`Sim.match([a, b, c, d])`). A swing can hit several foes at once. Locally, vs bot and watch fill the extra slots with bots; local play gives slots 3 and 4 to plugged-in gamepads. Online, the host is a hub for up to three guests and relays their input packets; the rollback session predicts and confirms each player separately (`game/net.js`).
+
+## Touch
+
+On phones and tablets (`game/touch.js`): a floating analog stick wherever the left thumb lands, and Jump, Light, Heavy, Dodge and Throw buttons on the right (64 to 84 px, over the WCAG 2.2 2.5.8 minimum), plus a Menu button. They feed player 1 in every mode, online included.
+
 ## Combos
 
 Lights that hit open a window (`comboWindow`). A light inside it continues the string: hit 1 is the move itself, hit 2 a kick and hit 3 the finisher. The finisher deals `finDmg`% damage and `finKb`% launch, with a short pause and a FINISH! callout. Each follow-up steps in only as far as the gap needs (capped at `comboStep`, and `comboLunge` for the finisher), so short-reach fighters keep their strings in range.

@@ -8,7 +8,7 @@
   :root { --bg:#0b0a1a; --ink:#ffffff; --muted:#aab0d6; --panel:rgba(16,15,44,.92); --rim:#0b0a1a; --gold:#ffd36b; --p1:#2fd5c4; --p2:#ff7a45; --p3:#b07cff; --p4:#8fe04a; }
   * { box-sizing: border-box; }
   html, body { margin:0; height:100%; background:var(--bg); color:var(--ink); font-family: "Segoe UI", system-ui, -apple-system, Roboto, sans-serif; overflow:hidden; }
-  canvas { position:fixed; inset:0; width:100vw; height:100vh; display:block; }
+  canvas { position:fixed; inset:0; width:100vw; height:100vh; display:block; touch-action:none; }
   .overlay { position:fixed; inset:0; display:flex; align-items:center; justify-content:center; padding:16px; background:radial-gradient(ellipse at center, rgba(11,10,26,.2), rgba(11,10,26,.82)); }
   .overlay[hidden] { display:none; }
   .card { width:min(760px,100%); background:var(--panel); border:3px solid var(--rim); border-radius:6px; padding:22px 26px 24px; box-shadow:0 0 0 2px rgba(255,255,255,.06) inset, 0 24px 60px rgba(0,0,0,.55); }
@@ -111,6 +111,7 @@
       <span>2 players, left</span><span><kbd>WASD</kbd> move, <kbd>Space</kbd> jump, <kbd>F</kbd> light, <kbd>G</kbd> heavy, <kbd>H</kbd> dodge, <kbd>T</kbd> throw</span>
       <span>2 players, right</span><span><kbd>Arrows</kbd> move, <kbd>Right Shift</kbd> jump, <kbd>.</kbd> light, <kbd>/</kbd> heavy, <kbd>,</kbd> dodge, <kbd>'</kbd> throw (or numpad 0 to 4)</span>
       <span>Gamepads</span><span>A jump, X light, B heavy, Y throw, shoulders dodge. Each player uses one; in Local play, players 3 and 4 are bots unless their gamepad is plugged in</span>
+      <span>Phones and tablets</span><span>Left thumb anywhere on the left half: move. Right buttons: jump, light, heavy, dodge, throw. Play sideways.</span>
       <span><kbd>M</kbd></span><span>Sound on or off</span>
       <span><kbd>F2</kbd> / <kbd>F3</kbd></span><span>Feel tuning panel / hitboxes</span>
     </div>
@@ -121,6 +122,7 @@
 <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.5/dist/peerjs.min.js"></script>
 <script src="net-config.js"></script>
 <script src="sim.js"></script>
+<script src="touch.js"></script>
 <script src="net.js"></script>
 <script src="render.js"></script>
 <script src="stick.js"></script>

@@ -58,6 +58,7 @@
   const P1 = { L: ["KeyA"], R: ["KeyD"], U: ["KeyW"], D: ["KeyS"], J: ["Space"], A: ["KeyF"], B: ["KeyG"], X: ["KeyH", "ShiftLeft"], T: ["KeyT"] };
   const P2 = { L: ["ArrowLeft"], R: ["ArrowRight"], U: ["ArrowUp"], D: ["ArrowDown"], J: ["ShiftRight", "Numpad0"], A: ["Period", "Numpad1"], B: ["Slash", "Numpad2"], X: ["Comma", "Numpad3"], T: ["Quote", "Numpad4"] };
   const read = (map) => { let v = 0; for (const k in map) if (map[k].some((c) => keys.has(c))) v |= IN[k]; return v; };
+  const touch = () => (window.TouchPad && TouchPad.active() ? TouchPad.bits() : 0); // phones and tablets: game/touch.js, player 1
   function pad(i) {
     const gp = navigator.getGamepads && navigator.getGamepads()[i];
     if (!gp) return 0;
@@ -1014,7 +1015,7 @@
     g.fillText(`${FIGHTERS[pick[wi]].name.toUpperCase()} WINS!`, W / 2, 45 * u);
     g.fillStyle = "rgba(14,12,48,0.6)"; g.fillRect(W / 2 - bw / 2, 70 * u, bw, 34 * u);
     g.font = `${15 * u}px "Lilita One", "Arial Black", sans-serif`; g.fillStyle = "#ffd36b";
-    g.fillText("SPACE OR J: REMATCH       ESC: MENU", W / 2, 88 * u);
+    g.fillText(window.TouchPad && TouchPad.active() ? "JUMP: REMATCH       MENU: BACK TO MENU" : "SPACE OR J: REMATCH       ESC: MENU", W / 2, 88 * u);
     // the winner first, then whoever lasted longest (fewest damage breaks a tie)
     const n = s.p.length, order = [wi, ...s.p.map((_, i) => i).filter((i) => i !== wi).sort((a, b) => (fx.outF[b] < 0 ? 1e9 : fx.outF[b]) - (fx.outF[a] < 0 ? 1e9 : fx.outF[a]) || s.p[a].dmg - s.p[b].dmg)];
     const gap = n === 2 ? Math.min(W * 0.22, 210 * u) * 2 : Math.min((W - 40 * u) / n, 230 * u), cu = n === 2 ? u : Math.min(u, gap / (230 * u) * u);
@@ -1180,7 +1181,7 @@
   function tick() {
     if (mode === "online") {
       if (!net.session) return;
-      net.session.tick(read(SOLO) | pad(0));
+      net.session.tick(read(SOLO) | pad(0) | touch());
       st = net.session.state;
       events(st); stepFx(); updateCam(st);
       return;
@@ -1190,8 +1191,8 @@
     // humans in local play when a gamepad is plugged in for them)
     const ins = st.p.map((_, i) => {
       if (mode === "demo" || !isHuman(i)) return bot(st, i, mode === "demo" ? 2 : 1);
-      if (mode === "bot") return read(SOLO) | pad(0);
-      return (i === 0 ? read(P1) : i === 1 ? read(P2) : 0) | pad(i);
+      if (mode === "bot") return read(SOLO) | pad(0) | touch();
+      return (i === 0 ? read(P1) | touch() : i === 1 ? read(P2) : 0) | pad(i);
     });
     // rematch: a human presses jump or light (the bots' own presses never restart the match)
     const human = ins.reduce((v, x, i) => (mode !== "demo" && isHuman(i) ? v | x : v), 0);
@@ -1219,6 +1220,7 @@
     if (n === 6) acc = 0;
     draw();
     if (mode === "loading") { loading.t++; drawLoading(); }
+    if (window.TouchPad) TouchPad.visible(mode !== "menu" && mode !== "loading");
     requestAnimationFrame(frame);
   }
   // a click on a mode never looks like a freeze: the versus screen from the reference, a card per
