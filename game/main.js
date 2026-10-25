@@ -72,7 +72,8 @@
     // in reserve for the way back, and hit them with aerials (a spike from above)
     const foeOff = foe.st !== ST.DEAD && (foe.x < m.x1 - 30 * S || foe.x > m.x2 + 30 * S || foe.y > m.y + 20 * S);
     const ledgeX = foe.x < (m.x1 + m.x2) / 2 ? m.x1 : m.x2;
-    if (foeOff && me.jumps >= 1 && me.y < m.y + 30 * S && Math.abs(me.x - ledgeX) < 230 * S) {
+    // only from above ledge height with jumps to spare: a bot that dives below it never makes it back
+    if (foeOff && me.jumps >= 2 && me.y < m.y - 20 * S && Math.abs(me.x - ledgeX) < 230 * S) {
       const near = Math.abs(dx) < 80 * S && Math.abs(dy) < 90 * S;
       v |= dx > 0 ? IN.R : IN.L;
       if (me.ground && even && Math.random() < 0.5) v |= IN.J;
@@ -82,9 +83,10 @@
     }
     if (((me.x < m.x1 - 4 * S || me.x > m.x2 + 4 * S) && !me.ground) || under || (!me.ground && me.y > m.y - 10 * S && (offL || offR))) {
       // under the island: steer out past the nearer ledge first, then back in once above it
-      const cx = (m.x1 + m.x2) / 2, outside = me.x < m.x1 || me.x > m.x2;
+      const cx = (m.x1 + m.x2) / 2, clear = 30 * S, outside = me.x < m.x1 - clear || me.x > m.x2 + clear;
       v |= under && !outside ? (me.x < cx ? IN.L : IN.R) : me.x < cx ? IN.R : IN.L;
-      if (me.vy > -200 && even) v |= me.wall || me.jumps > 0 ? IN.J : me.recov ? 0 : IN.U | IN.B;
+      // the recovery move never goes off under the island: it would only hit the underside
+      if (me.vy > -200 && even) v |= me.wall || me.jumps > 0 ? IN.J : me.recov || (under && !outside) ? 0 : IN.U | IN.B;
       return v;
     }
     if (foe.st === ST.DEAD) return Math.abs(me.x - 640 * S) > 60 * S ? (me.x < 640 * S ? IN.R : IN.L) : 0;
@@ -912,7 +914,11 @@
     "Dodge with a direction to dash. Dodge with no direction to step back.",
     "Hold heavy to charge it. Up and heavy is your recovery move.",
     "A fighter flashes in their damage colour when hit. Red means one more hit.",
-    "Slide down a wall and jump off it to get back to the stage."];
+    "Slide down a wall and jump off it to get back to the stage.",
+    "Land a hit, then dodge: a chase dodge ignores the cooldown, and an attack cancels it.",
+    "Dodge in place and attack at once: you get your air attack on the ground.",
+    "Air dodges recharge slowly. Land a while after one to get it back sooner.",
+    "Missing an attack leaves you open: your dodge is locked for a moment."];
   function drawLoading() {
     const u = Math.min(W / 1280, H / 720), t = loading.t;
     g.setTransform(dpr, 0, 0, dpr, 0, 0);

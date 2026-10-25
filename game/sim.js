@@ -32,7 +32,7 @@
     run: 900, gAcc: 420, fric: 300, airAcc: 190, airMax: 760, airFric: 8, // snappy: full run in 2 frames, a stop in 3, an air reversal in 8
     jumpV: 1640, airJumpV: 1560, jumpCut: 800,
     h: 64, hw: 18,
-    kbMul: 350,          // knockback multiplier in percent, applied to base and growth
+    kbMul: 355,          // knockback multiplier in percent, applied to base and growth
     growthDiv: 14,       // launch = kb + kg * max(0, damage - growthFrom) / growthDiv; higher means later kills
     growthFrom: 60,      // knockback only starts growing above this damage (docs/design/REFERENCE-KNOCKBACK.md)
     hitstunBase: 8,      // hitstun = hitstunBase + launch / hitstunDiv
@@ -42,11 +42,25 @@
     hitstunDiv: 168,
     hitDecay: 4,         // percent of horizontal launch speed lost per frame in hitstun
     pauseBase: 3, pauseDiv: 5, pauseMax: 7,   // the reference holds 4 frames on a light hit, 6 on a heavy
-    dodgeG: 20, dodgeA: 22, dodgeCdG: 36, dodgeCdA: 60, dodgeInvFrom: 3, backstep: 1100,
-    dodgeSpeedG: 1250, dodgeSpeedA: 1150, dodgeDragG: 8, dodgeDragA: 6,
+    // Dodges, from the reference's published frame data: 2 startup frames, then invincible for
+    // 12 (air, with a direction), 20 (air, in place), 16 (ground, in place: our backstep) or 17
+    // (chase) frames, no recovery. Cooldown 60 frames after a ground dodge and 163 after an air
+    // dodge; landing 75 or more frames after an air dodge clears it, landing sooner caps it at 75.
+    dodgeStart: 2, dodgeInvAir: 12, dodgeInvSpot: 20, dodgeInvGround: 16, dodgeInvChase: 17,
+    dodgeCdG: 60, dodgeCdA: 163, dodgeLandCd: 75, backstep: 1100,
+    dodgeSpeedA: 1450, dodgeDragG: 8, dodgeDragA: 6,
     // ground dodge with a direction is a dash: fast, cancelable into a jump or an attack
     dashSpeed: 1500, dashDrag: 4, dashFrames: 14, dashCancelFrom: 5, dashCd: 16,
-    chase: 40, chaseSpeed: 130, // after landing a hit: air dodge 30% faster, shorter cooldown
+    // chase dodge: landing a hit gives 2 dodges (1 if airborne) that ignore the cooldown, usable
+    // until 12 frames after the attack ends; attacking within 20 frames of one cancels it, with 9
+    // invincible frames
+    chaseWindow: 12, chaseSpeed: 130, chaseCancel: 20, chaseCancelInv: 9,
+    gcWindow: 18,       // gravity cancel: attack within 18 frames of an in-place dodge, an air move even on the ground
+    missDodgeLock: 7, missDashLock: 6, // whiffing locks dodges for 7 frames and dashes for 6
+    hitRecovery: 67,    // recovery on hit, percent of the recovery on a miss
+    jumpSquat: 2, jumpLand: 4, // jump startup, and the landing recovery after a jump
+    sigCd: 10,          // global cooldown between heavy (signature) attacks
+    stunSpeed: 1500,    // hitstun lasts while the victim is still launched faster than this (sideways or up)
     parryStun: 40,      // frames an attacker is stunned after hitting a parry
     chargeMax: 30,      // heavies with `charge` can be held up to 30 frames for up to +50%
     wallJumps: 3, wallSlide: 500, // touching the island side: slide slowly, jump off it up to 3 times
@@ -103,6 +117,7 @@
       stocks: FEEL.stocks, st: ST.IDLE, t: 0, mv: 0, hit: 0, inv: 0, dcd: 0, drop: 0, recov: 0,
       ff: 0, cut: 1, prev: 0, buf: 0, bufT: 0, land: 0, launch: 0, wall: 0, wj: FEEL.wallJumps,
       chase: 0, chg: 0, hang: 0,
+      dt: 0, dk: 0, ds: 999, chaseT: 0, lock: 0, dlock: 0, squat: 0, lag: 0, sig: 0, dashCd: 0,
     };
   }
   const PKEYS = Object.keys(player(0, 1, { airJumps: 2 }));
@@ -174,7 +189,14 @@
       if (p.dcd > 0) p.dcd--;
       if (p.drop > 0) p.drop--;
       if (p.land > 0) p.land--;
-      if (p.chase > 0) p.chase--;
+      if (p.chaseT > 0 && --p.chaseT === 0) p.chase = 0;
+      if (p.lock > 0) p.lock--;
+      if (p.dlock > 0) p.dlock--;
+      if (p.sig > 0) p.sig--;
+      if (p.dashCd > 0) p.dashCd--;
+      if (p.lag > 0) p.lag--;
+      if (p.ds < 999) p.ds++;
+      let gc = 0; // this frame's attack is a gravity cancel: an air move, even on the ground
       const dx = (input & IN.R ? 1 : 0) - (input & IN.L ? 1 : 0);
       const take = (bit) => {
         if (p.bufT > 0 && p.buf & bit) { p.buf &= ~bit; if (!p.buf) p.bufT = 0; return true; }
@@ -182,13 +204,20 @@
       };
 
       if (p.st === ST.HIT) {
-        if (--p.t <= 0) { p.st = ST.IDLE; p.t = 0; p.launch = 0; }
+        if (--p.t <= 0) {
+          const up = Math.min(0, p.vy); // the launch, sideways and upward: never the fall, or a falling fighter could never recover
+          if (p.vx * p.vx + up * up > FEEL.stunSpeed * FEEL.stunSpeed) p.t = 1;
+          else { p.st = ST.IDLE; p.t = 0; p.launch = 0; }
+        }
         p.vx -= div(FEEL.hitDecay * p.vx, 100);
       } else if (p.st === ST.DODGE) {
         p.t--;
+        const since = p.dt - p.t, atk = p.bufT > 0 && p.buf & (IN.A | IN.B);
+        if (atk && p.dk === 4 && since <= FEEL.chaseCancel) { p.st = ST.IDLE; p.t = 0; p.inv = Math.max(p.inv, FEEL.chaseCancelInv); }
+        else if (atk && (p.dk === 2 || p.dk === 3) && since <= FEEL.gcWindow) { p.st = ST.IDLE; p.t = 0; gc = 1; }
         if (p.ground) p.vx -= div(FEEL.dodgeDragG * p.vx, 100);
         else { p.vx -= div(FEEL.dodgeDragA * p.vx, 100); p.vy -= div(FEEL.dodgeDragA * p.vy, 100); }
-        if (p.t <= 0) { p.st = ST.IDLE; p.t = 0; }
+        if (p.st === ST.DODGE && p.t <= 0) { p.st = ST.IDLE; p.t = 0; }
       } else if (p.st === ST.DASH) {
         p.t++;
         p.vx -= div(FEEL.dashDrag * p.vx, 100);
@@ -210,24 +239,41 @@
           if (Math.abs(p.vx) > P.airMax) p.vx -= dx * div(P.airAcc, 2);
         }
         // after a hit connects, jump or dodge cancels the recovery so strings flow
+        const re = p.hit ? div(m.re * FEEL.hitRecovery, 100) : m.re;
         if (p.hit && p.t >= m.su + m.ac && p.bufT > 0 && p.buf & (IN.J | IN.X)) { p.st = ST.IDLE; p.t = 0; }
-        else if (p.t >= m.su + m.ac + m.re) { p.st = ST.IDLE; p.t = 0; }
+        else if (p.t >= m.su + m.ac + re) {
+          p.st = ST.IDLE; p.t = 0;
+          if (!p.hit) { p.lock = FEEL.missDodgeLock; p.dlock = FEEL.missDashLock; }
+        }
+        if (p.st === ST.IDLE && (p.mv === 5 || p.mv === 7 || p.mv === 9)) p.sig = FEEL.sigCd;
       }
 
-      if (p.st === ST.IDLE && s.f >= FEEL.countdown) {
-        if (take(IN.X) && p.dcd <= 0) {
+      // jump startup: the jump leaves the ground 2 frames after the press
+      if (p.squat > 0 && --p.squat === 0 && p.st === ST.IDLE && p.ground) { p.vy = P.jumpV; p.ground = 0; p.cut = !(input & IN.J) ? 1 : 0; if (p.cut) p.vy = -FEEL.jumpCut; }
+      const busy = p.squat > 0 || p.lag > 0;
+      if (p.st === ST.IDLE && s.f >= FEEL.countdown && !busy) {
+        const dy = (input & IN.U ? -1 : 0) + (input & IN.D ? 1 : 0);
+        const canDash = p.ground && dx && p.dlock <= 0 && p.dashCd <= 0;
+        const free = p.chase > 0 || (p.ground && dx ? canDash : p.dcd <= 0 && p.lock <= 0); // a dash waits for its own cooldown, never turns into a backstep
+        if (p.bufT > 0 && p.buf & IN.X && free && take(IN.X)) {
           p.st = ST.DODGE;
-          if (p.ground && dx) { p.st = ST.DASH; p.t = 0; p.vx = FEEL.dashSpeed * dx; p.dcd = FEEL.dashCd; }
-          else if (p.ground) { p.t = FEEL.dodgeG; p.vx = -p.face * FEEL.backstep; p.dcd = FEEL.dodgeCdG; } // no direction: an evasive backstep
-          else {
-            const chase = p.chase > 0, sp = chase ? div(FEEL.dodgeSpeedA * FEEL.chaseSpeed, 100) : FEEL.dodgeSpeedA;
-            p.t = FEEL.dodgeA; p.dcd = chase ? div(FEEL.dodgeCdA * 2, 3) : FEEL.dodgeCdA; p.chase = 0;
-            const dy = (input & IN.U ? -1 : 0) + (input & IN.D ? 1 : 0);
-            p.vx = sp * dx; p.vy = dy ? sp * dy : Math.min(p.vy, 200);
+          if (p.chase > 0) { // chase dodge: free of the cooldown, faster, cancelable into an attack
+            const sp = div(FEEL.dodgeSpeedA * FEEL.chaseSpeed, 100);
+            p.chase--; p.dk = 4; p.dt = FEEL.dodgeStart + FEEL.dodgeInvChase; p.t = p.dt;
+            p.vx = sp * dx; p.vy = p.ground ? 0 : dy ? sp * dy : Math.min(p.vy, 200);
+          } else if (canDash) { p.st = ST.DASH; p.t = 0; p.vx = FEEL.dashSpeed * dx; p.dashCd = FEEL.dashCd; }
+          else if (p.ground) { // no direction: an evasive backstep
+            p.dk = 3; p.dt = FEEL.dodgeStart + FEEL.dodgeInvGround; p.t = p.dt; p.vx = -p.face * FEEL.backstep; p.dcd = FEEL.dodgeCdG;
+          } else if (dx || dy) { // air dodge with a direction
+            p.dk = 1; p.dt = FEEL.dodgeStart + FEEL.dodgeInvAir; p.t = p.dt; p.dcd = FEEL.dodgeCdA; p.ds = 0;
+            p.vx = FEEL.dodgeSpeedA * dx; p.vy = FEEL.dodgeSpeedA * dy;
+          } else { // air dodge in place: longer invincibility, keeps a little of the fall
+            p.dk = 2; p.dt = FEEL.dodgeStart + FEEL.dodgeInvSpot; p.t = p.dt; p.dcd = FEEL.dodgeCdA; p.ds = 0;
+            p.vx = div(p.vx, 4); p.vy = Math.min(p.vy, 200);
           }
           if (dx) p.face = dx;
         } else if (take(IN.J)) {
-          if (p.ground) { p.vy = P.jumpV; p.ground = 0; p.cut = 0; }
+          if (p.ground) p.squat = FEEL.jumpSquat;
           else if (p.wall && p.wj > 0) { p.wj--; p.vy = P.jumpV; p.vx = 0; p.ff = 0; p.cut = 0; p.face = p.wall; }
           else if (p.jumps > 0) {
             p.jumps--; p.vy = P.airJumpV; p.vx = dx * P.airMax; p.ff = 0; p.cut = 0;
@@ -235,11 +281,12 @@
           }
         } else {
           let kind = 0;
-          if (take(IN.A)) kind = 1; else if (take(IN.B)) kind = 2;
+          if (take(IN.A)) kind = 1; else if (p.sig <= 0 && take(IN.B)) kind = 2;
           if (kind) {
             let m;
-            if (kind === 2) m = input & IN.U ? (p.ground || !p.recov ? 6 : -1) : input & IN.D ? (p.ground ? 7 : 9) : 5;
-            else m = input & IN.U ? 3 : input & IN.D ? (p.ground ? 2 : 8) : dx ? 1 : p.ground ? 0 : 4;
+            const grounded = p.ground && !gc; // a gravity cancel uses the air moves on the ground
+            if (kind === 2) m = input & IN.U ? (grounded || !p.recov ? 6 : -1) : input & IN.D ? (grounded ? 7 : 9) : 5;
+            else m = input & IN.U ? 3 : input & IN.D ? (grounded ? 2 : 8) : dx ? 1 : grounded ? 0 : 4;
             if (m >= 0) {
               if (dx) p.face = dx;
               p.st = ST.ATK; p.t = 0; p.mv = m; p.hit = 0; p.chg = 0;
@@ -321,6 +368,8 @@
     function land(p, M) {
       // air jumps are refilled by step(), which knows the owner's physics
       p.recov = 0; p.ff = 0; p.land = 6; p.wj = FEEL.wallJumps;
+      if (p.st === ST.IDLE) p.lag = FEEL.jumpLand;
+      if (p.ds < 999) { p.dcd = p.ds >= FEEL.dodgeLandCd ? 0 : Math.min(p.dcd, FEEL.dodgeLandCd - p.ds); p.ds = 999; } // an air dodge's cooldown
       if (p.st === ST.ATK && p.mv === 9 && p.t >= M[9].su) { p.mv = 7; p.t = M[7].su - 2; p.hit = 0; p.vx = 0; }
       else if (p.st === ST.ATK && M[p.mv].air) { p.st = ST.IDLE; p.t = 0; }
       if (p.st === ST.HIT && p.t > 0) p.vx = div(6 * p.vx, 10);
@@ -351,7 +400,7 @@
         if (a.t < m.su || a.t >= m.su + m.ac) continue;
         const v = s.p[1 - i], V = ph[1 - i];
         if (v.st === ST.DEAD || v.inv > 0) continue;
-        if (v.st === ST.DODGE && v.t > FEEL.dodgeInvFrom - 1) continue;
+        if (v.st === ST.DODGE && v.dt - v.t >= FEEL.dodgeStart) continue;
         const b = box(a, m);
         if (b[0] < v.x + V.hw && b[1] > v.x - V.hw && b[2] < v.y && b[3] > v.y - V.h) hits.push(i);
       }
@@ -377,7 +426,7 @@
         l = div(l * FEEL.kbMul, 100);
         l = div(l * 100, V.weight);
         l = div(l * (60 + a.chg), 60);
-        a.chase = FEEL.chase;
+        a.chase = a.ground ? 2 : 1; a.chaseT = m.su + m.ac + m.re - a.t + FEEL.chaseWindow;
         s.hk = l;
         if (vm && within(vm.armor)) {
           // armored: the damage sticks, the move goes on

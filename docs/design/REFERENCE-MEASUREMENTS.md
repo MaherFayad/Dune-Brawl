@@ -51,3 +51,23 @@ A side by side of our demo against 10 s of the reference showed three gaps: our 
 
 - **Dodge distance** and **run speed** are low-confidence. A clean ground run never appeared at a stable zoom in the sampled games. Round 2 should take a 60 fps track from a training-mode style clip if one exists.
 - **Mid-stage single-hit kills** read 245 to 290%, above the ledge band. Full matches still average 160 to 215% at KO, matching the reference. The single-hit target is a soft 200 to 290.
+
+## Round 3: mechanics and timing from the reference's published frame data
+
+Source: the reference game's community wiki (its Movement and Attacks pages), checked in October 2026. Those pages give exact frame counts that footage cannot, so the sim now follows them. Values the pages do not give (run speed, wall jumps, stun length per attack) keep the measured or tuned values above.
+
+| Mechanic | Reference | Ours before | Ours now (`FEEL` in `game/sim.js`) |
+|---|---|---|---|
+| Dodge startup and invincibility | 2 startup frames, then invincible for 12 (air, with a direction), 20 (air, in place), 16 (ground, in place), 17 (chase); 0 recovery | 20 to 22 frames, invincible from frame 3 to the end | Same as the reference (`dodgeStart`, `dodgeInv*`); our in-place ground dodge stays a short backstep |
+| Dodge cooldown | 60 frames on the ground, 163 in the air; landing 75+ frames after an air dodge clears it, landing sooner caps it at 75 | 36 and 60, no landing rule | Same as the reference (`dodgeCdG`, `dodgeCdA`, `dodgeLandCd`) |
+| Air dodge distance | not published | 1.8 bodies over 22 frames | 2.3 bodies over 14 frames (faster, shorter dodge) |
+| Chase dodge | after a hit: 2 dodges if grounded, 1 if airborne, free of the cooldown, usable until 12 frames after the attack ends; an attack within 20 frames cancels it, with about 9 invincible frames | one faster air dodge within 40 frames of a hit | Same as the reference (`chaseWindow`, `chaseCancel`, `chaseCancelInv`) |
+| Gravity cancel | attack within 18 frames of an in-place dodge | none | Attack within 18 frames of an in-place dodge (air or ground) uses the air move, even on the ground (`gcWindow`) |
+| Whiff | recovery longer on a miss than on a hit; dodge locked 7 frames and dash 6 after a miss | same recovery either way | Recovery on hit is 67% of the miss recovery (`hitRecovery`), and the lockouts match (`missDodgeLock`, `missDashLock`) |
+| Jump | 2 startup frames; 4 landing frames after any jump | instant, no landing frames | Same as the reference (`jumpSquat`, `jumpLand`); releasing jump during the startup gives a short hop |
+| Signature cooldown | 10 frames, global | none | 10 frames between heavies (`sigCd`) |
+| Stun while flying fast | stun lasts while the victim still moves fast | fixed timer | Stun lasts while the launch (sideways or upward, never the fall) is faster than `stunSpeed` |
+
+Knockback rose 1.4% (`kbMul` 355) to keep the ledge kill in its band after the snappier air control of round 2. All 21 feel metrics pass (`node tests/feel.mjs`), and `tests/mechanics.js` checks each rule above.
+
+The bots were also fixed: they edge-guarded below ledge height and fired their recovery from under the island, so about 40% of their KOs were falls off the bottom. Now they edge-guard only from above the ledge with jumps to spare and never recover from underneath; falls dropped to 10 to 15% of KOs, and bot matches run at one KO per 28 to 36 s (the reference: about 40 s).

@@ -37,11 +37,11 @@ out.platformHeight = b(STAGE.main.y - STAGE.plats[0].y);
 { // jumps
   const { M, s } = fresh();
   let apex = 0, air = 0, y0 = s.p[0].y;
-  run(M, s, 1, () => IN.J);
+  run(M, s, 1 + FEEL.jumpSquat, () => IN.J); // the jump leaves the ground after its startup
   for (let k = 0; k < 200 && !s.p[0].ground; k++) { M.step(s, [IN.J, 0]); air++; apex = Math.max(apex, y0 - s.p[0].y); }
   out.fullJumpHeight = b(apex); out.fullJumpAirtime = air + 1;
   const t = fresh(); let hop = 0; const yy = t.s.p[0].y;
-  run(t.M, t.s, 1, () => IN.J);
+  run(t.M, t.s, 1 + FEEL.jumpSquat, (k) => (k === 0 ? IN.J : 0));
   for (let k = 0; k < 120 && !t.s.p[0].ground; k++) { t.M.step(t.s, [0, 0]); hop = Math.max(hop, yy - t.s.p[0].y); }
   out.shortHopHeight = b(hop);
   out.jumpsTotal = 1 + t.M.ph[0].airJumps;
@@ -103,10 +103,10 @@ for (const [name, mid] of [["killSideHeavyLedge", false], ["killSideHeavyMidStag
   for (let pct = 0; pct <= 300; pct += 5) if (launch(5, pct, recoverAI, mid).ko) { kill = pct; break; }
   out[name] = kill; // victim recovers toward the stage with jumps and recovery
 }
-out.dodgeFrames = FEEL.dodgeG;
+out.dodgeFrames = FEEL.dodgeStart + FEEL.dodgeInvGround;
 // dodge with a direction on the ground is a dash; air dodge travel is measured from a jump apex
 out.dashDistance = (() => { const { M, s } = fresh(); run(M, s, 1, () => IN.R | IN.X); const x0 = s.p[0].x; run(M, s, FEEL.dashFrames, () => 0); return b(Math.abs(s.p[0].x - x0)); })();
-out.airDodgeDistance = (() => { const { M, s } = fresh(); run(M, s, 1, () => IN.J); run(M, s, 12, () => IN.J); const x0 = s.p[0].x; run(M, s, 1, () => IN.R | IN.X); run(M, s, FEEL.dodgeA, () => 0); return b(Math.abs(s.p[0].x - x0)); })();
+out.airDodgeDistance = (() => { const { M, s } = fresh(); run(M, s, 1, () => IN.J); run(M, s, 12, () => IN.J); const x0 = s.p[0].x; run(M, s, 1, () => IN.R | IN.X); run(M, s, FEEL.dodgeStart + FEEL.dodgeInvAir, () => 0); return b(Math.abs(s.p[0].x - x0)); })();
 
 if (process.argv.includes("--json")) { console.log(JSON.stringify(out, null, 2)); process.exit(0); }
 const rows = Object.entries(out).map(([k, v]) => {
