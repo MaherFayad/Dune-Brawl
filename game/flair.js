@@ -121,7 +121,8 @@
       frame(api, i, p, s) {
         const m = api.move(i, p.mv);
         if (p.st !== api.ST.ATK) return;
-        // Bat Swarm: bats pour out around her while she rises
+        // Bat Swarm: she bursts into bats at the start, they pour out while she rises
+        if (p.mv === 6 && p.t === m.su) for (let k = 0; k < 14; k++) api.bat(p.x / api.S, p.y / api.S - api.body(i) * 0.5, api.rnd() * 6.28, 7 + api.rnd() * 6, 0.8);
         if (p.mv === 6 && p.t >= m.su && p.t < m.su + m.ac) for (let k = 0; k < 2; k++) {
           const a = -Math.PI / 2 + (api.rnd() - 0.5) * 2.6;
           api.bat(p.x / api.S + (api.rnd() - 0.5) * 30, p.y / api.S - api.body(i) * (0.1 + api.rnd() * 0.8), a, 7 + api.rnd() * 5, 1);

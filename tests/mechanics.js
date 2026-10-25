@@ -128,5 +128,14 @@ const run = (M, s, n, a = () => 0, b = () => 0) => { for (let k = 0; k < n; k++)
   M.step(s, [IN.R | IN.B, 0]);
   ok(p.st !== ST.ATK, "a heavy pressed during it waits");
 }
+{ // finisher: a charged side heavy on a fighter at the finisher's damage plays the cinematic, then KOs
+  const { M, s } = setup(); const v = s.p[1]; v.dmg = FEEL.finDamage + 10; s.p[1].x = 660 * S;
+  M.step(s, [IN.R | IN.B, 0]); for (let k = 0; k < 60 && !s.fin; k++) M.step(s, [IN.B, 0]);
+  ok(s.fin === FEEL.finFrames - 0 || s.fin > 0, "a charged side heavy on a fighter at the finisher's damage starts the finisher");
+  const hold = { x: v.x, y: v.y }; run(M, s, FEEL.finFrames - 10);
+  ok(v.x === hold.x && v.y === hold.y, "the game holds still while the finisher plays");
+  let ko = false; for (let k = 0; k < 300 && !ko; k++) { M.step(s, [0, 0]); ko = v.st === ST.DEAD || v.stocks < 3; }
+  ok(ko, "the finisher ends in a KO");
+}
 console.log(fails ? `${fails} failed` : "all mechanics ok");
 process.exit(fails ? 1 : 0);

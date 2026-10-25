@@ -60,6 +60,9 @@
     hitRecovery: 67,    // recovery on hit, percent of the recovery on a miss
     jumpSquat: 2, jumpLand: 4, // jump startup, and the landing recovery after a jump
     sigCd: 10,          // global cooldown between heavy (signature) attacks
+    // finisher: a side heavy charged at least finCharge frames that hits a fighter at finDamage%+
+    // plays a cinematic for finFrames (the game holds still), then launches them for a KO
+    finCharge: 20, finDamage: 150, finFrames: 96, finBonus: 25,
     stunSpeed: 1500,    // hitstun lasts while the victim is still launched faster than this (sideways or up)
     parryStun: 40,      // frames an attacker is stunned after hitting a parry
     chargeMax: 30,      // heavies with `charge` can be held up to 30 frames for up to +50%
@@ -121,7 +124,7 @@
     };
   }
   const PKEYS = Object.keys(player(0, 1, { airJumps: 2 }));
-  const GKEYS = ["f", "freeze", "over", "overT", "hf", "hx", "hy", "hk", "hp", "ha", "kf", "kx", "ky", "kp"];
+  const GKEYS = ["f", "freeze", "over", "overT", "hf", "hx", "hy", "hk", "hp", "ha", "kf", "kx", "ky", "kp", "fin", "fa"];
 
   // A match binds two fighter definitions; the returned object steps a plain state.
   function match(defA, defB) {
@@ -131,7 +134,7 @@
     function create() {
       return {
         f: 0, freeze: 0, over: 0, overT: 0, hf: -1, hx: 0, hy: 0, hk: 0, hp: 0, ha: 0, // ha: 0 hit, 1 armored, 2 parried
-        kf: -1, kx: 0, ky: 0, kp: 0,
+        kf: -1, kx: 0, ky: 0, kp: 0, fin: 0, fa: 0, // fin: frames left of a finisher, fa: who lands it
         p: [player(STAGE.spawnX[0], 1, ph[0]), player(STAGE.spawnX[1], -1, ph[1])],
       };
     }
@@ -381,6 +384,12 @@
       if (s.f < FEEL.countdown - FEEL.spawnRelease) { s.f++; return; }
       if (s.f === FEEL.countdown - FEEL.spawnRelease) for (const p of s.p) p.drop = 40; // fall through the soft platforms
       const ins = s.f < FEEL.countdown ? [0, 0] : inputs;
+      if (s.fin > 0) { // the finisher cinematic: everything holds while it plays
+        s.fin--;
+        for (let i = 0; i < 2; i++) bufferPress(s.p[i], 0);
+        s.f++;
+        return;
+      }
       if (s.freeze > 0) {
         s.freeze--;
         for (let i = 0; i < 2; i++) bufferPress(s.p[i], ins[i]);
@@ -442,6 +451,16 @@
         if (v.jumps < 1) v.jumps = 1;
         if (v.vx) v.face = v.vx > 0 ? -1 : 1;
         if (a.mv === 9) { a.st = ST.IDLE; a.t = 0; a.vy = -900; }
+        if (a.mv === 5 && a.chg >= FEEL.finCharge && v.dmg >= FEEL.finDamage) {
+          // the finisher: a guaranteed KO launch once the cinematic ends; the attacker ends up
+          // behind the victim, back turned
+          v.dmg = Math.min(999, v.dmg + FEEL.finBonus);
+          const L = div(l * 5, 2);
+          v.vx = dir * div(L * 70, 100); v.vy = -div(L * 71, 100); v.t = 90; v.launch = L; v.ground = 0;
+          a.st = ST.IDLE; a.t = 0; a.vx = 0; a.vy = 0; a.x = v.x + dir * 55 * S; a.face = dir;
+          s.fin = FEEL.finFrames; s.fa = i; s.freeze = 0;
+          continue;
+        }
         s.freeze = Math.max(s.freeze, Math.min(FEEL.pauseMax, FEEL.pauseBase + div(dmg, FEEL.pauseDiv)));
       }
       const B = STAGE.blast;

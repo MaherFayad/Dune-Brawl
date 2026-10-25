@@ -17,9 +17,18 @@
     "clockwork-elephant": { name: "Tiktak", title: "The Brass Hour", color: "#c9973a", glow: "#5ff0d8", art: "anim-v2" },
     "melting-yeti": { name: "Brrr", title: "The Homesick Snow", color: "#9fd8ff", glow: "#e8fbff", art: "anim-v2", ready: 1 },
     "baby-roc": { name: "Rukhayy", title: "The Roc Who Cannot Fly Yet", color: "#2443b8", glow: "#ffd25a", art: "anim-v2" },
+    // stick fighters (game/stick.js): drawn from a skeleton; `kin` is the painted fighter whose
+    // moveset, effects and sound flavour they borrow
+    "stick-vespera": { name: "Vespera", title: "The Countess in the Shade", color: "#d0173f", glow: "#ff5c7a", ready: 1, stick: 1, kin: "vampire-countess" },
+    "stick-saif": { name: "Saif", title: "The Bound Blade", color: "#1f5a43", glow: "#36e2d4", ready: 1, stick: 1, kin: "djinn-warrior" },
     "chameleon-slinger": { name: "Hirba", title: "The Slow Trick Shot", color: "#7ccf2a", glow: "#ff5ad0", art: "anim-v2" },
   };
-  const portraitSrc = (id) => `${ROOT}/assets/fighters/${id}/${FIGHTERS[id].portrait || "source/portrait.png"}`;
+  const kin = (id) => (FIGHTERS[id] && FIGHTERS[id].kin) || id;
+  const stickArt = {}; // generated stills for stick fighters: chip portrait and loading card
+  const portraitSrc = (id) => {
+    if (FIGHTERS[id].stick) return (stickArt[id] = stickArt[id] || Stick.still(id, 160, true).toDataURL());
+    return `${ROOT}/assets/fighters/${id}/${FIGHTERS[id].portrait || "source/portrait.png"}`;
+  };
   const TEAM = ["#2fd5c4", "#ff7a45"];
   const params = new URLSearchParams(location.search);
 
@@ -90,6 +99,9 @@
       return v;
     }
     if (foe.st === ST.DEAD) return Math.abs(me.x - 640 * S) > 60 * S ? (me.x < 640 * S ? IN.R : IN.L) : 0;
+    // finisher: hold a charged side heavy on a foe at the finisher's damage
+    if (me.st === ST.ATK && me.mv === 5 && me.chg > 0 && me.chg < FEEL.finCharge + 4) return IN.B;
+    if (me.ground && foe.dmg >= FEEL.finDamage && Math.abs(dx) < 110 * S && Math.abs(dy) < 40 * S && foe.st !== ST.DODGE && even && Math.random() < 0.25) return (dx > 0 ? IN.R : IN.L) | IN.B;
     // like the reference players: buffer a dodge as hitstun ends to slip out of a string
     if (me.st === ST.HIT && me.t <= 3 && me.launch < 1800 && even && Math.random() < 0.3 + 0.1 * level) return v | IN.X;
     const close = Math.abs(dx) < 95 * S && Math.abs(dy) < 90 * S;
@@ -164,12 +176,16 @@
   async function load() {
     loading.done = 0; loading.total = 0; loading.t = 0; loading.tip = Math.floor(Math.random() * TIPS.length);
     // the versus cards first (one small image each), so the loading screen has its art at once
-    await Promise.all(pick.map(async (id) => { if (!cardArt[id]) cardArt[id] = await img(`${ROOT}/assets/fighters/${id}/${FIGHTERS[id].basePose || "source/base-pose.png"}`); }));
-    defs = await Promise.all(pick.map(async (id) => (await fetch(`${ROOT}/assets/fighters/${id}/moves.draft.json`)).json()));
+    await Promise.all(pick.map(async (id) => {
+      if (!cardArt[id]) cardArt[id] = FIGHTERS[id].stick ? Stick.still(id, 420, false) : await img(`${ROOT}/assets/fighters/${id}/${FIGHTERS[id].basePose || "source/base-pose.png"}`);
+    }));
+    defs = await Promise.all(pick.map(async (id) => (await fetch(`${ROOT}/assets/fighters/${kin(id)}/moves.draft.json`)).json()));
+    M = Sim.match(defs[0], defs[1]);
     const progress = { onCount: (n) => (loading.total += n), onSheet: () => loading.done++ };
-    gfx = await Promise.all(pick.map((id, i) => Render.loadFighter(id, ROOT, { art: FIGHTERS[id].art, height: (defs[i].stats || {}).height, basePose: FIGHTERS[id].basePose, victoryHold: FIGHTERS[id].victoryHold, remap: FIGHTERS[id].remap, ...progress })));
+    gfx = await Promise.all(pick.map((id, i) => FIGHTERS[id].stick ? Stick.create(id, (defs[i].stats || {}).height || 64, M.ph[i])
+      : Render.loadFighter(id, ROOT, { art: FIGHTERS[id].art, height: (defs[i].stats || {}).height, basePose: FIGHTERS[id].basePose, victoryHold: FIGHTERS[id].victoryHold, remap: FIGHTERS[id].remap, ...progress })));
     await Promise.all(pick.map((id) => new Promise((ok) => { const im = new Image(); im.onload = () => { portraits[id] = im; ok(); }; im.onerror = ok; im.src = portraitSrc(id); })));
-    M = Sim.match(defs[0], defs[1]); st = M.create(); fx.reset(); Object.assign(cam, { x: 640, y: 330, z: 0.9 });
+    st = M.create(); fx.reset(); Object.assign(cam, { x: 640, y: 330, z: 0.9 });
   }
   // the versus screen stays up for at least 1.6 s so the cards register, as in the reference
   const holdCards = (t0) => new Promise((ok) => setTimeout(ok, Math.max(0, 1600 - (performance.now() - t0))));
@@ -185,10 +201,10 @@
    "smear1", "smear2", "smear3", "kick1", "kick2", "kick3", "ko-splash", "ko-cloud"].forEach((n) => { const im = new Image(); im.onload = () => (vfx[n] = im); im.src = `${ROOT}/assets/vfx/${n}.webp`; });
   const fx = {
     sprites: [], parts: [], shake: 0, lastHf: -1, lastKf: -1, koStamp: [0, 0],
-    grounded: [1, 1], wasSt: [0, 0], lastVy: [0, 0], after: [[], []], landF: [-99, -99], jumpF: [-99, -99], turnF: [-99, -99], lastFace: [1, -1],
+    grounded: [1, 1], wasSt: [0, 0], lastVy: [0, 0], after: [[], []], landF: [-99, -99], landVy: [0, 0], jumpF: [-99, -99], turnF: [-99, -99], lastFace: [1, -1],
     bats: [], petals: [], marks: [], banner: null, won: 0, stats: [], lastDmg: [0, 0], hitOn: [-1e9, -1e9],
     reset() {
-      Object.assign(this, { sprites: [], parts: [], shake: 0, lastHf: -1, lastKf: -1, koStamp: [0, 0], bats: [], petals: [], marks: [], banner: null, won: 0, koHold: 0, chain: 0, chainF: -99, landF: [-99, -99], jumpF: [-99, -99], turnF: [-99, -99], lastFace: [1, -1],
+      Object.assign(this, { sprites: [], parts: [], shake: 0, lastHf: -1, lastKf: -1, koStamp: [0, 0], bats: [], petals: [], marks: [], banner: null, won: 0, koHold: 0, chain: 0, chainF: -99, landF: [-99, -99], landVy: [0, 0], jumpF: [-99, -99], turnF: [-99, -99], lastFace: [1, -1],
         stats: [0, 1].map(() => ({ kos: 0, falls: 0, acc: 0, done: 0, taken: 0 })), lastDmg: [0, 0], hitOn: [-1e9, -1e9] });
     },
     // a painted sprite: grows from s0 to s1 in `pop` frames, holds, then fades over the rest of `life` frames
@@ -200,7 +216,7 @@
   // sounds (game/audio.js), panned by where they happen on screen
   const sfx = (name, x, o) => {
     if (!window.Sfx || mode === "loading") return;
-    const pan = Math.max(-1, Math.min(1, (x - cam.x) / 640)), opt = { fighter: o && o.who !== undefined ? pick[o.who] : null, ...o };
+    const pan = Math.max(-1, Math.min(1, (x - cam.x) / 640)), opt = { fighter: o && o.who !== undefined ? kin(pick[o.who]) : null, ...o };
     if (dbg.soundLog) dbg.soundLog.push({ f: st ? st.f : 0, name, pan, o: opt }); // test hook: recordings render these offline
     Sfx.play(name, pan, opt);
   };
@@ -212,7 +228,7 @@
     if (track) Sfx.music(track); else Sfx.stopMusic();
   };
   // ---------- per-fighter flair (game/flair.js) ----------
-  const style = (i) => Flair.STYLES[pick[i]] || {};
+  const style = (i) => Flair.STYLES[kin(pick[i])] || {};
   const flairApi = {
     S, ST, rnd: () => rnd(),
     body: (i) => (gfx[i] ? gfx[i].h : 64),
@@ -288,6 +304,16 @@
     g.globalAlpha = 1;
   }
   function events(s) {
+    if (s.fin > 0) { // finisher cues, keyed to its frames so they replay identically
+      const T = finT(s), V = s.p[1 - s.fa], vx = V.x / S, vy = V.y / S - (gfx[1 - s.fa] ? gfx[1 - s.fa].h : 64) * 0.5;
+      if (T === 1) { sfx("parry", vx, { who: s.fa }); for (let k = 0; k < 16; k++) flairApi.bat(vx, vy, rnd() * 6.28, 8 + rnd() * 8, 1.2); fx.shake = 6; }
+      if (T >= FIN.open && (T - FIN.open) % FIN.slash === 0 && (T - FIN.open) / FIN.slash < FIN.count) {
+        sfx("hitHeavy", vx, { who: s.fa, k: 40 }); fx.shake = 7;
+        fx.add(`star${1 + Math.floor(rnd() * 3)}`, vx + (rnd() - 0.5) * 20, vy + (rnd() - 0.5) * 20, { w: 46, rot: rnd() * 6.28, s0: 1, s1: 0.7, pop: 1, life: 8 });
+        if (style(s.fa).hit) style(s.fa).hit(flairApi, s.fa, vx, vy, rnd() < 0.5 ? 1 : -1, true, 5);
+      }
+      if (T === FEEL.finFrames - 3) sfx("swingHeavy", vx, { who: s.fa, mv: 5 });
+    }
     // countdown and match end cues
     const cd = FEEL.countdown - s.f;
     if (cd === 125) music("battle"); // the match bed starts with the countdown (rematches too)
@@ -326,7 +352,7 @@
       const killer = s.f - fx.hitOn[s.kp] < 300 ? 1 - s.kp : -1;
       fx.stats[s.kp].falls++; if (killer >= 0) fx.stats[killer].kos++; else fx.stats[s.kp].acc++;
       fx.banner = { killer, victim: s.kp, t: 0 };
-      sfx("ko", s.kx / S, { scorer: killer >= 0 ? pick[killer] : null });
+      sfx("ko", s.kx / S, { scorer: killer >= 0 ? kin(pick[killer]) : null });
       // the reference KOs at the screen edge: a white ink splash and a cloud bank burst inward
       // from where the fighter left the view, with speed lines in the attacker's team colour
       const z = Math.min(W / 1280, H / 720) * cam.z, hw = W / 2 / z, hh = H / 2 / z;
@@ -351,7 +377,7 @@
     s.p.forEach((p, i) => {
       if (p.st === ST.DEAD) return;
       if (style(i).frame) style(i).frame(flairApi, i, p, s);
-      if (p.ground && !fx.grounded[i]) fx.landF[i] = s.f;
+      if (p.ground && !fx.grounded[i]) { fx.landF[i] = s.f; fx.landVy[i] = fx.lastVy[i]; }
       if (!p.ground && fx.grounded[i] && p.vy < 0) fx.jumpF[i] = s.f;
       if (p.face !== fx.lastFace[i]) { // a turn at speed skids: a small kick of dust
         if (p.ground && Math.abs(p.vx) > 500) { fx.turnF[i] = s.f; fx.kick(p.x / S, p.y / S, (gfx[i] ? gfx[i].h : 64) * 0.5, -p.face); }
@@ -363,6 +389,11 @@
       const body = gfx[i] ? gfx[i].h : 64;
       if (p.ground && !fx.grounded[i]) {
         fx.puff(x - body * 0.3, y - 6, body * 0.35); fx.puff(x + body * 0.3, y - 6, body * 0.35);
+        if (fx.lastVy[i] > 1250 && gfx[i].stick) { // a hard landing on one knee throws a ring of dust
+          fx.marks.push({ t: 0, kind: "ring", x, y: y - 2, color: "#f3d9a4", life: 16, r0: 0.4, r1: 2.4, flat: 1 });
+          for (const sgn of [-1, 1]) fx.puff(x + sgn * body * 0.65, y - 4, body * 0.3, { s0: 0.5, s1: 1.3, life: 24 });
+          fx.shake = Math.max(fx.shake, 4);
+        }
         if ((p.st === ST.ATK || fx.wasSt[i] === ST.ATK) && style(i).land) style(i).land(flairApi, i, x, y, p.mv);
         sfx("land", x);
       }
@@ -415,6 +446,11 @@
   // ---------- camera ----------
   const cam = { x: 640, y: 380, z: 1 };
   function updateCam(s) {
+    if (s.fin > 0) { // a finisher pushes in tight on the victim
+      const v = s.p[1 - s.fa], tx = v.x / S, ty = v.y / S - (gfx[1 - s.fa] ? gfx[1 - s.fa].h : 64) * 0.6;
+      cam.x += (tx - cam.x) * 0.2; cam.y += (ty - cam.y) * 0.2; cam.z += (2.3 - cam.z) * 0.15;
+      return;
+    }
     // frame the fighters, not the stage, like the reference broadcast camera: a tight window
     // (max zoom puts the silhouette at about 12 percent of screen height, as in the reference)
     // around the pair (never narrower than about 10 bodies) that follows them off the ledge and
@@ -492,9 +528,29 @@
   }
   const tintBuf = document.createElement("canvas"), tg = tintBuf.getContext("2d");
   function drawSprite(i, p, f, alpha, tint, halo, tintColor = "#fff") {
-    const win = st && st.over === i + 1 && st.overT > 20 ? st.overT - 20 : -1;
-    const F = gfx[i], ps = Render.pose(F, p, f, M.mv[i], Sim, win);
-    const x = p.x / S, y = p.y / S;
+    const win = p.winPose !== undefined ? p.winPose : st && st.over === i + 1 && st.overT > 20 ? st.overT - 20 : -1;
+    const F = gfx[i], x = p.x / S, y = p.y / S;
+    if (F.stick) { // a stick fighter: a skeleton posed from the sim state, drawn with brush strokes
+      const m = M.mv[i][p.mv], atk = p.st === ST.ATK;
+      // Bat Swarm: she is a cloud of bats while it rises, and reforms at the end
+      if (atk && F.style.batForm === p.mv && p.t >= m.su && p.t < m.su + m.ac) return;
+      // after a hard landing she holds a one-knee pose for a beat
+      const since = st ? st.f - fx.landF[i] : 99, hero = p.ground && fx.landVy[i] > 1250 && since < 16 ? 1 - since / 16 : 0;
+      const pp = hero ? { ...p, hero } : p;
+      g.save(); g.translate(Math.round(x), Math.round(y)); g.scale(p.face, 1);
+      if (p.juice) { g.rotate(p.juice.rot); g.scale(p.juice.sx, p.juice.sy); }
+      // smear frames: the two poses before the strike linger as fading ghosts, like drawn animation
+      if (atk && p.t >= m.su && p.t < m.su + 3 && alpha === 1) {
+        for (const [back, al] of [[2, 0.18], [1, 0.32]]) {
+          g.globalAlpha = al; Stick.draw(g, F, Stick.pose(F, { ...p, t: p.t - back }, f, M.mv[i], Sim, win), { tint: 1, tintColor: "#ffffff", f });
+        }
+      }
+      g.globalAlpha = alpha;
+      Stick.draw(g, F, Stick.pose(F, pp, f, M.mv[i], Sim, win), { tint, tintColor, vx: p.vx * p.face, vy: p.vy, f });
+      g.restore();
+      return;
+    }
+    const ps = Render.pose(F, p, f, M.mv[i], Sim, win);
     if (!ps) return;
     const { sh, k, rot } = ps, sc = sh.scale;
     const screenBody = F.h * cam.z * Math.min(W / 1280, H / 720) * dpr;
@@ -537,9 +593,24 @@
     }
     return { sx, sy, rot };
   }
+  // speed lines: thin streaks trailing anything moving very fast (dashes, dodges, launches, dives)
+  function speedLines(s, i, p) {
+    const v = Math.hypot(p.vx, p.vy);
+    if (v < 1300) return;
+    const ux = p.vx / v, uy = p.vy / v, body = gfx[i].h, cx = p.x / S, cy = p.y / S - body * 0.5, k = Math.min(1, (v - 1300) / 1500);
+    g.save(); g.strokeStyle = "rgba(255,250,240,0.7)"; g.lineCap = "round";
+    for (let j = 0; j < 5; j++) {
+      const off = ((j * 37 + s.f * 13) % 100) / 100 - 0.5, len = body * (0.6 + 0.8 * k) * (0.6 + ((j * 53) % 40) / 100);
+      const ox = -uy * off * body * 1.1, oy = ux * off * body * 1.1, st0 = body * (0.45 + ((j * 29) % 30) / 100);
+      g.globalAlpha = 0.35 + 0.4 * k; g.lineWidth = 1.2 + (j % 2);
+      g.beginPath(); g.moveTo(cx + ox - ux * st0, cy + oy - uy * st0); g.lineTo(cx + ox - ux * (st0 + len), cy + oy - uy * (st0 + len)); g.stroke();
+    }
+    g.restore();
+  }
   function drawFighter(s, i) {
     const p = s.p[i];
     if (p.st === ST.DEAD) return;
+    speedLines(s, i, p);
     const x = p.x / S, y = p.y / S, m = M.mv[i][p.mv];
     if (s.f < FEEL.countdown - FEEL.spawnRelease + 4) { // spawn pad glowing under the hanging fighter
       g.save(); g.globalAlpha = 0.85; g.fillStyle = TEAM[i]; g.shadowColor = TEAM[i]; g.shadowBlur = 14;
@@ -863,14 +934,70 @@
     g.save();
     g.translate(W / 2 + (rnd() - 0.5) * fx.shake, H / 2 + (rnd() - 0.5) * fx.shake); g.scale(z, z); g.translate(-cam.x, -cam.y);
     drawStage();
-    drawFx(true);
-    for (const t of [0, 1]) drawFighter(st, t);
-    drawSmears();
+    if (!st.fin) drawFx(true); // dust under the fighters would only read as a grey lump in the darkened finisher
+    if (st.fin > 0) finisherWorld(st);
+    else { for (const t of [0, 1]) drawFighter(st, t); drawSmears(); }
     drawFx();
     for (const t of [0, 1]) bubble(st, t, z);
     g.restore();
     drawAtmosphere();
     hud(st);
+    if (st.fin > 0) finisherOverlay(st);
+  }
+  // ---------- finishers ----------
+  // A charged side heavy on a fighter at 150%+ holds the game for FEEL.finFrames while this plays:
+  // the world darkens, she bursts into bats and strikes six times from six angles, each pass a
+  // white streak through the victim, then lands behind them, back turned; the sim launches them.
+  const FIN_NAME = { "stick-vespera": "NIGHTFALL WALTZ", "stick-saif": "STORM OF THE SASH", "vampire-countess": "NIGHTFALL WALTZ", "djinn-warrior": "STORM OF THE SASH" };
+  const FIN = { open: 14, slash: 9, count: 6 };
+  function finT(s) { return FEEL.finFrames - s.fin; }
+  // where the attacker strikes from on pass k: alternating sides, always from above the ground
+  const FIN_ANG = [-0.12, -0.88, -0.38, -0.62, -0.02, -0.98].map((t) => t * Math.PI);
+  function finSpot(s, k) {
+    const v = s.p[1 - s.fa], body = gfx[1 - s.fa].h, a = FIN_ANG[k % FIN_ANG.length];
+    return { x: v.x / S + Math.cos(a) * body * 1.1, y: v.y / S + Math.sin(a) * body * 0.9 + body * 0.15 };
+  }
+  function finisherWorld(s) {
+    const T = finT(s), a = s.fa, vi = 1 - a, A = s.p[a], V = s.p[vi], mvA = M.mv[a][5];
+    const k = Math.floor((T - FIN.open) / FIN.slash), local = (T - FIN.open) % FIN.slash, slashing = T >= FIN.open && k < FIN.count;
+    // the world behind the two fighters falls into shadow
+    g.save(); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.fillStyle = `rgba(12,4,20,${Math.min(0.62, T / 10 * 0.62)})`; g.fillRect(0, 0, W, H); g.restore();
+    // the victim: held in a hurt pose, jolting and flashing on every pass
+    const jolt = slashing && local < 3;
+    drawSprite(vi, { ...V, st: ST.HIT, launch: 0, t: 20, vx: 0, vy: 0, x: V.x + (jolt ? (k % 2 ? 5 : -5) * S : 0) }, s.f, 1, jolt ? 1 : 0, null, "#ffffff");
+    if (T < FIN.open) { // the wind-up: the parasol opens beside the victim she just hit
+      drawSprite(a, { ...A, x: V.x - A.face * 55 * S, face: A.face, st: ST.IDLE, ground: 1, vx: 0, vy: 0, winPose: T * 3 }, s.f, 1, 0, null);
+    } else if (slashing) {
+      const p0 = k ? finSpot(s, k - 1) : { x: V.x / S - A.face * 55, y: V.y / S }, p1 = finSpot(s, k);
+      if (local < 5) { // the pass: a white streak from where she was, through the victim, to where she is
+        const fade = 1 - local / 5;
+        g.save(); g.lineCap = "round";
+        for (const [w, c] of [[9, "rgba(20,4,12,0.5)"], [6, style(a).trail || "#ffffff"], [2.5, "#ffffff"]]) {
+          g.globalAlpha = fade; g.strokeStyle = c; g.lineWidth = w * fade + 1;
+          g.beginPath(); g.moveTo(p0.x, p0.y - 30); g.quadraticCurveTo(V.x / S, V.y / S - 40, p1.x, p1.y - 30); g.stroke();
+        }
+        g.restore();
+      }
+      const face = p1.x < V.x / S ? 1 : -1;
+      drawSprite(a, { ...A, x: p1.x * S, y: p1.y * S, face, st: ST.ATK, mv: 5, t: mvA.su + Math.min(2, local), ground: 0, chg: 0, vx: 0, vy: 0 }, s.f, 1, local < 2 ? 0.4 : 0, null, "#ffffff");
+    } else { // behind the victim, back turned, the parasol furling
+      drawSprite(a, { ...A, st: ST.IDLE, ground: 1, vx: 0, vy: 0 }, s.f, 1, 0, null);
+    }
+    drawFx();
+  }
+  function finisherOverlay(s) {
+    const T = finT(s), u = Math.min(W / 1280, H / 720), bar = Math.min(1, T / 8) * H * 0.11;
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    g.fillStyle = "#08030f"; g.fillRect(0, 0, W, bar); g.fillRect(0, H - bar, W, bar); // letterbox
+    if (T > 4 && T < FEEL.finFrames - 6) {
+      const pop = T < 10 ? 1.5 - (T - 4) / 12 : 1;
+      g.save(); g.translate(W / 2, H * 0.2); g.scale(pop, pop);
+      display("FINISHER", 0, 0, 74 * u, { ghost: T < 7, alpha: T < 7 ? 0.5 : 1 });
+      g.restore();
+      g.font = `${22 * u}px "Lilita One", "Arial Black", sans-serif`; g.textAlign = "center"; g.textBaseline = "middle"; g.fillStyle = "#ffd36b";
+      g.fillText(FIN_NAME[pick[s.fa]] || "FINISHER", W / 2, H * 0.2 + 52 * u);
+    }
+    if (T >= FEEL.finFrames - 4) { g.fillStyle = `rgba(255,255,255,${(T - FEEL.finFrames + 4) / 4 * 0.8})`; g.fillRect(0, 0, W, H); } // the release flash
   }
 
   // ---------- loop ----------
@@ -918,7 +1045,8 @@
     "Land a hit, then dodge: a chase dodge ignores the cooldown, and an attack cancels it.",
     "Dodge in place and attack at once: you get your air attack on the ground.",
     "Air dodges recharge slowly. Land a while after one to get it back sooner.",
-    "Missing an attack leaves you open: your dodge is locked for a moment."];
+    "Missing an attack leaves you open: your dodge is locked for a moment.",
+    "Foe at 150% or more? Hold heavy to charge a side heavy: if it lands, it is a finisher."];
   function drawLoading() {
     const u = Math.min(W / 1280, H / 720), t = loading.t;
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -1069,7 +1197,7 @@
         if (!FIGHTERS[id].ready) continue;
         const b = document.createElement("button");
         b.className = "chip" + (pick[i] === id ? " on" : ""); b.setAttribute("aria-pressed", pick[i] === id);
-        b.innerHTML = `<i class="disc"><img alt="" src="${portraitSrc(id)}"></i><span>${FIGHTERS[id].name}</span>`;
+        b.innerHTML = `<i class="disc"><img alt="" src="${portraitSrc(id)}"></i><span>${FIGHTERS[id].name}${FIGHTERS[id].stick ? "<small> stick</small>" : ""}</span>`;
         b.onclick = () => { pick[i] = id; buildPickers(); if (window.Sfx) Sfx.play("uiMove", 0); };
         row.appendChild(b);
       }
