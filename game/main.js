@@ -179,7 +179,8 @@
     await Promise.all(pick.map(async (id) => {
       if (!cardArt[id]) cardArt[id] = FIGHTERS[id].stick ? Stick.still(id, 420, false) : await img(`${ROOT}/assets/fighters/${id}/${FIGHTERS[id].basePose || "source/base-pose.png"}`);
     }));
-    defs = await Promise.all(pick.map(async (id) => (await fetch(`${ROOT}/assets/fighters/${kin(id)}/moves.draft.json`)).json()));
+    // stick fighters move with the stick kit (FEEL.kit in sim.js); painted fighters keep the reference tuning
+    defs = await Promise.all(pick.map(async (id) => ({ ...(await (await fetch(`${ROOT}/assets/fighters/${kin(id)}/moves.draft.json`)).json()), kit: FIGHTERS[id].stick ? 1 : 0 })));
     M = Sim.match(defs[0], defs[1]);
     const progress = { onCount: (n) => (loading.total += n), onSheet: () => loading.done++ };
     gfx = await Promise.all(pick.map((id, i) => FIGHTERS[id].stick ? Stick.create(id, (defs[i].stats || {}).height || 64, M.ph[i])
@@ -201,10 +202,10 @@
    "smear1", "smear2", "smear3", "kick1", "kick2", "kick3", "ko-splash", "ko-cloud"].forEach((n) => { const im = new Image(); im.onload = () => (vfx[n] = im); im.src = `${ROOT}/assets/vfx/${n}.webp`; });
   const fx = {
     sprites: [], parts: [], shake: 0, lastHf: -1, lastKf: -1, koStamp: [0, 0],
-    grounded: [1, 1], wasSt: [0, 0], lastVy: [0, 0], after: [[], []], landF: [-99, -99], landVy: [0, 0], jumpF: [-99, -99], turnF: [-99, -99], lastFace: [1, -1],
+    grounded: [1, 1], wasSt: [0, 0], lastVy: [0, 0], after: [[], []], landF: [-99, -99], landVy: [0, 0], jumpF: [-99, -99], turnF: [-99, -99], lastFace: [1, -1], lastVx: [0, 0], walled: [0, 0],
     bats: [], petals: [], marks: [], banner: null, won: 0, stats: [], lastDmg: [0, 0], hitOn: [-1e9, -1e9],
     reset() {
-      Object.assign(this, { sprites: [], parts: [], shake: 0, lastHf: -1, lastKf: -1, koStamp: [0, 0], bats: [], petals: [], marks: [], banner: null, won: 0, koHold: 0, chain: 0, chainF: -99, landF: [-99, -99], landVy: [0, 0], jumpF: [-99, -99], turnF: [-99, -99], lastFace: [1, -1],
+      Object.assign(this, { sprites: [], parts: [], shake: 0, lastHf: -1, lastKf: -1, koStamp: [0, 0], bats: [], petals: [], marks: [], banner: null, won: 0, koHold: 0, chain: 0, chainF: -99, landF: [-99, -99], landVy: [0, 0], jumpF: [-99, -99], turnF: [-99, -99], lastFace: [1, -1], lastVx: [0, 0], walled: [0, 0],
         stats: [0, 1].map(() => ({ kos: 0, falls: 0, acc: 0, done: 0, taken: 0 })), lastDmg: [0, 0], hitOn: [-1e9, -1e9] });
     },
     // a painted sprite: grows from s0 to s1 in `pop` frames, holds, then fades over the rest of `life` frames
@@ -331,6 +332,13 @@
         sfx("parry", x);
       } else {
         fx.hitOn[1 - s.hp] = s.f;
+        const cmb = s.p[s.hp].cmb, vb = gfx[1 - s.hp] ? gfx[1 - s.hp].h : 64;
+        if (cmb === 1) fx.marks.push({ t: 0, kind: "text", x, y: y - vb * 0.7, text: "x2", size: 22, life: 34 });
+        if (cmb === 3) { // the combo finisher lands: a shockwave bubble, a callout, a harder shake
+          fx.marks.push({ t: 0, kind: "text", x, y: y - vb * 0.8, text: "FINISH!", size: 30, life: 46 });
+          fx.marks.push({ t: 0, kind: "bubble", x, y, r: vb * 1.3, life: 18 });
+          fx.shake = Math.max(fx.shake, 10);
+        } else if (heavy && gfx[s.hp].stick) fx.marks.push({ t: 0, kind: "bubble", x, y, r: vb * 0.9, life: 14 });
         if (style(s.hp).hit) style(s.hp).hit(flairApi, s.hp, x, y, s.p[s.hp].face, heavy, s.p[s.hp].mv);
         fx.chain = s.f - fx.chainF < 12 ? fx.chain + 1 : 0; fx.chainF = s.f; // strings of hits rise in pitch
         sfx(heavy ? "hitHeavy" : "hit", x, { k, who: s.hp, mv: s.p[s.hp].mv, chain: fx.chain });
@@ -399,6 +407,12 @@
       }
       if (!p.ground && fx.grounded[i] && p.vy < 0) { fx.kick(x, y, body * 0.6, -p.face); sfx("jump", x); }
       if (!p.ground && !fx.grounded[i] && p.vy < -1000 && fx.lastVy[i] >= -1000 && p.st === ST.IDLE) { fx.puff(x, y + 4, body * 0.5, { s0: 0.4, s1: 1.3, life: 22 }); sfx("airJump", x); } // air jump ring
+      // a fighter blasted into the stage cracks it, as in stick-fight animation: a crater of cracks, grey smoke and grit
+      if (gfx[i].stick && p.st === ST.HIT) {
+        const vG = p.ground && !fx.grounded[i] ? fx.lastVy[i] : 0, vW = p.wall && !fx.walled[i] ? Math.abs(fx.lastVx[i]) : 0;
+        if (vG > 1100 || vW > 900) slam(i, x, y, body, vW > 900 ? p.wall : 0, Math.max(vG, vW));
+      }
+      fx.walled[i] = p.wall; fx.lastVx[i] = p.vx;
       fx.lastVy[i] = p.vy;
       if (p.st === ST.DODGE || p.st === ST.DASH) { if (s.f % 2 === 0) { fx.after[i].unshift({ x: p.x, y: p.y }); fx.after[i].length = Math.min(fx.after[i].length, 4); } }
       else fx.after[i].length = 0;
@@ -425,6 +439,20 @@
       if (p.st === ST.ATK && p.t === M.mv[i][p.mv].su && p.mv > 4 && p.mv !== 9) sfx("swingHeavy", x, { who: i, mv: p.mv });
       fx.wasSt[i] = p.st;
     });
+  }
+  function slam(i, x, y, body, wall, v) {
+    const k = Math.min(1, (v - 900) / 2600), cx = x + wall * body * 0.28, cy = wall ? y - body * 0.5 : y, out = wall ? (wall > 0 ? Math.PI : 0) : -Math.PI / 2;
+    fx.marks.push({ t: 0, kind: "crack", x: cx, y: cy, ang: out + Math.PI, r: body * (0.7 + 0.6 * k), n: 6 + Math.round(4 * k), seed: (st ? st.f : 0) * 7 + i, life: 150 });
+    for (let j = 0; j < 4; j++) { // smoke billows sideways along the hit surface, behind the body
+      const side = j % 2 ? 1 : -1, d = body * (0.3 + 0.25 * (j >> 1)), tx = -Math.sin(out), ty = Math.cos(out);
+      fx.puff(cx + tx * side * d + Math.cos(out) * body * 0.1, cy + ty * side * d + Math.sin(out) * body * 0.1, body * (0.28 + 0.2 * k), { s0: 0.6, s1: 1.6, pop: 5, life: 40 + j * 8, alpha: 0.55, under: 1, im: tintedVfx(`puff${1 + Math.floor(rnd() * 4)}`, "#8f8a86") });
+    }
+    for (let j = 0; j < 8 + 6 * k; j++) { // grit: dark specks thrown off the surface
+      const a = out + (rnd() - 0.5) * 2.6, sp = 2 + rnd() * 5;
+      fx.parts.push({ x: cx, y: cy, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, g: 0.32, life: 1, size: 1.2 + rnd() * 1.8, c: "#2a1a14" });
+    }
+    fx.shake = Math.max(fx.shake, 5 + 4 * k);
+    sfx("slam", x);
   }
   function stepFx() {
     for (const q of fx.parts) { q.x += q.vx; q.y += q.vy; q.vy += q.g; q.vx *= 0.93; q.life -= 0.035; }
@@ -537,6 +565,27 @@
       // after a hard landing she holds a one-knee pose for a beat
       const since = st ? st.f - fx.landF[i] : 99, hero = p.ground && fx.landVy[i] > 1250 && since < 16 ? 1 - since / 16 : 0;
       const pp = hero ? { ...p, hero } : p;
+      // speed: colour-split ghosts trail anything fast, cyan then violet, as in stick-fight animation
+      const sp = Math.hypot(p.vx, p.vy);
+      if (alpha === 1 && (sp > 1000 || p.st === ST.DASH || (p.st === ST.DODGE && !p.ground))) {
+        const q = Stick.pose(F, pp, f, M.mv[i], Sim, win), k = Math.min(1, sp / 1800);
+        for (const [back, c, al] of [[2.6, "#b45cff", 0.32], [1.3, "#36e6ff", 0.45]]) {
+          g.save(); g.translate(Math.round(x - (p.vx / S) * back), Math.round(y - (p.vy / S) * back)); g.scale(p.face, 1);
+          g.globalAlpha = al * (0.5 + 0.5 * k); Stick.draw(g, F, q, { tint: 1, tintColor: c, f }); g.restore();
+        }
+      }
+      // a body moving very fast becomes a streak: lines in its own colour drawn back along the flight
+      if (alpha === 1 && sp > 1600 && (p.st === ST.HIT || p.st === ST.DODGE || p.st === ST.DASH)) {
+        const ux = p.vx / sp, uy = p.vy / sp, L = Math.min(3.4, sp / 1000) * F.h * 0.55, col = F.style.color;
+        g.save(); g.lineCap = "round";
+        for (const [h, w, l, al] of [[0.85, 3, 1, 0.55], [0.5, 4.5, 1.25, 0.65], [0.2, 2.5, 0.8, 0.45], [0.65, 1.5, 1.5, 0.35]]) {
+          const ox = x - ux * F.h * 0.1, oy = y - F.h * h, ex = ox - ux * L * l, ey = oy - uy * L * l;
+          const gr = g.createLinearGradient(ox, oy, ex, ey);
+          gr.addColorStop(0, col); gr.addColorStop(1, "rgba(255,255,255,0)");
+          g.globalAlpha = al; g.strokeStyle = gr; g.lineWidth = w; g.beginPath(); g.moveTo(ox, oy); g.lineTo(ex, ey); g.stroke();
+        }
+        g.restore();
+      }
       g.save(); g.translate(Math.round(x), Math.round(y)); g.scale(p.face, 1);
       if (p.juice) { g.rotate(p.juice.rot); g.scale(p.juice.sx, p.juice.sy); }
       // smear frames: the two poses before the strike linger as fading ghosts, like drawn animation
@@ -640,7 +689,7 @@
     const jitter = p.st === ST.HIT && s.freeze > 0 ? (rnd() - 0.5) * 4 : 0;
     g.save(); g.translate(jitter, 0);
     const evading = p.st === ST.DODGE || p.st === ST.DASH;
-    if (evading) { // afterimages trail behind a dodge or dash so it reads as movement, not a fade
+    if (evading && !gfx[i].stick) { // afterimages trail behind a dodge or dash so it reads as movement, not a fade
       const trail = fx.after[i];
       for (let k = trail.length - 1; k >= 0; k--) drawSprite(i, { ...p, x: trail[k].x, y: trail[k].y }, s.f, 0.32 - k * 0.07, 1, null, style(i).after || TEAM[i]);
       if (p.st === ST.DODGE && !tint) { tint = 0.18 + 0.14 * Math.sin(s.f * 1.3); tintColor = "#ffffff"; } // invulnerable shimmer
@@ -674,7 +723,7 @@
       g.restore();
     }
     g.globalAlpha = 1;
-    if (under) return;
+    if (under) { drawCracks(); return; }
     for (const q of fx.parts) { g.globalAlpha = Math.min(1, q.life * 1.5); g.fillStyle = q.c; g.beginPath(); g.arc(q.x, q.y, q.size * 0.7, 0, 7); g.fill(); }
     g.globalAlpha = 1;
     drawMarks();
@@ -683,11 +732,47 @@
     g.globalAlpha = 1;
   }
   // marks: pierce glints, rings, the parry canopy and ward, KO crests
+  // stage cracks from a slam: jagged lines fanned into the surface, dark under a pale edge
+  function drawCracks() {
+    for (const m of fx.marks) {
+      if (m.kind !== "crack") continue;
+      let r = m.seed; const rr = () => ((r = (r * 9301 + 49297) % 233280) / 233280);
+      const grow = Math.min(1, m.t / 4), fade = m.t > m.life - 40 ? (m.life - m.t) / 40 : 1;
+      g.save(); g.translate(m.x, m.y); g.rotate(m.ang); g.globalAlpha = fade; g.lineCap = "round"; g.lineJoin = "round";
+      for (let j = 0; j < m.n; j++) {
+        const a0 = (j / (m.n - 1) - 0.5) * 2.3 + (rr() - 0.5) * 0.25, len = m.r * (0.55 + 0.6 * rr()) * grow;
+        const pts = [[0, 0]]; let ax = 0, ay = 0;
+        for (let q = 1; q <= 4; q++) { const a = a0 + (rr() - 0.5) * 0.7; ax += Math.cos(a) * len / 4; ay += Math.sin(a) * len / 4; pts.push([ax, ay]); }
+        for (const [w, c] of [[5, "rgba(255,235,200,0.3)"], [3, "#140906"]]) {
+          g.lineWidth = w * (j % 2 ? 0.65 : 1); g.strokeStyle = c; g.beginPath(); g.moveTo(0, 0);
+          for (const [px, py] of pts) g.lineTo(px, py);
+          g.stroke();
+        }
+        if (rr() < 0.6) { const [bx, by] = pts[2], a = a0 + (rr() < 0.5 ? 0.7 : -0.7); g.lineWidth = 2; g.beginPath(); g.moveTo(bx, by); g.lineTo(bx + Math.cos(a) * len * 0.3, by + Math.sin(a) * len * 0.3); g.stroke(); }
+      }
+      g.fillStyle = "#140906"; g.beginPath(); g.ellipse(0, 0, m.r * 0.08, m.r * 0.22, 0, 0, 7); g.fill(); // the dent
+      g.restore();
+    }
+  }
   function drawMarks() {
     for (const m of fx.marks) {
       const k = m.t / m.life, fade = 1 - k;
       g.save();
-      if (m.kind === "burst") { // impact lines: thin white wedges thrown out from the contact point
+      if (m.kind === "bubble") { // a translucent shockwave sphere with a flat ring through it
+        const r = m.r * (0.3 + 0.9 * (1 - (1 - k) * (1 - k)));
+        g.globalAlpha = fade * 0.75;
+        const rg = g.createRadialGradient(m.x, m.y, r * 0.2, m.x, m.y, r);
+        rg.addColorStop(0, "rgba(255,255,255,0)"); rg.addColorStop(0.75, "rgba(255,240,245,0.25)"); rg.addColorStop(1, "rgba(255,255,255,0.7)");
+        g.fillStyle = rg; g.beginPath(); g.arc(m.x, m.y, r, 0, 7); g.fill();
+        g.lineWidth = 2; g.strokeStyle = "rgba(40,20,40,0.5)"; g.stroke();
+        g.lineWidth = 3 * fade + 1; g.strokeStyle = "rgba(255,255,255,0.85)"; g.beginPath(); g.ellipse(m.x, m.y, r * 1.6, r * 0.22, 0, 0, 7); g.stroke();
+      } else if (m.kind === "text") { // a comic callout that pops, rises and fades
+        const pop = m.t < 5 ? 0.6 + m.t * 0.12 : 1.2 - Math.min(0.2, (m.t - 5) * 0.02);
+        g.translate(m.x, m.y - m.t * 0.6); g.rotate(-0.08); g.scale(pop, pop); g.globalAlpha = Math.min(1, fade * 2);
+        g.font = `italic 900 ${m.size}px "Lilita One", "Arial Black", sans-serif`; g.textAlign = "center"; g.textBaseline = "middle"; g.lineJoin = "round";
+        g.lineWidth = m.size * 0.22; g.strokeStyle = "#14060f"; g.strokeText(m.text, 0, 0);
+        g.fillStyle = m.text === "FINISH!" ? "#ffd36b" : "#ffffff"; g.fillText(m.text, 0, 0);
+      } else if (m.kind === "burst") { // impact lines: thin white wedges thrown out from the contact point
         g.translate(m.x, m.y); g.rotate(m.rot); g.globalAlpha = fade; g.fillStyle = "#ffffff"; g.strokeStyle = "#14060f"; g.lineWidth = 1.2;
         for (let j = 0; j < m.n; j++) {
           const a = (j / m.n) * Math.PI * 2 + (j % 2) * 0.3, r0 = m.r * (0.25 + 0.5 * k), r1 = m.r * (0.75 + 0.45 * k) * (j % 2 ? 0.7 : 1), w = m.r * 0.07 * fade;

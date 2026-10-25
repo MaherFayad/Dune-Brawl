@@ -137,5 +137,76 @@ const run = (M, s, n, a = () => 0, b = () => 0) => { for (let k = 0; k < n; k++)
   let ko = false; for (let k = 0; k < 300 && !ko; k++) { M.step(s, [0, 0]); ko = v.st === ST.DEAD || v.stocks < 3; }
   ok(ko, "the finisher ends in a KO");
 }
+// ---- the stick kit (fighters whose definition sets kit) ----
+const kit = (da, db) => { da.kit = 1; db.kit = 1; };
+{ // instant jump, higher than the reference jump
+  const r = setup(), k = setup("djinn-warrior", "djinn-warrior", kit);
+  run(k.M, k.s, 1, () => IN.J);
+  ok(!k.s.p[0].ground, "kit: the jump leaves the ground at once");
+  let top = 0, topR = 0; const y0 = k.s.p[0].y;
+  for (let j = 0; j < 60; j++) { k.M.step(k.s, [IN.J, 0]); top = Math.max(top, y0 - k.s.p[0].y); }
+  run(r.M, r.s, 1 + FEEL.jumpSquat, () => IN.J); for (let j = 0; j < 60; j++) { r.M.step(r.s, [IN.J, 0]); topR = Math.max(topR, y0 - r.s.p[0].y); }
+  ok(top > topR * 1.15, `kit: a full jump goes higher (${(top / S).toFixed(0)} px against ${(topR / S).toFixed(0)})`);
+}
+{ // sprint builds while running
+  const { M, s } = setup("djinn-warrior", "djinn-warrior", kit); s.p[1].x = 1050 * S; s.p[0].x = 250 * S;
+  run(M, s, 10, () => IN.R); const v10 = s.p[0].vx; run(M, s, 30, () => IN.R);
+  ok(s.p[0].vx > v10 * 1.2, `kit: running builds into a sprint (${v10} to ${s.p[0].vx})`);
+}
+{ // slide: low and fast; it ducks under a jab
+  const { M, s } = setup("djinn-warrior", "djinn-warrior", kit); const p = s.p[0];
+  run(M, s, 1, () => IN.R | IN.D | IN.X);
+  ok(p.st === ST.DASH && p.slide === 1 && p.vx >= FEEL.kit.slideSpeed, "kit: down + dodge on the ground slides");
+}
+{ // air dashes: two per airtime, back on landing
+  const { M, s } = setup("djinn-warrior", "djinn-warrior", kit); const p = s.p[0]; s.p[1].x = 1050 * S;
+  p.y = -300 * S; p.ground = 0; p.vy = 0; // high above the stage, so nothing lands mid-test
+  run(M, s, 2);
+  run(M, s, 1, () => IN.R | IN.X); const one = p.st === ST.DODGE && p.adash === 1;
+  run(M, s, FEEL.kit.dashACd + 2); run(M, s, 1, () => IN.L | IN.U | IN.X); const two = p.st === ST.DODGE && p.adash === 2;
+  run(M, s, FEEL.kit.dashACd + 2); run(M, s, 1, () => IN.R | IN.X); const none = p.st !== ST.DODGE;
+  ok(one && two && none, "kit: two air dashes per airtime, a third waits");
+  run(M, s, 400); ok(p.ground && p.adash === 0, "kit: landing gives the air dashes back");
+}
+{ // grace jump after running off a ledge, and a super jump from a crouch
+  const g1 = setup("djinn-warrior", "djinn-warrior", kit), p = g1.s.p[0]; p.x = (STAGE.main.x2 - 4 * S); g1.s.p[1].x = 600 * S;
+  let k = 0; while (p.ground && k++ < 40) g1.M.step(g1.s, [IN.R, 0]);
+  run(g1.M, g1.s, 2, () => IN.R); run(g1.M, g1.s, 1, () => IN.J);
+  ok(p.vy < -1000, "kit: a jump a moment after running off the ledge still works");
+  const g2 = setup("djinn-warrior", "djinn-warrior", kit); g2.s.p[1].x = 1050 * S;
+  run(g2.M, g2.s, FEEL.kit.crouchFor + 2, () => IN.D); run(g2.M, g2.s, 1, () => IN.J);
+  ok(g2.s.p[0].sj === 1 && g2.s.p[0].vy < g2.M.ph[0].jumpV, "kit: a crouch held a moment turns the jump into a super jump");
+}
+{ // wall run: holding toward the island's side runs up it; a jump kicks off away from it
+  const { M, s } = setup("djinn-warrior", "djinn-warrior", kit); const p = s.p[0]; s.p[1].x = 400 * S;
+  Object.assign(p, { x: STAGE.main.x2 + 10 * S, y: STAGE.main.y + 50 * S, ground: 0, vx: 0, vy: 0, face: -1 });
+  run(M, s, 1, () => IN.L); const y0 = p.y; run(M, s, 6, () => IN.L);
+  ok(p.wr > 0 && p.y < y0, `kit: holding toward the wall runs up it (${p.wr} frames, rose ${((y0 - p.y) / S).toFixed(0)} px)`);
+  run(M, s, 5, () => IN.L | IN.J);
+  ok(p.x > STAGE.main.x2 + 40 * S && p.face === 1 && p.vy < -1200, "kit: a wall jump kicks up and away from the wall, even holding toward it");
+}
+{ // combos: lights that hit chain into hit 2 and a finisher with more damage
+  const { M, s } = setup("djinn-warrior", "djinn-warrior", kit); const a = s.p[0], v = s.p[1]; v.x = 650 * S;
+  const steps = [], dmg = [];
+  for (let n = 0; n < 3; n++) {
+    let k = 0; while (a.st === ST.ATK && k++ < 60) M.step(s, [0, 0]); // wait for the move to end or cancel
+    const before = v.dmg; M.step(s, [IN.A, 0]); steps.push(a.cmb);
+    k = 0; while (!a.hit && a.st === ST.ATK && k++ < 40) M.step(s, [0, 0]);
+    dmg.push(v.dmg - before); v.x = a.x + a.face * 40 * S; v.st = ST.IDLE; v.vx = 0; v.vy = 0; v.y = a.y; v.ground = 1;
+  }
+  ok(steps.join() === "0,1,2", `kit: three lights in a row are hit 1, hit 2 and the finisher (${steps})`);
+  ok(dmg[2] > dmg[0], `kit: the combo finisher deals more damage (${dmg})`);
+}
+{ // a jab string connects all three hits by stepping in, with no help
+  const { M, s } = setup("djinn-warrior", "djinn-warrior", kit); const a = s.p[0], v = s.p[1]; v.x = a.x + 60 * S;
+  let hits = 0, k = 0;
+  for (let n = 0; n < 3; n++) {
+    M.step(s, [IN.A, 0]);
+    for (k = 0; k < 60 && a.st === ST.ATK && !a.hit; k++) M.step(s, [0, 0]);
+    if (a.hit) hits++;
+    for (k = 0; k < 60 && a.st === ST.ATK && a.t < M.mv[0][a.mv].su + M.mv[0][a.mv].ac; k++) M.step(s, [0, 0]);
+  }
+  ok(hits === 3, `kit: a jab string lands all three hits on its own (${hits})`);
+}
 console.log(fails ? `${fails} failed` : "all mechanics ok");
 process.exit(fails ? 1 : 0);

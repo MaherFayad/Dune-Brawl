@@ -63,7 +63,23 @@
     // finisher: a side heavy charged at least finCharge frames that hits a fighter at finDamage%+
     // plays a cinematic for finFrames (the game holds still), then launches them for a KO
     finCharge: 20, finDamage: 150, finFrames: 96, finBonus: 25,
-    stunSpeed: 1500,    // hitstun lasts while the victim is still launched faster than this (sideways or up)
+    stunSpeed: 1500,
+    // The stick kit: movement built for play rather than matched to the reference, for fighters
+    // whose definition sets `kit` (the stick fighters). Instant jumps that go higher on a snappier
+    // arc, a sprint that builds while running, up to two quick air dashes per airtime, a slide,
+    // a super jump from a crouch, a wall run, a roll out of hard landings, and a short grace
+    // jump after running off a ledge.
+    kit: {
+      grav: 125, jumpV: 2040, airJumpV: 1900, jumpCut: 1000, maxFall: 1600, fastFall: 2700,
+      run: 1000, sprint: 1350, sprintAfter: 24, gAcc: 520, airMax: 920, airAcc: 260,
+      dashA: 1850, dashAFrames: 12, dashACd: 30, dashACount: 2, dashADrag: 5,
+      slideSpeed: 1450, slideFrames: 24, slideDrag: 3,
+      coyote: 6, superJump: 135, crouchFor: 10, wallRun: 22, wallRunV: 950, wallKick: 1050, kickLock: 10,
+      rollSpeed: 1150, rollFrames: 14, hardLand: 1250,
+      // combos: a light that hits opens a window; the next light is hit 2 (a faster variant), the
+      // one after is the combo finisher: more damage and knockback, a longer hit pause
+      comboWindow: 26, comboStep: 1500, comboLunge: 1900, combo2Speed: 80, finDmg: 170, finKb: 150, finPause: 4,
+    },    // hitstun lasts while the victim is still launched faster than this (sideways or up)
     parryStun: 40,      // frames an attacker is stunned after hitting a parry
     chargeMax: 30,      // heavies with `charge` can be held up to 30 frames for up to +50%
     wallJumps: 3, wallSlide: 500, // touching the island side: slide slowly, jump off it up to 3 times
@@ -78,18 +94,21 @@
   function physics(def) {
     const st = def.stats || {};
     const pct = (k) => (st[k] === undefined ? 100 : st[k]);
-    const grav = div(FEEL.grav * pct("gravity"), 100);
+    const K = def.kit ? FEEL.kit : null, base = K || FEEL; // the stick kit swaps in its own movement
+    const grav = div(base.grav * pct("gravity"), 100);
     // jump stat is a height percentage: keep v^2 / 2g proportional to it
-    const baseH = div(FEEL.jumpV * FEEL.jumpV, 2 * FEEL.grav);
-    const airBaseH = div(FEEL.airJumpV * FEEL.airJumpV, 2 * FEEL.grav);
+    const baseH = div(base.jumpV * base.jumpV, 2 * base.grav);
+    const airBaseH = div(base.airJumpV * base.airJumpV, 2 * base.grav);
     return {
-      grav,
-      maxFall: div(FEEL.maxFall * pct("fallSpeed"), 100),
-      fastFall: div(FEEL.fastFall * pct("fallSpeed"), 100),
-      run: div(FEEL.run * pct("run"), 100),
-      gAcc: div(FEEL.gAcc * pct("run"), 100),
-      airMax: div(FEEL.airMax * pct("airSpeed"), 100),
-      airAcc: div(FEEL.airAcc * pct("airSpeed"), 100),
+      grav, kit: K ? 1 : 0,
+      maxFall: div(base.maxFall * pct("fallSpeed"), 100),
+      fastFall: div(base.fastFall * pct("fallSpeed"), 100),
+      run: div(base.run * pct("run"), 100),
+      sprint: K ? div(K.sprint * pct("run"), 100) : 0,
+      gAcc: div(base.gAcc * pct("run"), 100),
+      airMax: div(base.airMax * pct("airSpeed"), 100),
+      airAcc: div(base.airAcc * pct("airSpeed"), 100),
+      jumpCut: base.jumpCut,
       jumpV: -isqrt(2 * grav * div(baseH * pct("jump"), 100)),
       airJumpV: -isqrt(2 * grav * div(airBaseH * pct("jump"), 100)),
       airJumps: st.airJumps === undefined ? 2 : st.airJumps,
@@ -121,6 +140,8 @@
       ff: 0, cut: 1, prev: 0, buf: 0, bufT: 0, land: 0, launch: 0, wall: 0, wj: FEEL.wallJumps,
       chase: 0, chg: 0, hang: 0,
       dt: 0, dk: 0, ds: 999, chaseT: 0, lock: 0, dlock: 0, squat: 0, lag: 0, sig: 0, dashCd: 0,
+      slide: 0, coy: 0, crouch: 0, wr: 0, runT: 0, adash: 0, // stick kit: slide (1) or roll (2), grace jump, crouch, wall run, sprint, air dashes
+      cmb: 0, cmbT: 0, sj: 0, kick: 0, // combo step of the current light (0, 1, 2 = finisher) and the window to continue it
     };
   }
   const PKEYS = Object.keys(player(0, 1, { airJumps: 2 }));
@@ -199,6 +220,9 @@
       if (p.dashCd > 0) p.dashCd--;
       if (p.lag > 0) p.lag--;
       if (p.ds < 999) p.ds++;
+      if (p.coy > 0) p.coy--;
+      if (p.cmbT > 0 && --p.cmbT === 0 && p.st !== ST.ATK) p.cmb = 0;
+      const K = P.kit ? FEEL.kit : null;
       let gc = 0; // this frame's attack is a gravity cancel: an air move, even on the ground
       const dx = (input & IN.R ? 1 : 0) - (input & IN.L ? 1 : 0);
       const take = (bit) => {
@@ -218,21 +242,23 @@
         const since = p.dt - p.t, atk = p.bufT > 0 && p.buf & (IN.A | IN.B);
         if (atk && p.dk === 4 && since <= FEEL.chaseCancel) { p.st = ST.IDLE; p.t = 0; p.inv = Math.max(p.inv, FEEL.chaseCancelInv); }
         else if (atk && (p.dk === 2 || p.dk === 3) && since <= FEEL.gcWindow) { p.st = ST.IDLE; p.t = 0; gc = 1; }
+        const drag = K && p.dk === 1 ? K.dashADrag : FEEL.dodgeDragA;
         if (p.ground) p.vx -= div(FEEL.dodgeDragG * p.vx, 100);
-        else { p.vx -= div(FEEL.dodgeDragA * p.vx, 100); p.vy -= div(FEEL.dodgeDragA * p.vy, 100); }
+        else { p.vx -= div(drag * p.vx, 100); p.vy -= div(drag * p.vy, 100); }
         if (p.st === ST.DODGE && p.t <= 0) { p.st = ST.IDLE; p.t = 0; }
       } else if (p.st === ST.DASH) {
         p.t++;
-        p.vx -= div(FEEL.dashDrag * p.vx, 100);
+        p.vx -= div((p.slide && K ? K.slideDrag : FEEL.dashDrag) * p.vx, 100);
         const cancel = p.t >= FEEL.dashCancelFrom && p.bufT > 0 && p.buf & (IN.J | IN.A | IN.B);
-        if (cancel || !p.ground || p.t >= FEEL.dashFrames) { p.st = ST.IDLE; p.t = 0; } // keeps its momentum
+        const len = p.slide === 1 ? K.slideFrames : p.slide === 2 ? K.rollFrames : FEEL.dashFrames;
+        if (cancel || !p.ground || p.t >= len) { p.st = ST.IDLE; p.t = 0; p.slide = 0; } // keeps its momentum
       } else if (p.st === ST.ATK) {
         const m = M[p.mv];
         p.t++;
         // a held heavy charges: hold one frame before the strike, up to chargeMax frames
         if (m.charge && p.ground && input & IN.B && p.t === m.su - 1 && p.chg < FEEL.chargeMax) { p.chg++; p.t--; }
         if (p.t === m.su) {
-          if (m.ix) p.vx = p.face * m.ix;
+          if (m.ix) p.vx = p.face * (K && p.cmb ? Math.max(m.ix, p.face * p.vx) : m.ix);
           if (m.iy) p.vy = m.iy;
           if (m.iy < 0) p.ground = 0;
         }
@@ -243,7 +269,7 @@
         }
         // after a hit connects, jump or dodge cancels the recovery so strings flow
         const re = p.hit ? div(m.re * FEEL.hitRecovery, 100) : m.re;
-        if (p.hit && p.t >= m.su + m.ac && p.bufT > 0 && p.buf & (IN.J | IN.X)) { p.st = ST.IDLE; p.t = 0; }
+        if (p.hit && p.t >= m.su + m.ac && p.bufT > 0 && p.buf & (IN.J | IN.X | (K && p.cmb < 2 ? IN.A : 0))) { p.st = ST.IDLE; p.t = 0; }
         else if (p.t >= m.su + m.ac + re) {
           p.st = ST.IDLE; p.t = 0;
           if (!p.hit) { p.lock = FEEL.missDodgeLock; p.dlock = FEEL.missDashLock; }
@@ -257,16 +283,23 @@
       if (p.st === ST.IDLE && s.f >= FEEL.countdown && !busy) {
         const dy = (input & IN.U ? -1 : 0) + (input & IN.D ? 1 : 0);
         const canDash = p.ground && dx && p.dlock <= 0 && p.dashCd <= 0;
-        const free = p.chase > 0 || (p.ground && dx ? canDash : p.dcd <= 0 && p.lock <= 0); // a dash waits for its own cooldown, never turns into a backstep
+        const airDash = K && !p.ground && (dx || dy) && p.adash < K.dashACount;
+        const free = p.chase > 0 || (p.ground && dx ? canDash : p.dcd <= 0 && p.lock <= 0 && (!K || p.ground || airDash || !(dx || dy))); // a dash waits for its own cooldown, never turns into a backstep
         if (p.bufT > 0 && p.buf & IN.X && free && take(IN.X)) {
           p.st = ST.DODGE;
           if (p.chase > 0) { // chase dodge: free of the cooldown, faster, cancelable into an attack
             const sp = div(FEEL.dodgeSpeedA * FEEL.chaseSpeed, 100);
             p.chase--; p.dk = 4; p.dt = FEEL.dodgeStart + FEEL.dodgeInvChase; p.t = p.dt;
             p.vx = sp * dx; p.vy = p.ground ? 0 : dy ? sp * dy : Math.min(p.vy, 200);
+          } else if (canDash && K && dy > 0) { // slide: low and fast, under attacks; jump out of it to go farther
+            p.st = ST.DASH; p.t = 0; p.slide = 1; p.vx = dx * Math.max(Math.abs(p.vx), K.slideSpeed); p.dashCd = FEEL.dashCd;
           } else if (canDash) { p.st = ST.DASH; p.t = 0; p.vx = FEEL.dashSpeed * dx; p.dashCd = FEEL.dashCd; }
           else if (p.ground) { // no direction: an evasive backstep
             p.dk = 3; p.dt = FEEL.dodgeStart + FEEL.dodgeInvGround; p.t = p.dt; p.vx = -p.face * FEEL.backstep; p.dcd = FEEL.dodgeCdG;
+          } else if (airDash) { // stick kit: a fast air dash, two per airtime, refreshed on landing, walls and hits
+            const sp = dx && dy ? div(K.dashA * 72, 100) : K.dashA;
+            p.dk = 1; p.dt = K.dashAFrames; p.t = p.dt; p.dcd = K.dashACd; p.adash++;
+            p.vx = sp * dx; p.vy = sp * dy; p.ff = 0;
           } else if (dx || dy) { // air dodge with a direction
             p.dk = 1; p.dt = FEEL.dodgeStart + FEEL.dodgeInvAir; p.t = p.dt; p.dcd = FEEL.dodgeCdA; p.ds = 0;
             p.vx = FEEL.dodgeSpeedA * dx; p.vy = FEEL.dodgeSpeedA * dy;
@@ -276,8 +309,12 @@
           }
           if (dx) p.face = dx;
         } else if (take(IN.J)) {
-          if (p.ground) p.squat = FEEL.jumpSquat;
-          else if (p.wall && p.wj > 0) { p.wj--; p.vy = P.jumpV; p.vx = 0; p.ff = 0; p.cut = 0; p.face = p.wall; }
+          if (K && (p.ground || p.coy > 0)) { // instant, and a crouch held a moment first makes it a super jump
+            p.sj = p.crouch >= K.crouchFor ? 1 : 0; // a super jump (the renderer flips it twice)
+            p.vy = p.sj ? div(P.jumpV * K.superJump, 100) : P.jumpV;
+            p.ground = 0; p.cut = 0; p.coy = 0; p.crouch = 0; p.ff = 0;
+          } else if (p.ground) p.squat = FEEL.jumpSquat;
+          else if (p.wall && p.wj > 0) { p.wj--; p.vy = P.jumpV; p.vx = K ? -p.wall * K.wallKick : 0; p.ff = 0; p.cut = 0; p.face = K ? -p.wall : p.wall; p.adash = 0; if (K) p.kick = K.kickLock; } // p.wall points at the wall; the kit kicks off it
           else if (p.jumps > 0) {
             p.jumps--; p.vy = P.airJumpV; p.vx = dx * P.airMax; p.ff = 0; p.cut = 0;
             if (dx) p.face = dx;
@@ -293,6 +330,15 @@
             if (m >= 0) {
               if (dx) p.face = dx;
               p.st = ST.ATK; p.t = 0; p.mv = m; p.hit = 0; p.chg = 0;
+              const light = kind === 1 && m !== 6; // a light inside the combo window continues the string
+              p.cmb = K && light && p.cmbT > 0 ? Math.min(2, p.cmb + 1) : 0; p.cmbT = 0;
+              if (K && p.cmb === 1) p.t = div(M[m].su * (100 - K.combo2Speed), 100); // hit 2 skips into its startup
+              if (K && p.cmb) { // each follow-up steps in just far enough to keep the string in reach
+                const o = s.p[1 - i], gap = (o.x - p.x) * p.face - div(M[m].box[1] * S * 6, 10);
+                let travel = 0, w = 1000;
+                for (let f = p.t; f < M[m].su; f++) { if (p.ground) w -= div(12 * w, 100); travel += w; }
+                p.vx = gap > 0 && travel > 0 ? p.face * Math.min(p.cmb === 2 ? K.comboLunge : K.comboStep, div(gap * 1000, travel)) : 0;
+              }
               if (m === 6) p.recov = 1;
               if (m === 9) { p.vy = 0; p.vx = div(p.vx, 3); }
             }
@@ -302,27 +348,34 @@
 
       if (p.st === ST.IDLE) {
         if (p.ground) {
+          if (K) { // the sprint builds while running one way; a crouch on the main stage charges a super jump
+            p.runT = dx && dx * p.vx >= P.run - 60 ? p.runT + 1 : 0;
+            p.crouch = !dx && input & IN.D && p.y === STAGE.main.y ? p.crouch + 1 : 0;
+          }
           if (dx) {
             p.face = dx;
-            const target = dx * P.run;
+            const target = dx * (K && p.runT >= K.sprintAfter ? P.sprint : P.run);
             if (p.vx < target) p.vx = Math.min(target, p.vx + P.gAcc);
             else if (p.vx > target) p.vx = Math.max(target, p.vx - P.gAcc);
           } else if (p.vx > 0) p.vx = Math.max(0, p.vx - FEEL.fric);
           else if (p.vx < 0) p.vx = Math.min(0, p.vx + FEEL.fric);
           if (pressed & IN.D && p.y !== STAGE.main.y) { p.drop = 12; p.ground = 0; p.y += S; }
         } else {
-          if (dx) {
+          if (p.kick > 0) p.kick--; // a wall kick carries away from the wall before air steering returns
+          else if (dx) {
             if (dx * p.vx < P.airMax) { p.vx += dx * P.airAcc; if (dx * p.vx > P.airMax) p.vx = dx * P.airMax; }
           } else if (p.vx) p.vx -= Math.sign(p.vx) * Math.min(Math.abs(p.vx), FEEL.airFric);
           if (pressed & IN.D && p.vy > -300) p.ff = 1;
-          if (!p.cut && !(input & IN.J) && p.vy < -FEEL.jumpCut) { p.vy = -FEEL.jumpCut; p.cut = 1; }
+          if (K && p.wall && !p.kick && dx === p.wall && p.wr < K.wallRun) { p.vy = -K.wallRunV; p.wr++; p.face = p.wall; p.ff = 0; } // run up the island's side
+          if (!p.cut && !(input & IN.J) && p.vy < -P.jumpCut && p.wr === 0) { p.vy = -P.jumpCut; p.cut = 1; }
           if (p.vy >= 0) p.cut = 1;
         }
       }
 
-      const wasGround = p.ground;
+      const wasGround = p.ground, fallV = p.vy;
       move(p, P, M);
-      if (p.ground && !wasGround) land(p, M);
+      if (p.ground && !wasGround) land(p, M, P, dx, fallV);
+      if (K && wasGround && !p.ground && p.vy >= 0) p.coy = K.coyote; // ran off a ledge: a short grace jump
     }
 
     function move(p, P, M) {
@@ -336,6 +389,7 @@
         if (p.ff && !hit && p.vy < P.fastFall) p.vy = Math.max(p.vy, P.fastFall);
         if (p.vy > cap && !pounding) p.vy = cap;
         if (onWall && !hit && p.vy > FEEL.wallSlide) p.vy = FEEL.wallSlide;
+        if (onWall && P.kit) p.adash = 0;
       }
       p.x += p.vx; p.y += p.vy; p.ground = 0;
       const m = STAGE.main;
@@ -368,10 +422,13 @@
       }
     }
 
-    function land(p, M) {
+    function land(p, M, P, dx, fallV) {
       // air jumps are refilled by step(), which knows the owner's physics
       p.recov = 0; p.ff = 0; p.land = 6; p.wj = FEEL.wallJumps;
-      if (p.st === ST.IDLE) p.lag = FEEL.jumpLand;
+      if (P.kit) { // the stick kit: no landing lag, air dashes back, and a roll out of a hard landing
+        p.adash = 0; p.wr = 0; p.dcd = 0; p.sj = 0;
+        if (p.st === ST.IDLE && dx && fallV > FEEL.kit.hardLand) { p.st = ST.DASH; p.t = 0; p.slide = 2; p.vx = dx * FEEL.kit.rollSpeed; p.face = dx; }
+      } else if (p.st === ST.IDLE) p.lag = FEEL.jumpLand;
       if (p.ds < 999) { p.dcd = p.ds >= FEEL.dodgeLandCd ? 0 : Math.min(p.dcd, FEEL.dodgeLandCd - p.ds); p.ds = 999; } // an air dodge's cooldown
       if (p.st === ST.ATK && p.mv === 9 && p.t >= M[9].su) { p.mv = 7; p.t = M[7].su - 2; p.hit = 0; p.vx = 0; }
       else if (p.st === ST.ATK && M[p.mv].air) { p.st = ST.IDLE; p.t = 0; }
@@ -410,8 +467,8 @@
         const v = s.p[1 - i], V = ph[1 - i];
         if (v.st === ST.DEAD || v.inv > 0) continue;
         if (v.st === ST.DODGE && v.dt - v.t >= FEEL.dodgeStart) continue;
-        const b = box(a, m);
-        if (b[0] < v.x + V.hw && b[1] > v.x - V.hw && b[2] < v.y && b[3] > v.y - V.h) hits.push(i);
+        const b = box(a, m), vh = v.st === ST.DASH && v.slide === 1 ? div(V.h, 2) : V.h; // a slide ducks under
+        if (b[0] < v.x + V.hw && b[1] > v.x - V.hw && b[2] < v.y && b[3] > v.y - vh) hits.push(i);
       }
       for (const i of hits) {
         const a = s.p[i], v = s.p[1 - i], m = mv[i][a.mv], V = ph[1 - i];
@@ -429,12 +486,15 @@
           s.ha = 2; s.hk = 0; s.freeze = Math.max(s.freeze, FEEL.pauseMax);
           continue;
         }
-        const dmg = m.dmg + div(m.dmg * a.chg, 60);
+        const kitA = ph[i].kit ? FEEL.kit : null, fin3 = kitA && a.cmb === 2;
+        const dmg = div((m.dmg + div(m.dmg * a.chg, 60)) * (fin3 ? kitA.finDmg : 100), 100);
+        if (kitA && a.cmb < 2 && a.mv !== 6 && [0, 1, 2, 3, 4, 8].includes(a.mv)) a.cmbT = m.su + m.ac + m.re - a.t + kitA.comboWindow;
         v.dmg = Math.min(999, v.dmg + dmg);
         let l = m.kb + div(m.kg * Math.max(0, v.dmg - FEEL.growthFrom), FEEL.growthDiv);
         l = div(l * FEEL.kbMul, 100);
         l = div(l * 100, V.weight);
         l = div(l * (60 + a.chg), 60);
+        if (fin3) l = div(l * kitA.finKb, 100);
         a.chase = a.ground ? 2 : 1; a.chaseT = m.su + m.ac + m.re - a.t + FEEL.chaseWindow;
         s.hk = l;
         if (vm && within(vm.armor)) {
@@ -447,7 +507,7 @@
         v.vy = div(l * m.ay, 100);
         if (v.ground && v.vy > 0) v.vy = -div(v.vy, 2);
         v.ground = 0; v.st = ST.HIT; v.t = FEEL.hitstunBase + div(l, FEEL.hitstunDiv); v.launch = l;
-        v.ff = 0; v.recov = 0; v.chg = 0;
+        v.ff = 0; v.recov = 0; v.chg = 0; v.adash = 0; v.slide = 0;
         if (v.jumps < 1) v.jumps = 1;
         if (v.vx) v.face = v.vx > 0 ? -1 : 1;
         if (a.mv === 9) { a.st = ST.IDLE; a.t = 0; a.vy = -900; }
@@ -461,7 +521,8 @@
           s.fin = FEEL.finFrames; s.fa = i; s.freeze = 0;
           continue;
         }
-        s.freeze = Math.max(s.freeze, Math.min(FEEL.pauseMax, FEEL.pauseBase + div(dmg, FEEL.pauseDiv)));
+        s.freeze = Math.max(s.freeze, Math.min(FEEL.pauseMax, FEEL.pauseBase + div(dmg, FEEL.pauseDiv)) + (fin3 ? kitA.finPause : 0));
+        if (fin3) a.cmb = 3; // marks the landed finisher for the renderer until the move ends
       }
       const B = STAGE.blast;
       for (let i = 0; i < 2; i++) {

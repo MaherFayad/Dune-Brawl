@@ -86,6 +86,7 @@
     jump: [{ b: "jump" }],
     airJump: [{ b: "jump", r: 1.08 }], // the same puff, lifted a little
     land: [{ b: "land" }],
+    slam: [{ b: "heavy", g: -7, r: 0.8 }, { b: "land", g: 2 }], // a fighter blasted into the stage: a low, slowed body under a thud
     dodge: [{ b: "dodge" }],
     dash: [{ b: "dash" }],
     parry: [{ b: "parry" }],

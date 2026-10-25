@@ -35,7 +35,47 @@
     dive:    P([   8,  10,  10,   0,-150,   20,   5,   0,  -5,   5]),
     // launching off the ground: stretched long, arms swept up
     launch:  P([   5,  -8, 170, -10,-170,   10,   5,  -5, -15,  -5]),
+    // the stick kit's moves
+    slide:   P([ -38,  12,  60,  30,-130,   30,  88,  -5,  25,-115,   0,   0,  0.05]),
+    tuck:    P([  20,  15, 110,-120,-110,  120,  95,-150,  85,-150]),
+    superman:P([   0,   0, 178,   0, 165,   0,   4,   4,  -6,  -4]),
+    skid:    P([ -28,  -6, 125,  -5,-125,   25,  55, -10, -35, -45]),
+    knocked: P([ -20, -20, 120,  20,  60,   30,  80,-145, -40, -70,   0,   0,  0,  0.02]),
+    flung:   P([   0,  15,  20,  10, -20,  -10,   8,  15,  -8,  25]),
+    deep:    P([  22,   8,  50,  40, -60,  -60,  75,-140, -10,-120,   0,   0,  0,  0.04]),
   };
+  // combos change limbs, as stick fights do: the blade, then a kick, then a flying finisher.
+  // `turn` is a pirouette during the wind-up (a spinning kick lands facing forward); `spin` and
+  // `flip` whirl over the active frames as before.
+  //                                     lean head  a1   e1   a2    e2   l1   k1    l2   k2  prop open dx    dy   rot spin
+  const KICKS = { // combo hit 2, by move
+    // jab and side light: a spinning back kick, heel out at head height, the blade tucked
+    0: { wind: P([ 25, 10,  60, 100, -80,  -40,  80,-140, -10, -20]), strike: P([-38, -5,  45, 110,-150,   30, 100,  -2, -12,  -8,  0, 0, 0.12]), turn: 360 },
+    1: { wind: P([ 25, 10,  60, 100, -80,  -40,  80,-140, -10, -20]), strike: P([-38, -5,  45, 110,-150,   30, 100,  -2, -12,  -8,  0, 0, 0.16]), turn: 360 },
+    // down light: a spinning leg sweep along the floor, a hand down for balance
+    2: { wind: P([ 30,  5,  90,  40, -60,  -60,  75,-150, -10,-120]), strike: P([ 35, 10, 110,   0, -75,  -10,  86,   0, -30,-140,  0, 0, 0.1]), turn: 360 },
+    // up light: a backflip kick, the leg sweeping up through the target
+    3: { wind: P([ 15,  0,  40,  40, -60,  -60,  70,-120, -15, -95]), strike: P([-25, -10,  20,  60,-130,   20, 175,  -5, -20, -40,  0, 0, 0, -0.2]), spin: -360 },
+    // neutral air: an axe kick, the heel brought down from overhead
+    4: { wind: P([-15,  0, 120,  20,-120,   20, 175,  -5, -20, -40]), strike: P([ 25, 10,  80,  60, -90,   30,  70,  -5, -15, -60]) },
+    // down air: a double stomp, both heels driven down
+    8: { wind: P([  0,  0, 140,  30,-140,  -30,  80,-130,  70,-130]), strike: P([  5, 10, 120,  20,-120,  -20,  12,  -3,  -8,  -3]) },
+  };
+  const FINISH = { // combo hit 3, by move: the finisher, bigger in every way
+    // a flying side kick: the whole body laid out flat behind one straight leg, heel first
+    0: { wind: P([ 22,  8,  70,  80, -60,  -60,  75,-140, -10,-120]), strike: P([  0, 20, 150,  30,-165,   10,   4,   0, -55,-110,  0, 0, 0.3, -0.3, -78]) },
+    1: { wind: P([ 22,  8,  70,  80, -60,  -60,  75,-140, -10,-120]), strike: P([  0, 20, 150,  30,-165,   10,   4,   0, -55,-110,  0, 0, 0.4, -0.32, -80]) },
+    // a breakdance windmill: two sweeps in one spin
+    2: { wind: P([ 30,  5,  90,  40, -60,  -60,  75,-150, -10,-120]), strike: P([ 40, 10, 120,   0, -60,  -10,  86,   0,  70,   0,  0, 0, 0.1]), spin: 720, flip: 1 },
+    // a rising flip: the blade carried up through a front flip
+    3: { wind: P([ 22,  0,  40,  40, -60,  -60,  75,-140, -10,-120]), strike: P([ -5,-15, 178,   0,-178,    0,   5,  -5,  -5,  -5,  0, 0, 0, -0.28]), spin: 360 },
+    // neutral air: a double whirl, legs out like a propeller
+    4: { wind: P([ 10,  0, 130,  20,-120,   20,  70,-110,  30,-100]), strike: P([  5,  0,  95,   0, -95,    0,  80,   0, -80,   0]), spin: 720 },
+    // down air: a corkscrew plunge, straight as a drill, the blade leading
+    8: { wind: P([ 10,  0, 160,  20,-140,   20,  70,-120,  60,-120]), strike: P([ 10, 15,  10,   0, -10,    0,   5,   0,  -5,   0,  0, 0, 0, 0.1]), spin: 1080, flip: 1 },
+  };
+  const backhand = (k) => ({ wind: add(k.strike, { a1: 60, lean: -12 }), strike: add(k.strike, { a1: -25, e1: 20, lean: 10 }), spin: 360, flip: 1 });
+  const leaping = (k) => ({ wind: add(BASE.deep, { a1: 100, e1: 40 }), strike: add(k.strike, { lean: 22, dx: 0.25, dy: -0.16, k1: -45, k2: -70, l2: -15 }) });
   // the generic moveset: [wind-up, strike], plus spin degrees over the active frames when it whirls
   const GENERIC = [
     { wind: P([  0,  0,  60,  70, -50,  -60,  20, -30, -20, -10]), strike: P([ 20,  0,  95,   0, -70,  -30,  35, -35, -35,  -5,  0, 0, 0.05]) },
@@ -65,6 +105,14 @@
         9: { wind: P([  0, -4, 150,  20,-120,   20,  70,-110,  30,-100]), strike: P([  0,  0,   0,   0,-160,    0,  10,   0, -10,   0]) },
       },
       victory: P([-10, -10, 150, -40, -20, 100, 10, -10, -5, 0, 150, 1]),
+      // her combo finishers: the Rose Lunge (a flying horizontal thrust), the Moon Rise (a
+      // rising flip with the blade up) and a double whirl in the air
+      finish: {
+        0: { wind: P([ 25, -4,  70,  80, -60,  -60,  75,-140, -10,-120]), strike: P([ 78,-10,  92,   0,-120,    0,  30, -10, -45,   0,  0, 0, 0.35, -0.12]) },
+        1: { wind: P([ 25, -4,  70,  80, -60,  -60,  75,-140, -10,-120]), strike: P([ 80,-10,  92,   0,-120,    0,  30, -10, -45,   0,  0, 0, 0.45, -0.14]) },
+        3: { wind: P([ 22, -4,  40,  40, -60,  -60,  75,-140, -10,-120]), strike: P([ -5,-15, 178,   0,-178,    0,   5,  -5,  -5,  -5,  0, 0, 0, -0.25]), spin: 360 },
+        4: { wind: P([ 10, -4, 130,  20,-120,   20,  70,-110,  30,-100]), strike: P([  5,  0,  95,   0, -95,    0,  40, -30, -40, -30]), spin: 720 },
+      },
     },
     // the djinn swordsman: a scimitar and a long scarf
     "stick-saif": { color: "#1f5a43", prop: "scimitar", acc: ["scarf"], moves: {}, victory: P([-5, -10, 175, -10, -60, 90, 20, -20, -15, 0, 0]) },
@@ -74,12 +122,24 @@
   function basePose(rig, p, f, ph, Sim) {
     const ST = Sim.ST, H = rig.H;
     if (p.st === ST.HIT) {
+      const sp = Math.hypot(p.vx, p.vy);
+      if (p.launch > 2400 && sp > 1700 && !p.ground) { // blasted: straight as a plank, head first along the flight, arms trailing
+        const w = Math.sin(f * 1.3) * 6;
+        return { ...BASE.flung, a1: BASE.flung.a1 + w, a2: BASE.flung.a2 - w, rot: Math.atan2(p.vx * p.face, -p.vy) / R };
+      }
+      if (p.launch > 2400 && p.ground) return add(BASE.knocked, { a2: 8 * Math.sin(f * 0.9) }); // skidding back low, a hand dragging the floor
       if (p.launch > 2400) { // a big launch tumbles and flails, a cartoon ragdoll
         const w = f * 0.6;
         return P([0, 20 * Math.sin(w * 0.9), 150 + 40 * Math.sin(w), 30 * Math.sin(w * 1.3), -150 + 40 * Math.cos(w * 0.8), 40 * Math.sin(w * 1.1),
           60 + 30 * Math.sin(w * 0.7), -60 + 40 * Math.cos(w), -50 + 30 * Math.cos(w * 0.9), -40 + 30 * Math.sin(w * 1.2), 0, 0, 0, 0, -(f * 22) % 360]);
       }
       return add(BASE.hurt, { a1: 15 * Math.sin(f * 0.8), a2: 15 * Math.cos(f * 0.7) });
+    }
+    if (p.st === ST.DASH && p.slide === 1) return add(BASE.slide, { a1: 6 * Math.sin(f * 0.9) });
+    if (p.st === ST.DASH && p.slide === 2) return { ...BASE.tuck, rot: 360 * Math.min(1, p.t / 14) }; // the landing roll
+    if (p.st === ST.DODGE && ph.kit && p.dk === 1) { // the air dash: a superman, body along the dash
+      const vf = p.vx * p.face;
+      return { ...BASE.superman, rot: Math.atan2(vf, -p.vy) / R };
     }
     if (p.st === ST.DODGE) {
       if (p.ground) return BASE.back;
@@ -88,9 +148,14 @@
     }
     if (p.st === ST.DASH) return runPose(BASE.dash, p, H, 2.2);
     if (!p.ground) {
+      if (ph.kit && p.wall && p.vy < -300) { // the wall run: feet on the wall, legs cycling up it
+        const w = (p.y / 100 / (0.8 * H)) * Math.PI, s2 = Math.sin(w), c2 = Math.cos(w);
+        return { ...BASE.stance, lean: 10, a1: 40, e1: 30, a2: -70, e2: 50, l1: 55 * s2, k1: -20 - 90 * Math.max(0, c2), l2: -55 * s2, k2: -20 - 90 * Math.max(0, -c2), rot: -80 };
+      }
       if (p.wall) return BASE.wall;
       if (p.vy < 0) {
         const pose = lerp(p.vy < ph.jumpV * 0.75 ? BASE.launch : BASE.jump, BASE.fall, Math.max(0, Math.min(1, (p.vy + 1600) / 1600)));
+        if (p.sj) pose.rot = 720 * Math.max(0, Math.min(1, 1 - p.vy / (ph.jumpV * 1.35))); // a super jump: a double front flip on the way up
         // a wall jump is a backflip off the wall
         if (p.wj < 3 && p.jumps === ph.airJumps && p.vy < -300) pose.rot = -360 * Math.max(0, Math.min(1, 1 - (p.vy + 300) / (ph.jumpV + 300)));
         // an air jump is a front flip: the turn follows the rise, so it is still a pure function
@@ -101,10 +166,12 @@
     }
     if (p.hero > 0 && Math.abs(p.vx) < 300) return lerp(BASE.stance, BASE.hero, Math.min(1, p.hero * 1.6)); // set by the renderer after a hard landing
     if (p.land > 0) return lerp(BASE.stance, BASE.crouch, p.land / 6);
+    if (ph.kit && p.vx * p.face < -350) return BASE.skid; // turning at speed: heels dug in
+    if (p.crouch > 0) return p.crouch >= 10 ? add(BASE.deep, { lean: 2 * Math.sin(f * 1.7), a1: 3 * Math.sin(f * 2.3) }) : lerp(BASE.stance, BASE.deep, p.crouch / 10);
     if (Math.abs(p.vx) > 150) return runPose(BASE.stance, p, H, 1);
-    // idle: a fencer's breathing, the guard bobbing
-    const b = Math.sin(f / 22);
-    return add(BASE.stance, { lean: 2 * b, a1: 3 * b, e1: -3 * b, k1: -4 * b, k2: -3 * b });
+    // idle: a fencer's bounce on the balls of the feet, the guard bobbing
+    const b = Math.sin(f / (ph.kit ? 9 : 22)), bb = Math.abs(b);
+    return add(BASE.stance, ph.kit ? { lean: 3 * b, a1: 4 * b, e1: -4 * b, k1: -14 * bb, k2: -12 * bb, l1: 6 * bb } : { lean: 2 * b, a1: 3 * b, e1: -3 * b, k1: -4 * b, k2: -3 * b });
   }
   // the run cycle is driven by distance, so the feet never slide
   // a sprint: leaning hard, long strides, the blade trailing low behind her
@@ -118,11 +185,13 @@
     if (win >= 0 && p.ground && st.victory) return lerp(BASE.stance, st.victory, eo(Math.min(1, win / 20)));
     const base = basePose(rig, p, f, rig.ph, Sim);
     if (p.st !== ST.ATK) return base;
-    const m = moves[p.mv], k = (st.moves && st.moves[p.mv]) || GENERIC[p.mv];
+    const m = moves[p.mv], k0 = (st.moves && st.moves[p.mv]) || GENERIC[p.mv];
+    const k = p.cmb === 1 ? (st.kicks && st.kicks[p.mv]) || KICKS[p.mv] || backhand(k0) : p.cmb >= 2 ? (st.finish && st.finish[p.mv]) || FINISH[p.mv] || leaping(k0) : k0;
     const stance = p.ground ? BASE.stance : BASE.fall;
     let out;
     if (p.t < m.su) {
       out = lerp(stance, k.wind, eo(Math.min(1, p.t / Math.max(1, m.su * 0.6))));
+      if (k.turn) out.spin = k.turn * eo(Math.min(1, (p.t + 1) / Math.max(1, m.su))); // the turn of a spinning kick
       if (p.chg > 0 && p.t === m.su - 1) out = add(out, { lean: 3 * Math.sin(f * 2.1), a1: 4 * Math.sin(f * 2.7) }); // a held charge trembles
     } else if (p.t < m.su + m.ac) {
       out = lerp(k.wind, k.strike, Math.min(1, (p.t - m.su + 1) / 2)); // the strike snaps in and holds
