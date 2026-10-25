@@ -153,6 +153,9 @@
     tuck:      BASE.tuck,
     landReady: P([  15,   5,  60,  40, -60,  -40,  60,-100,  40, -90]),
     landNinja: P([  35,  10,-110,  20,  15,    0,  70,-130, -30, -80,   0,   0,  0,  0.02]),
+    throwBack: P([ -18,  -5,-160,  -40,  70,   10,  45, -30, -35, -15]), // the blade cocked back over the shoulder, the free hand aiming
+    throwOut:  P([  30,   5,  85,    0, -80,  -20,  60, -60, -45,  -5]), // the arm whipped through, open hand forward
+    clash:     P([ -22, -10, 150,  -40, -60,   60,  40, -40, -30, -20]), // driven back, the blade up between them
   };
   const FALLS = [BASE.fall, P([20, 10, -100, 30, -130, 20, 70, -110, -20, -60]), P([0, 0, 110, -10, -110, 10, 30, -30, -20, -20]), P([20, 10, -100, 30, -130, 20, 70, -110, -20, -60])];
   FALLS[9] = VARY.landReady;
@@ -192,6 +195,12 @@
       }
       return add(BASE.hurt, { a1: 15 * Math.sin(f * 0.8), a2: 15 * Math.cos(f * 0.7) });
     }
+    if (p.st === ST.THROW) { // the throw: the blade drawn back over the shoulder, then whipped forward along the aim
+      const at = Sim.FEEL.kit.throwAt, aim = (p.wa || 0) * 45;
+      if (p.t < at) return lerp(BASE.stance, VARY.throwBack, eo(Math.min(1, (p.t + 1) / at)));
+      return lerp(add(VARY.throwOut, { a1: -aim, lean: -aim * 0.2 }), BASE.stance, Math.max(0, (p.t - at - 3) / 8));
+    }
+    if (p.st === ST.CLASH) return add(VARY.clash, { lean: 3 * Math.sin(f * 2.3), a1: 4 * Math.sin(f * 3.1) }); // braced from the clash, the blade still up
     if (p.st === ST.DASH && p.slide === 1) return add(BASE.slide, { a1: 6 * Math.sin(f * 0.9) });
     if (p.st === ST.DASH && p.slide === 2) return { ...BASE.tuck, rot: 360 * Math.min(1, p.t / 14) }; // the landing roll
     if (p.st === ST.DODGE && ph.kit && p.dk === 1) { // the air dash: a superman, body along the dash
@@ -341,7 +350,7 @@
     g.fillStyle = body; g.beginPath(); g.arc(J.head[0], J.head[1], B.headR * H, 0, 7); g.fill();
     if (st.acc.includes("bun")) { const hb = [J.head[0] - B.headR * H * 0.55, J.head[1] - B.headR * H * 0.95]; g.beginPath(); g.arc(hb[0], hb[1], B.headR * H * 0.5, 0, 7); g.fill(); }
     stroke(g, [J.hip, J.knee1, J.foot1], w, body);
-    drawProp(g, rig, J, q, w, body);
+    if (!o.noProp) drawProp(g, rig, J, q, w);
     stroke(g, [J.neck, J.elbow1, J.hand1], w, body);
     g.restore();
     return J;
@@ -355,14 +364,22 @@
     shamshir: { len: 0.78, base: 0.05, w0: 0.026, w1: 0.04, bend: 0.11, metal: "#e0a640", grip: "#1f5a43" },
   };
   // the blade's centre line in local space: points from the guard to the point, along the hand
-  function bladeLine(rig, J, q, n = 10) {
-    const W = WEAPONS[rig.style.prop], H = rig.H, a = (J.handAngle + (q.prop || 0)) * R, d = [Math.sin(a), Math.cos(a)], nrm = [-d[1], d[0]], h = J.hand1;
+  function bladeLine(rig, J, q, n = 10) { return bladeFrom(rig, J.hand1, J.handAngle + (q.prop || 0), n); }
+  function bladeFrom(rig, h, deg, n = 10) {
+    const W = WEAPONS[rig.style.prop], H = rig.H, a = deg * R, d = [Math.sin(a), Math.cos(a)], nrm = [-d[1], d[0]];
     const pts = [];
     for (let k = 0; k <= n; k++) {
       const u = k / n, t = W.base + (W.len - W.base) * u, b = W.bend * H * Math.sin(u * Math.PI * 0.85) * u;
       pts.push([h[0] + d[0] * t * H + nrm[0] * b, h[1] + d[1] * t * H + nrm[1] * b]);
     }
     return { pts, d, nrm, h };
+  }
+  // a thrown blade in world space: the point at (x, y), along its flight, or tumbling when knocked loose
+  function drawThrown(g, rig, x, y, vx, vy, tumble) {
+    const W = WEAPONS[rig.style.prop];
+    if (!W) return;
+    const deg = tumble ? tumble : Math.atan2(vx, vy) / R, a = deg * R, L = W.len * rig.H;
+    drawWeapon(g, rig, [x - Math.sin(a) * L, y - Math.cos(a) * L], deg, rig.H * 0.075);
   }
   // the blade from guard to point, in the same space the body is drawn in (after rot and spin)
   function blade(rig, q) {
@@ -371,10 +388,12 @@
     const c = Math.cos((q.rot || 0) * R), sn = Math.sin((q.rot || 0) * R);
     return pts.map(([x, y]) => { x *= sx; const yy = y - cy; return [x * c - yy * sn, x * sn + yy * c + cy]; });
   }
-  function drawProp(g, rig, J, q, w, body) {
+  function drawProp(g, rig, J, q, w) { drawWeapon(g, rig, J.hand1, J.handAngle + (q.prop || 0), w); }
+  // a weapon on its own: the grip at `h`, pointing along `deg` (0 is straight down); thrown blades use it too
+  function drawWeapon(g, rig, h, deg, w) {
     const W = WEAPONS[rig.style.prop];
     if (!W) return;
-    const H = rig.H, { pts, d, nrm, h } = bladeLine(rig, J, q), at = (t) => [h[0] + d[0] * t * H, h[1] + d[1] * t * H];
+    const H = rig.H, { pts, d, nrm } = bladeFrom(rig, h, deg), at = (t) => [h[0] + d[0] * t * H, h[1] + d[1] * t * H];
     const off = (p, k) => [p[0] + nrm[0] * k, p[1] + nrm[1] * k];
     // grip and pommel behind the hand
     const pom = at(-0.075);
@@ -419,5 +438,5 @@
     return c;
   }
 
-  root.Stick = { STYLES, WEAPONS, create, pose, draw, joints, blade, still, BASE };
+  root.Stick = { STYLES, WEAPONS, create, pose, draw, joints, blade, drawThrown, still, BASE };
 })(this);

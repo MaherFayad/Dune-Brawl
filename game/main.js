@@ -51,9 +51,9 @@
   });
   addEventListener("keyup", (e) => keys.delete(e.code));
   addEventListener("blur", () => keys.clear());
-  const SOLO = { L: ["KeyA", "ArrowLeft"], R: ["KeyD", "ArrowRight"], U: ["KeyW", "ArrowUp"], D: ["KeyS", "ArrowDown"], J: ["Space"], A: ["KeyJ", "KeyC"], B: ["KeyK", "KeyX"], X: ["KeyL", "ShiftLeft", "ShiftRight"] };
-  const P1 = { L: ["KeyA"], R: ["KeyD"], U: ["KeyW"], D: ["KeyS"], J: ["Space"], A: ["KeyF"], B: ["KeyG"], X: ["KeyH", "ShiftLeft"] };
-  const P2 = { L: ["ArrowLeft"], R: ["ArrowRight"], U: ["ArrowUp"], D: ["ArrowDown"], J: ["ShiftRight", "Numpad0"], A: ["Period", "Numpad1"], B: ["Slash", "Numpad2"], X: ["Comma", "Numpad3"] };
+  const SOLO = { L: ["KeyA", "ArrowLeft"], R: ["KeyD", "ArrowRight"], U: ["KeyW", "ArrowUp"], D: ["KeyS", "ArrowDown"], J: ["Space"], A: ["KeyJ", "KeyC"], B: ["KeyK", "KeyX"], X: ["KeyL", "ShiftLeft", "ShiftRight"], T: ["KeyI", "KeyV"] };
+  const P1 = { L: ["KeyA"], R: ["KeyD"], U: ["KeyW"], D: ["KeyS"], J: ["Space"], A: ["KeyF"], B: ["KeyG"], X: ["KeyH", "ShiftLeft"], T: ["KeyT"] };
+  const P2 = { L: ["ArrowLeft"], R: ["ArrowRight"], U: ["ArrowUp"], D: ["ArrowDown"], J: ["ShiftRight", "Numpad0"], A: ["Period", "Numpad1"], B: ["Slash", "Numpad2"], X: ["Comma", "Numpad3"], T: ["Quote", "Numpad4"] };
   const read = (map) => { let v = 0; for (const k in map) if (map[k].some((c) => keys.has(c))) v |= IN[k]; return v; };
   function pad(i) {
     const gp = navigator.getGamepads && navigator.getGamepads()[i];
@@ -62,7 +62,7 @@
     let v = 0;
     if (ax < -0.4 || b(14)) v |= IN.L; if (ax > 0.4 || b(15)) v |= IN.R;
     if (ay < -0.5 || b(12)) v |= IN.U; if (ay > 0.5 || b(13)) v |= IN.D;
-    if (b(0) || b(3)) v |= IN.J; if (b(2)) v |= IN.A; if (b(1)) v |= IN.B;
+    if (b(0)) v |= IN.J; if (b(2)) v |= IN.A; if (b(1)) v |= IN.B; if (b(3)) v |= IN.T; // Y throws
     if (b(4) || b(5) || b(6) || b(7)) v |= IN.X;
     return v;
   }
@@ -105,6 +105,13 @@
       return v;
     }
     if (foe.st === ST.DEAD) return Math.abs(me.x - 640 * S) > 60 * S ? (me.x < 640 * S ? IN.R : IN.L) : 0;
+    // weapons: go and fetch a stuck blade, and throw now and then at a foe across the stage
+    if (!me.wpn && me.ws === 2 && Math.abs(me.wx - me.x) > 20 * S) {
+      v |= me.wx > me.x ? IN.R : IN.L;
+      if (me.ground && me.wy < me.y - 60 * S && even) v |= IN.J;
+      return v;
+    }
+    if (me.wpn && M.ph[i].kit && me.ground && Math.abs(dy) < 60 * S && Math.abs(dx) > 260 * S && even && Math.random() < 0.02 + 0.01 * level) return (dx > 0 ? IN.R : IN.L) | IN.T;
     // finisher: hold a charged side heavy on a foe at the finisher's damage
     if (me.st === ST.ATK && me.mv === 5 && me.chg > 0 && me.chg < FEEL.finCharge + 4) return IN.B;
     if (me.ground && foe.dmg >= FEEL.finDamage && Math.abs(dx) < 110 * S && Math.abs(dy) < 40 * S && foe.st !== ST.DODGE && even && Math.random() < 0.25) return (dx > 0 ? IN.R : IN.L) | IN.B;
@@ -216,7 +223,7 @@
       const n = Math.max(2, pick.length), per = (v) => Array.from({ length: n }, () => (typeof v === "function" ? v() : v));
       Object.assign(this, { sprites: [], parts: [], shake: 0, lastHf: -1, lastKf: -1, koStamp: per(0), bats: [], petals: [], marks: [], banner: null, won: 0, koHold: 0, chain: 0, chainF: -99,
         grounded: per(1), wasSt: per(0), lastVy: per(0), after: per(() => []), landF: per(-99), landVy: per(0), jumpF: per(-99), turnF: per(-99), lastFace: per(1), lastVx: per(0), walled: per(0),
-        stats: per(() => ({ kos: 0, falls: 0, acc: 0, done: 0, taken: 0 })), lastDmg: per(0), hitOn: per(-1e9), lastBy: per(-1), outF: per(-1) });
+        stats: per(() => ({ kos: 0, falls: 0, acc: 0, done: 0, taken: 0 })), lastDmg: per(0), hitOn: per(-1e9), lastBy: per(-1), outF: per(-1), ws: per(0), lastCf: -1 });
     },
     // a painted sprite: grows from s0 to s1 in `pop` frames, holds, then fades over the rest of `life` frames
     add(name, x, y, opt) { this.sprites.push({ name, x, y, t: 0, rot: 0, flip: 1, s0: 0.6, s1: 1, pop: 3, life: 18, w: 80, ax: 0.5, ay: 0.5, alpha: 1, ...opt }); },
@@ -388,6 +395,27 @@
         fx.parts.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: 0.8 + rnd() * 0.4, size: 2 + rnd() * 3, c: rnd() < 0.6 ? team : "#ffffff", g: 0 });
       }
     }
+    if (s.cf !== fx.lastCf && s.cf >= 0) { // blades meeting: a big white spark, rings, a clang and a callout
+      fx.lastCf = s.cf;
+      const x = s.cx / S, y = s.cy / S;
+      fx.add("star2", x, y, { w: 90, rot: rnd() * 6.28, s0: 0.4, s1: 1.5, pop: 2, life: 12 });
+      fx.marks.push({ t: 0, kind: "burst", x, y, dir: 1, r: 70, n: 12, life: 12, rot: rnd() * 6.28 });
+      fx.marks.push({ t: 0, kind: "ring", x, y, color: "#fff2b0", life: 14, r0: 0.2, r1: 2.2 });
+      fx.marks.push({ t: 0, kind: "text", x, y: y - 46, text: "CLASH!", size: 24, life: 34 });
+      for (let j = 0; j < 14; j++) { const a = rnd() * 6.28, sp = 3 + rnd() * 6; fx.parts.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 1, life: 0.6, size: 1.2 + rnd(), c: rnd() < 0.5 ? "#ffe9a0" : "#ffffff", g: 0.2 }); }
+      fx.shake = Math.max(fx.shake, 7);
+      sfx("clash", x);
+    }
+    s.p.forEach((p, i) => { // thrown weapons: let go, stuck in, picked up
+      const was = fx.ws[i];
+      if (p.ws !== was) {
+        const x = p.wx / S, y = p.wy / S;
+        if (p.ws === 1) sfx("throw", p.x / S, { who: i });
+        if (p.ws === 2) { sfx("stick", x); fx.puff(x, y - 4, 22, { s0: 0.5, s1: 1.2, life: 20, alpha: 0.7 }); for (let j = 0; j < 5; j++) fx.parts.push({ x, y, vx: (rnd() - 0.5) * 4, vy: -1 - rnd() * 3, life: 0.5, size: 1.2, c: "#2a1a14", g: 0.25 }); }
+        if (p.ws === 0 && was) { sfx("pickup", p.x / S); fx.marks.push({ t: 0, kind: "ring", x: p.x / S, y: p.y / S - (gfx[i] ? gfx[i].h : 64) * 0.55, color: TEAM[i], life: 14, r0: 0.6, r1: 1.3 }); }
+        fx.ws[i] = p.ws;
+      }
+    });
     s.p.forEach((p, i) => { // damage dealt and taken, for the results screen
       const d = p.dmg - fx.lastDmg[i];
       if (d > 0) { fx.stats[i].taken += d; if (fx.lastBy[i] >= 0) fx.stats[fx.lastBy[i]].done += d; }
@@ -587,7 +615,7 @@
         const q = Stick.pose(F, pp, f, M.mv[i], Sim, win), k = Math.min(1, sp / 1800);
         for (const [back, c, al] of [[2.6, "#b45cff", 0.32], [1.3, "#36e6ff", 0.45]]) {
           g.save(); g.translate(Math.round(x - (p.vx / S) * back), Math.round(y - (p.vy / S) * back)); g.scale(p.face, 1);
-          g.globalAlpha = al * (0.5 + 0.5 * k); Stick.draw(g, F, q, { tint: 1, tintColor: c, f }); g.restore();
+          g.globalAlpha = al * (0.5 + 0.5 * k); Stick.draw(g, F, q, { tint: 1, tintColor: c, f, noProp: !p.wpn }); g.restore();
         }
       }
       // a body moving very fast becomes a streak: lines in its own colour drawn back along the flight
@@ -605,7 +633,7 @@
       g.save(); g.translate(Math.round(x), Math.round(y)); g.scale(p.face, 1);
       if (p.juice) { g.rotate(p.juice.rot); g.scale(p.juice.sx, p.juice.sy); }
       // the blade's path: a ribbon swept through where the steel was over the last frames, bright at the edge
-      if (atk && alpha === 1 && p.t >= m.su - 1 && p.t < m.su + m.ac + 3) {
+      if (atk && alpha === 1 && p.wpn && p.t >= m.su - 1 && p.t < m.su + m.ac + 3) {
         const path = [];
         for (let back = 0; back <= 4; back++) {
           const t = p.t - back;
@@ -626,7 +654,7 @@
         }
       }
       g.globalAlpha = alpha;
-      Stick.draw(g, F, Stick.pose(F, pp, f, M.mv[i], Sim, win), { tint, tintColor, vx: p.vx * p.face, vy: p.vy, f });
+      Stick.draw(g, F, Stick.pose(F, pp, f, M.mv[i], Sim, win), { tint, tintColor, vx: p.vx * p.face, vy: p.vy, f, noProp: !p.wpn });
       g.restore();
       return;
     }
@@ -1030,6 +1058,30 @@
   }
   function rr(x, y, w, h, r) { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); }
 
+  // thrown weapons: point first in flight with a streak behind, tumbling when knocked loose, and a
+  // pulsing glint while stuck so its owner can find it
+  function drawBlades(s) {
+    s.p.forEach((p, i) => {
+      if (!gfx[i] || !gfx[i].stick || !p.ws) return;
+      const x = p.wx / S, y = p.wy / S, sp = Math.hypot(p.wvx, p.wvy) || 1;
+      g.save();
+      if (p.ws === 1) {
+        const ux = p.wvx / sp, uy = p.wvy / sp, L = gfx[i].h * 1.6, gr = g.createLinearGradient(x, y, x - ux * L, y - uy * L);
+        gr.addColorStop(0, "rgba(255,255,255,0.9)"); gr.addColorStop(1, "rgba(255,255,255,0)");
+        g.strokeStyle = gr; g.lineWidth = 3; g.lineCap = "round"; g.beginPath(); g.moveTo(x, y); g.lineTo(x - ux * L, y - uy * L); g.stroke();
+      }
+      Stick.drawThrown(g, gfx[i], x, y, p.wvx, p.wvy, p.ws === 3 ? (s.f * 31 + i * 47) % 360 : 0);
+      if (p.ws === 2) {
+        const k = (s.f + i * 13) % 50, a = k < 12 ? Math.sin((k / 12) * Math.PI) : 0, deg = Math.atan2(p.wvx, p.wvy), L = Stick.WEAPONS[gfx[i].style.prop].len * gfx[i].h;
+        const gx = x - Math.sin(deg) * L * 0.55, gy = y - Math.cos(deg) * L * 0.55; // the glint runs along the blade
+        g.save(); g.globalAlpha = a; g.fillStyle = "#ffffff"; g.translate(gx, gy); g.rotate(s.f * 0.1);
+        g.beginPath(); for (let j = 0; j < 8; j++) { const r = j % 2 ? 2 : 9; g.lineTo(Math.cos((j * Math.PI) / 4) * r, Math.sin((j * Math.PI) / 4) * r); } g.closePath(); g.fill();
+        g.restore();
+        g.globalAlpha = 0.85; g.strokeStyle = TEAM[i]; g.lineWidth = 2; g.beginPath(); g.ellipse(x, y + 2, 14, 3.5, 0, 0, 7); g.stroke(); // the owner's colour where it bit in
+      }
+      g.restore();
+    });
+  }
   // a fighter outside the view shows in a glass bubble at the screen edge, as in the reference
   function bubble(s, i, z) {
     const p = s.p[i];
@@ -1056,7 +1108,7 @@
     drawStage();
     if (!st.fin) drawFx(true); // dust under the fighters would only read as a grey lump in the darkened finisher
     if (st.fin > 0) finisherWorld(st);
-    else { for (let t = 0; t < st.p.length; t++) drawFighter(st, t); drawSmears(); }
+    else { drawBlades(st); for (let t = 0; t < st.p.length; t++) drawFighter(st, t); drawSmears(); }
     drawFx();
     for (let t = 0; t < st.p.length; t++) bubble(st, t, z);
     g.restore();

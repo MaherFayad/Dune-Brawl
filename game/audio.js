@@ -87,6 +87,10 @@
     airJump: [{ b: "jump", r: 1.08 }], // the same puff, lifted a little
     land: [{ b: "land" }],
     slam: [{ b: "heavy", g: -7, r: 0.8 }, { b: "land", g: 2 }], // a fighter blasted into the stage: a low, slowed body under a thud
+    throw: [{ b: "swingHeavy", r: 1.12 }], // the blade let go
+    stick: [{ b: "parry", g: -9, r: 0.75 }, { b: "land", g: 1 }], // the blade bites into the stage
+    pickup: [{ b: "parry", g: -12, r: 1.3 }], // a light ring as the blade is taken back
+    clash: [{ b: "parry", g: 1 }, { b: "heavy", g: -12, r: 1.25 }], // blades meeting: a ringing clang over a short knock
     dodge: [{ b: "dodge" }],
     dash: [{ b: "dash" }],
     parry: [{ b: "parry" }],

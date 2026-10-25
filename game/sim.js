@@ -7,8 +7,8 @@
 
   const S = 100;
   const div = (a, b) => Math.trunc(a / b);
-  const IN = { L: 1, R: 2, U: 4, D: 8, J: 16, A: 32, B: 64, X: 128 };
-  const ST = { IDLE: 0, ATK: 1, HIT: 2, DODGE: 3, DEAD: 4, DASH: 5 };
+  const IN = { L: 1, R: 2, U: 4, D: 8, J: 16, A: 32, B: 64, X: 128, T: 256 }; // T: throw the weapon
+  const ST = { IDLE: 0, ATK: 1, HIT: 2, DODGE: 3, DEAD: 4, DASH: 5, THROW: 6, CLASH: 7 };
 
   // Dune Island, scaled to the reference (docs/design/REFERENCE-MEASUREMENTS.md): the main
   // platform is 14 bodies wide, soft platforms sit 3 bodies up so they take a double jump, and
@@ -81,7 +81,13 @@
       // combos: a light that hits opens a window; the next light is hit 2 (a faster variant), the
       // one after is the combo finisher: more damage and knockback, a longer hit pause
       comboWindow: 26, comboStep: 1500, comboLunge: 1900, combo2Speed: 80, finDmg: 170, finKb: 150, finPause: 4,
-    },    // hitstun lasts while the victim is still launched faster than this (sideways or up)
+      // the weapon throw: a blade flies point first, sticks in the stage, and is picked up again
+      // by walking over it (or comes back on its own); fists deal unarmedDmg percent meanwhile
+      throwFrames: 16, throwAt: 6, throwSpeed: 3000, throwGrav: 30, throwDmg: 9, throwKb: 380, throwKg: 26,
+      dropGrav: 90, dropMax: 2000, stuckMax: 360, unarmedDmg: 75,
+    },
+    // blades meeting mid-swing: both attacks stop, both fighters recoil, sparks and a short freeze
+    clashFrames: 16, clashPush: 1100, clashFreeze: 6, clashEarly: 2,    // hitstun lasts while the victim is still launched faster than this (sideways or up)
     parryStun: 40,      // frames an attacker is stunned after hitting a parry
     chargeMax: 30,      // heavies with `charge` can be held up to 30 frames for up to +50%
     wallJumps: 3, wallSlide: 500, // touching the island side: slide slowly, jump off it up to 3 times
@@ -143,11 +149,12 @@
       chase: 0, chg: 0, hang: 0,
       dt: 0, dk: 0, ds: 999, chaseT: 0, lock: 0, dlock: 0, squat: 0, lag: 0, sig: 0, dashCd: 0,
       slide: 0, coy: 0, crouch: 0, wr: 0, runT: 0, adash: 0, // stick kit: slide (1) or roll (2), grace jump, crouch, wall run, sprint, air dashes
+      wpn: 1, ws: 0, wx: 0, wy: 0, wvx: 0, wvy: 0, wt: 0, wa: 0, // the weapon: in hand (wpn), its state ws (0 held, 1 flying, 2 stuck, 3 falling), place, velocity, timer, aim
       cmb: 0, cmbT: 0, sj: 0, kick: 0, carry: 0, hb: 0, vr: 0, jv: 0, // vr: the variation seed of the current jump or attack; jv: the jump's style (9: a vault onto a platform) // combo step of the current light (0, 1, 2 = finisher) and the window to continue it
     };
   }
   const PKEYS = Object.keys(player(0, 1, { airJumps: 2 }));
-  const GKEYS = ["f", "freeze", "over", "overT", "hf", "hx", "hy", "hk", "hp", "hv", "ha", "kf", "kx", "ky", "kp", "fin", "fa", "fv"];
+  const GKEYS = ["f", "freeze", "over", "overT", "hf", "hx", "hy", "hk", "hp", "hv", "ha", "kf", "kx", "ky", "kp", "fin", "fa", "fv", "cf", "cx", "cy"];
 
   // A match binds two to four fighter definitions (match(a, b) or match([a, b, c, d])); the
   // returned object steps a plain state. Free for all: the last fighter with stocks wins.
@@ -160,6 +167,7 @@
       return {
         f: 0, freeze: 0, over: 0, overT: 0, hf: -1, hx: 0, hy: 0, hk: 0, hp: 0, hv: 1, ha: 0, // the last hit: hp hit hv; ha: 0 hit, 1 armored, 2 parried
         kf: -1, kx: 0, ky: 0, kp: 0, fin: 0, fa: 0, fv: 1, // fin: frames left of a finisher, fa lands it on fv
+        cf: -1, cx: 0, cy: 0, // the last clash: frame and place
         p: defs.map((d, i) => player(spawnX[i], spawnX[i] < 640 * S ? 1 : -1, ph[i])),
       };
     }
@@ -192,7 +200,7 @@
     function bufferPress(p, input) {
       const pressed = input & ~p.prev;
       p.prev = input;
-      const b = pressed & (IN.J | IN.A | IN.B | IN.X);
+      const b = pressed & (IN.J | IN.A | IN.B | IN.X | IN.T);
       if (b) { p.buf = b; p.bufT = FEEL.buffer; } else if (p.bufT > 0 && --p.bufT === 0) p.buf = 0;
       return pressed;
     }
@@ -203,6 +211,67 @@
     function vaultable(p, P) {
       const reach = div(P.jumpV * P.jumpV, 2 * P.grav);
       return STAGE.plats.some((pl) => p.x > pl.x1 - 30 * S && p.x < pl.x2 + 30 * S && pl.y < p.y - 20 * S && p.y - pl.y < reach);
+    }
+    // is a point inside the stage, for a thrown blade? The island body (a V from the ledges down to
+    // the keel) and the top of a soft platform when coming down onto it.
+    function solidAt(x, y, down) {
+      const m = STAGE.main;
+      if (x > m.x1 && x < m.x2 && y >= m.y) {
+        const half = div(m.x2 - m.x1, 2), cx = m.x1 + half;
+        if (y <= m.y + m.keel - div((m.keel - m.lip) * Math.min(half, Math.abs(x - cx)), half)) return true;
+      }
+      if (down) for (const pl of STAGE.plats) if (x > pl.x1 && x < pl.x2 && y >= pl.y && y <= pl.y + 10 * S) return true;
+      return false;
+    }
+    // a thrown weapon: flies point first in 3 substeps (fast enough to skip a fighter otherwise),
+    // sticks in the stage, hits the first foe it meets, is knocked away by a swing or a parry
+    function stepBlade(s, i) {
+      const p = s.p[i], K = FEEL.kit;
+      if (!ph[i].kit || p.ws === 0) return;
+      const B = STAGE.blast, back = () => { p.ws = 0; p.wpn = 1; };
+      if (p.ws === 2) { // stuck: the owner picks it up by touching it; it comes back on its own in time
+        if (++p.wt > K.stuckMax) return back();
+        if (p.st !== ST.DEAD && Math.abs(p.x - p.wx) < 40 * S && p.wy > p.y - ph[i].h - 30 * S && p.wy < p.y + 30 * S) back();
+        return;
+      }
+      p.wt++;
+      if (p.ws === 3) { p.wvy = Math.min(K.dropMax, p.wvy + K.dropGrav); p.wvx -= div(2 * p.wvx, 100); } else p.wvy += K.throwGrav;
+      for (let k = 0; k < 3; k++) {
+        p.wx += div(p.wvx, 3); p.wy += div(p.wvy, 3);
+        if (p.wx < B.l || p.wx > B.r || p.wy > B.b || p.wy < B.t) return back(); // gone off the stage: back to the hand
+        if (solidAt(p.wx, p.wy, p.wvy > 0)) { p.ws = 2; p.wt = 0; return; }
+        if (p.ws !== 1) continue;
+        for (let j = 0; j < s.p.length; j++) {
+          const v = s.p[j], V = ph[j];
+          if (j === i || v.st === ST.DEAD || v.inv > 0) continue;
+          // a swing in progress, or a parry, knocks the blade away
+          const vm = v.st === ST.ATK ? mv[j][v.mv] : null;
+          if (vm && v.t >= vm.su && v.t < vm.su + vm.ac || vm && vm.parry && v.t >= vm.parry[0] && v.t <= vm.parry[1]) {
+            const b = box(v, vm);
+            if (p.wx > b[0] && p.wx < b[1] && p.wy > b[2] && p.wy < b[3]) {
+              p.ws = 3; p.wvx = -div(p.wvx, 4); p.wvy = -1100;
+              s.cf = s.f; s.cx = p.wx; s.cy = p.wy; s.freeze = Math.max(s.freeze, 3);
+              return;
+            }
+          }
+          if (v.st === ST.DODGE && v.dt - v.t >= FEEL.dodgeStart) continue;
+          if (p.wx < v.x - V.hw || p.wx > v.x + V.hw || p.wy < v.y - V.h || p.wy > v.y) continue;
+          // a hit: damage and a launch along the throw, then the blade drops
+          const dir = p.wvx >= 0 ? 1 : -1;
+          v.dmg = Math.min(999, v.dmg + K.throwDmg);
+          let l = div(div((K.throwKb + div(K.throwKg * Math.max(0, v.dmg - FEEL.growthFrom), FEEL.growthDiv)) * FEEL.kbMul, 100) * 100, V.weight);
+          if (!(v.st === ST.ATK && mv[j][v.mv].armor && v.t >= mv[j][v.mv].armor[0] && v.t <= mv[j][v.mv].armor[1])) {
+            v.vx = dir * div(l * 80, 100); v.vy = -div(l * 45, 100);
+            v.ground = 0; v.st = ST.HIT; v.t = FEEL.hitstunBase + div(l, FEEL.hitstunDiv); v.launch = l;
+            v.ff = 0; v.recov = 0; v.chg = 0; v.adash = 0; v.slide = 0; if (v.jumps < 1) v.jumps = 1;
+            v.face = -dir;
+          }
+          s.hf = s.f; s.hp = i; s.hv = j; s.ha = 0; s.hk = l; s.hx = p.wx; s.hy = p.wy;
+          s.freeze = Math.max(s.freeze, FEEL.pauseBase + 1);
+          p.ws = 3; p.wvx = -div(p.wvx, 5); p.wvy = -900;
+          return;
+        }
+      }
     }
     // the distance to the nearest living foe ahead of p (0 when there is none)
     function nearestAhead(s, i, p) {
@@ -221,7 +290,7 @@
         if (--p.t <= 0) {
           p.x = STAGE.respawn.x; p.y = STAGE.respawn.y; p.vx = 0; p.vy = 0; p.st = ST.IDLE; p.t = 0;
           p.inv = FEEL.respawnInv; p.dmg = 0; p.jumps = P.airJumps; p.ground = 0; p.recov = 0; p.ff = 0; p.wj = FEEL.wallJumps;
-          p.hang = FEEL.respawnHang;
+          p.hang = FEEL.respawnHang; p.wpn = 1; p.ws = 0;
         }
         return;
       }
@@ -273,6 +342,19 @@
         const cancel = p.t >= FEEL.dashCancelFrom && p.bufT > 0 && p.buf & (IN.J | IN.A | IN.B);
         const len = p.slide === 1 ? K.slideFrames : p.slide === 2 ? K.rollFrames : FEEL.dashFrames;
         if (cancel || !p.ground || p.t >= len) { p.st = ST.IDLE; p.t = 0; p.slide = 0; } // keeps its momentum
+      } else if (p.st === ST.THROW) { // the throw: wind back, let go at throwAt, follow through
+        p.t++;
+        if (p.t === K.throwAt) {
+          const sp = K.throwSpeed, d = div(sp * 70, 100);
+          p.wpn = 0; p.ws = 1; p.wt = 0;
+          p.wx = p.x + p.face * 20 * S; p.wy = p.y - div(P.h * 6, 10);
+          if (p.wa < 0) { p.wvx = p.face * d; p.wvy = -d; } else if (p.wa > 0) { p.wvx = p.face * d; p.wvy = d; } else { p.wvx = p.face * sp; p.wvy = -200; }
+        }
+        if (p.ground) p.vx -= div(12 * p.vx, 100);
+        if (p.t >= K.throwFrames) { p.st = ST.IDLE; p.t = 0; }
+      } else if (p.st === ST.CLASH) { // recoil from a clash: no control, sliding back
+        if (p.ground) p.vx -= div(10 * p.vx, 100);
+        if (--p.t <= 0) { p.st = ST.IDLE; p.t = 0; }
       } else if (p.st === ST.ATK) {
         const m = M[p.mv];
         p.t++;
@@ -306,7 +388,10 @@
         const canDash = p.ground && dx && p.dlock <= 0 && p.dashCd <= 0;
         const airDash = K && !p.ground && (dx || dy) && p.adash < K.dashACount;
         const free = p.chase > 0 || (p.ground && dx ? canDash : p.dcd <= 0 && p.lock <= 0 && (!K || p.ground || airDash || !(dx || dy))); // a dash waits for its own cooldown, never turns into a backstep
-        if (p.bufT > 0 && p.buf & IN.X && free && take(IN.X)) {
+        if (K && p.wpn && take(IN.T)) { // throw the weapon, aimed up, straight or (in the air) down
+          p.st = ST.THROW; p.t = 0; if (dx) p.face = dx;
+          p.wa = dy < 0 ? -1 : dy > 0 && !p.ground ? 1 : 0;
+        } else if (p.bufT > 0 && p.buf & IN.X && free && take(IN.X)) {
           p.st = ST.DODGE;
           if (p.chase > 0) { // chase dodge: free of the cooldown, faster, cancelable into an attack
             const sp = div(FEEL.dodgeSpeedA * FEEL.chaseSpeed, 100);
@@ -490,6 +575,19 @@
         stepPlayer(s, i, ins[i]);
         if (s.p[i].ground && !before) s.p[i].jumps = ph[i].airJumps;
       }
+      for (let i = 0; i < N; i++) stepBlade(s, i);
+      // clashes: two swings whose active hitboxes overlap cancel out and push both fighters apart
+      for (let i = 0; i < N; i++) for (let j = i + 1; j < N; j++) {
+        const a = s.p[i], b = s.p[j];
+        if (a.st !== ST.ATK || b.st !== ST.ATK) continue;
+        const ma = mv[i][a.mv], mb = mv[j][b.mv];
+        if (a.t < ma.su - FEEL.clashEarly || a.t >= ma.su + ma.ac || b.t < mb.su - FEEL.clashEarly || b.t >= mb.su + mb.ac) continue; // a swing about to land counts too
+        const ba = box(a, ma), bb = box(b, mb);
+        if (ba[0] >= bb[1] || bb[0] >= ba[1] || ba[2] >= bb[3] || bb[2] >= ba[3]) continue;
+        for (const q of [a, b]) { q.st = ST.CLASH; q.t = FEEL.clashFrames; q.vx = (q === a ? (a.x <= b.x ? -1 : 1) : (b.x < a.x ? -1 : 1)) * FEEL.clashPush; if (!q.ground) q.vy = -400; q.cmb = 0; }
+        s.cf = s.f; s.cx = div(Math.max(ba[0], bb[0]) + Math.min(ba[1], bb[1]), 2); s.cy = div(Math.max(ba[2], bb[2]) + Math.min(ba[3], bb[3]), 2);
+        s.freeze = Math.max(s.freeze, FEEL.clashFreeze);
+      }
       const hits = []; // [attacker, victim]; a.hit is a bitmask of who this swing already hit
       for (let i = 0; i < N; i++) {
         const a = s.p[i];
@@ -524,7 +622,7 @@
           continue;
         }
         const kitA = ph[i].kit ? FEEL.kit : null, fin3 = kitA && a.cmb === 2;
-        const dmg = div((m.dmg + div(m.dmg * a.chg, 60)) * (fin3 ? kitA.finDmg : 100), 100);
+        const dmg = div(div((m.dmg + div(m.dmg * a.chg, 60)) * (fin3 ? kitA.finDmg : 100), 100) * (kitA && !a.wpn ? kitA.unarmedDmg : 100), 100); // fists hit softer
         if (kitA && a.cmb < 2 && a.mv !== 6 && [0, 1, 2, 3, 4, 8].includes(a.mv)) a.cmbT = m.su + m.ac + m.re - a.t + kitA.comboWindow;
         v.dmg = Math.min(999, v.dmg + dmg);
         let l = m.kb + div(m.kg * Math.max(0, v.dmg - FEEL.growthFrom), FEEL.growthDiv);

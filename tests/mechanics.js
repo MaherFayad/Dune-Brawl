@@ -227,6 +227,41 @@ const kit = (da, db) => { da.kit = 1; db.kit = 1; };
   let k = 0; while (!p.hb && k++ < 30) M.step(s, [0, 0]);
   ok(p.hb && p.vy < -1500 && o.st === ST.HIT && o.dmg === FEEL.kit.stompDmg, "kit: landing on a head stomps it and bounces high");
 }
+// ---- weapon throws and clashes ----
+{ // a thrown blade flies, hits the foe in its path, then drops and sticks in the stage
+  const { M, s } = setup("djinn-warrior", "djinn-warrior", kit); const p = s.p[0], v = s.p[1]; v.x = 900 * S;
+  run(M, s, 1, () => IN.T);
+  ok(p.st === ST.THROW, "kit: the throw button starts a throw");
+  let k = 0; while (p.ws !== 1 && k++ < 30) M.step(s, [0, 0]);
+  ok(p.ws === 1 && !p.wpn, "kit: the blade leaves the hand and flies");
+  k = 0; while (v.dmg === 0 && k++ < 60) M.step(s, [0, 0]);
+  ok(v.dmg === FEEL.kit.throwDmg && v.st === ST.HIT, `kit: the flying blade hits the foe in its path (${v.dmg})`);
+  k = 0; while (p.ws !== 2 && k++ < 120) M.step(s, [0, 0]);
+  ok(p.ws === 2, "kit: after the hit the blade drops and sticks in the stage");
+  const before = v.dmg; v.x = 1000 * S; v.st = ST.IDLE; v.t = 0;
+  M.step(s, [IN.R | IN.A, 0]); k = 0; while (p.st === ST.ATK && k++ < 40) M.step(s, [0, 0]);
+  p.x = p.wx; p.y = STAGE.main.y; M.step(s, [0, 0]);
+  ok(p.wpn === 1 && p.ws === 0, "kit: walking over the stuck blade picks it up");
+}
+{ // fists hit softer than the blade
+  const a = setup("djinn-warrior", "djinn-warrior", kit), b = setup("djinn-warrior", "djinn-warrior", kit);
+  a.s.p[0].wpn = 0; a.s.p[0].ws = 2; a.s.p[0].wx = 100 * S; a.s.p[0].wy = 2000 * S; // the blade stuck far away
+  for (const g of [a, b]) { g.M.step(g.s, [IN.R | IN.A, 0]); let k = 0; while (g.s.p[0].st === ST.ATK && k++ < 40) g.M.step(g.s, [0, 0]); }
+  ok(a.s.p[1].dmg > 0 && a.s.p[1].dmg < b.s.p[1].dmg, `kit: unarmed hits deal less (${a.s.p[1].dmg} against ${b.s.p[1].dmg})`);
+}
+{ // a thrown blade off the stage comes back to the hand
+  const { M, s } = setup("djinn-warrior", "djinn-warrior", kit); const p = s.p[0]; s.p[1].x = 300 * S; p.x = 1000 * S;
+  run(M, s, 1, () => IN.T); let k = 0; while (p.ws !== 0 || p.st === ST.THROW || !k) { if (k++ > 200) break; M.step(s, [0, 0]); }
+  ok(p.wpn === 1 && p.ws === 0 && k < 200, `kit: a blade thrown off the stage comes back (${k} frames)`);
+}
+{ // two swings meeting: a clash, both recoil apart, nobody takes damage
+  const { M, s } = setup(); const a = s.p[0], b = s.p[1]; a.x = 600 * S; b.x = 690 * S;
+  M.step(s, [IN.R | IN.A, IN.L | IN.A]); let k = 0;
+  while (a.st === ST.ATK && b.st === ST.ATK && k++ < 20) M.step(s, [0, 0]);
+  ok(a.st === ST.CLASH && b.st === ST.CLASH && a.dmg === 0 && b.dmg === 0 && s.cf >= 0, "two swings meeting clash: both recoil, no damage");
+  run(M, s, 4);
+  ok(a.vx < 0 && b.vx > 0, "the clash pushes both fighters apart");
+}
 // ---- four fighters ----
 { // free for all: four spawns, one swing can hit two foes, the last fighter standing wins
   const d = def("djinn-warrior"), M = Sim.match([d, d, d, d]), s = M.create();
