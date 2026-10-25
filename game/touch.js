@@ -9,7 +9,15 @@
   const coarse = () => (root.matchMedia && root.matchMedia("(pointer: coarse)").matches) || "ontouchstart" in root;
   let used = coarse(), shown = false, el = null;
   const held = new Map(); // pointerId -> bits held by a button
-  const stick = { id: null, ox: 0, oy: 0, x: 0, y: 0, R: 64 };
+  const stick = { id: null, ox: 0, oy: 0, x: 0, y: 0, R: 64, lowT: 0, jump: false };
+  // tap jump: a quick flick up jumps (held for a full jump, let go early for a short hop); a slow
+  // push up stays a plain up, for up attacks, aiming a throw and the recovery
+  const JUMP_Y = -0.62, LOW_Y = -0.3, FLICK_MS = 150;
+  function tapJump() {
+    const ny = (stick.y - stick.oy) / stick.R, now = performance.now();
+    if (ny > LOW_Y) { stick.lowT = now; stick.jump = false; }
+    else if (ny < JUMP_Y && !stick.jump && now - stick.lowT < FLICK_MS) stick.jump = true;
+  }
 
   const css = `
   #touch { position:fixed; inset:0; z-index:5; pointer-events:none; touch-action:none; user-select:none; -webkit-user-select:none; }
@@ -58,7 +66,7 @@
     zone.addEventListener("pointerdown", (e) => {
       if (stick.id !== null) return;
       e.preventDefault(); zone.setPointerCapture(e.pointerId);
-      stick.id = e.pointerId; stick.ox = e.clientX; stick.oy = e.clientY; stick.x = e.clientX; stick.y = e.clientY; place();
+      stick.id = e.pointerId; stick.ox = e.clientX; stick.oy = e.clientY; stick.x = e.clientX; stick.y = e.clientY; stick.lowT = performance.now(); stick.jump = false; place();
     });
     zone.addEventListener("pointermove", (e) => {
       if (e.pointerId !== stick.id) return;
@@ -66,9 +74,9 @@
       const d = Math.hypot(dx, dy), R = stick.R;
       if (d > R * 1.6) { stick.ox += (dx / d) * (d - R * 1.6); stick.oy += (dy / d) * (d - R * 1.6); dx = e.clientX - stick.ox; dy = e.clientY - stick.oy; } // the base follows a thumb that runs away
       const k = Math.min(1, R / Math.max(1, Math.hypot(dx, dy)));
-      stick.x = stick.ox + dx * k; stick.y = stick.oy + dy * k; place();
+      stick.x = stick.ox + dx * k; stick.y = stick.oy + dy * k; tapJump(); place();
     });
-    const end = (e) => { if (e.pointerId === stick.id) { stick.id = null; place(); } };
+    const end = (e) => { if (e.pointerId === stick.id) { stick.id = null; stick.jump = false; place(); } };
     zone.addEventListener("pointerup", end); zone.addEventListener("pointercancel", end);
     el.querySelectorAll("button[data-bit]").forEach((b) => {
       const bit = IN[b.dataset.bit];
@@ -81,7 +89,7 @@
     el.addEventListener("contextmenu", (e) => e.preventDefault());
   }
 
-  // the input bits this frame: the stick in 8 directions with a dead zone, plus held buttons
+  // the input bits this frame: the stick in 8 directions with a dead zone, a flick up as jump, plus held buttons
   function bits() {
     let v = 0;
     for (const b of held.values()) v |= b;
@@ -91,6 +99,7 @@
         if (nx > 0.38) v |= IN.R; else if (nx < -0.38) v |= IN.L;
         if (ny < -0.5) v |= IN.U; else if (ny > 0.5) v |= IN.D;
       }
+      if (stick.jump) v |= IN.J;
     }
     return v;
   }

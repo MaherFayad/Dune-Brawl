@@ -60,7 +60,7 @@ Two to four fighters, free for all, last one standing (`Sim.match([a, b, c, d])`
 
 ## Touch
 
-On phones and tablets (`game/touch.js`): a floating analog stick wherever the left thumb lands, and Jump, Light, Heavy, Dodge and Throw buttons on the right (64 to 84 px, over the WCAG 2.2 2.5.8 minimum), plus a Menu button. They feed player 1 in every mode, online included.
+On phones and tablets (`game/touch.js`): a floating analog stick wherever the left thumb lands (a quick flick up jumps, held for a full jump; a slow push up stays a plain up, for up attacks, throws and the recovery), and Jump, Light, Heavy, Dodge and Throw buttons on the right (64 to 84 px, over the WCAG 2.2 2.5.8 minimum), plus a Menu button. They feed player 1 in every mode, online included.
 
 ## Combos
 
