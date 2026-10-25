@@ -21,6 +21,9 @@
     // moveset, effects and sound flavour they borrow
     "stick-vespera": { name: "Vespera", title: "The Countess in the Shade", color: "#d0173f", glow: "#ff5c7a", ready: 1, stick: 1, kin: "vampire-countess" },
     "stick-saif": { name: "Saif", title: "The Bound Blade", color: "#1f5a43", glow: "#36e2d4", ready: 1, stick: 1, kin: "djinn-warrior" },
+    "stick-marjana": { name: "Marjana", title: "Bane of the Forty", color: "#c22a6e", glow: "#ffd0e4", ready: 1, stick: 1, kin: "dagger-dancer" },
+    "stick-dana": { name: "Dana", title: "Bride of the Sea", color: "#128a7f", glow: "#8ff5ea", ready: 1, stick: 1, kin: "sea-siren" },
+    "stick-nawaf": { name: "Nawaf", title: "Falconer of the Heights", color: "#7a4a22", glow: "#ffcf5a", ready: 1, stick: 1, kin: "falcon-rider" },
     "chameleon-slinger": { name: "Hirba", title: "The Slow Trick Shot", color: "#7ccf2a", glow: "#ff5ad0", art: "anim-v2" },
   };
   const kin = (id) => (FIGHTERS[id] && FIGHTERS[id].kin) || id;
@@ -1120,7 +1123,8 @@
   // A charged side heavy on a fighter at 150%+ holds the game for FEEL.finFrames while this plays:
   // the world darkens, she bursts into bats and strikes six times from six angles, each pass a
   // white streak through the victim, then lands behind them, back turned; the sim launches them.
-  const FIN_NAME = { "stick-vespera": "NIGHTFALL WALTZ", "stick-saif": "STORM OF THE SASH", "vampire-countess": "NIGHTFALL WALTZ", "djinn-warrior": "STORM OF THE SASH" };
+  const FIN_NAME = { "stick-vespera": "NIGHTFALL WALTZ", "stick-saif": "STORM OF THE SASH", "vampire-countess": "NIGHTFALL WALTZ", "djinn-warrior": "STORM OF THE SASH",
+    "stick-marjana": "FORTY CUTS", "stick-dana": "TIDE OF FANS", "stick-nawaf": "STOOPING FALCON" };
   const FIN = { open: 14, slash: 9, count: 6 };
   function finT(s) { return FEEL.finFrames - s.fin; }
   // where the attacker strikes from on pass k: alternating sides, always from above the ground
@@ -1228,7 +1232,9 @@
     "Dodge in place and attack at once: you get your air attack on the ground.",
     "Air dodges recharge slowly. Land a while after one to get it back sooner.",
     "Missing an attack leaves you open: your dodge is locked for a moment.",
-    "Foe at 150% or more? Hold heavy to charge a side heavy: if it lands, it is a finisher."];
+    "Foe at 150% or more? Hold heavy to charge a side heavy: if it lands, it is a finisher.",
+    "Throw your weapon with I or V. Walk over it to pick it up; until then, fists hit softer.",
+    "Swing into a swing and the blades clash: both of you are thrown back."];
   function drawLoading() {
     const u = Math.min(W / 1280, H / 720), t = loading.t;
     g.setTransform(dpr, 0, 0, dpr, 0, 0);

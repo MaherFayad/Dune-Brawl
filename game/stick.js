@@ -140,6 +140,12 @@
     },
     // the djinn swordsman: a scimitar and a long scarf
     "stick-saif": { color: "#1f5a43", prop: "shamshir", acc: ["scarf"], moves: {}, victory: P([-5, -10, 175, -10, -60, 90, 20, -20, -15, 0, 0]) },
+    // the dancer: two daggers, quick and close, a ponytail
+    "stick-marjana": { color: "#c22a6e", prop: "dagger", twin: 1, acc: ["tail"], moves: {}, victory: P([5, -10, 160, -20, -160, 20, 30, -40, -20, -10]) },
+    // the siren: a war fan that opens for every strike, a long ponytail
+    "stick-dana": { color: "#128a7f", prop: "fan", acc: ["tail"], moves: {}, victory: P([0, -10, 150, -30, -40, 60, 15, -15, -20, -10, 0, 1]) },
+    // the falconer: a long spear and a sand-coloured scarf
+    "stick-nawaf": { color: "#7a4a22", prop: "spear", acc: ["scarf"], scarf: "#e9dcc0", moves: {}, victory: P([0, -10, 170, 0, -50, 60, 10, -10, -15, -5, -170]) },
   };
 
   // ---------- movement variety: the sim rolls p.jv at each jump, so every jump can look different ----------
@@ -267,6 +273,7 @@
       : rig.ph && rig.ph.kit && (p.mv === 0 || p.mv === 1) && (p.vr || 0) % 3 === 2 ? rising(k0) : k0;
     const stance = p.ground ? BASE.stance : BASE.fall;
     let out;
+    const fanOpen = st.prop === "fan" ? 1 : 0; // a war fan snaps open for every strike
     if (p.t < m.su) {
       out = lerp(stance, k.wind, eo(Math.min(1, p.t / Math.max(1, m.su * 0.6))));
       if (k.turn) out.spin = k.turn * eo(Math.min(1, (p.t + 1) / Math.max(1, m.su))); // the turn of a spinning kick
@@ -278,6 +285,7 @@
       const u = (p.t - m.su - m.ac) / Math.max(1, m.re);
       out = u < 0.3 ? { ...k.strike } : lerp(k.strike, stance, eio((u - 0.3) / 0.7));
     }
+    if (fanOpen) out.open = Math.max(out.open || 0, p.t < m.su ? Math.min(1, (p.t + 1) / Math.max(1, m.su * 0.6)) : 1);
     return out;
   }
 
@@ -337,7 +345,7 @@
     }
     if (st.acc.includes("scarf")) {
       const n = J.neck, L = H * 0.5, end = [n[0] - L * (0.7 + 0.3 * Math.max(0, -drag)), n[1] + L * (0.15 - 0.4 * lift) + 6 * sway];
-      g.strokeStyle = "#e0a640"; g.lineWidth = w * 0.7; g.beginPath(); g.moveTo(n[0], n[1] + w * 0.3); g.quadraticCurveTo(n[0] - L * 0.4, n[1] + 8 * sway, end[0], end[1]); g.stroke();
+      g.strokeStyle = st.scarf || "#e0a640"; g.lineWidth = w * 0.7; g.beginPath(); g.moveTo(n[0], n[1] + w * 0.3); g.quadraticCurveTo(n[0] - L * 0.4, n[1] + 8 * sway, end[0], end[1]); g.stroke();
       g.lineWidth = w * 0.5; g.beginPath(); g.moveTo(n[0], n[1] + w * 0.3); g.quadraticCurveTo(n[0] - L * 0.3, n[1] + H * 0.1, end[0] + 6, end[1] + H * 0.12); g.stroke();
     }
     // a pale halo keeps the strokes readable over the painted stage
@@ -345,9 +353,15 @@
     const limbs = [[J.hip, J.knee2, J.foot2], [J.neck, J.elbow2, J.hand2], [J.hip, J.neck], [J.hip, J.knee1, J.foot1], [J.neck, J.elbow1, J.hand1]];
     for (const l of limbs) stroke(g, l, w + 3, halo);
     stroke(g, [J.hip, J.knee2, J.foot2], w, back); stroke(g, [J.neck, J.elbow2, J.hand2], w, back);
+    if (st.twin && !o.noProp) drawWeapon(g, rig, J.hand2, q.a2 + q.e2, w); // the second dagger, in the back hand
     stroke(g, [J.hip, J.neck], w * 1.1, body);
     g.fillStyle = halo; g.beginPath(); g.arc(J.head[0], J.head[1], B.headR * H + 1.5, 0, 7); g.fill();
     g.fillStyle = body; g.beginPath(); g.arc(J.head[0], J.head[1], B.headR * H, 0, 7); g.fill();
+    if (st.acc.includes("tail")) { // a long ponytail streaming back with the motion
+      const t0 = [J.head[0] - B.headR * H * 0.8, J.head[1] - B.headR * H * 0.3], L = H * 0.28;
+      g.strokeStyle = body; g.lineWidth = w * 0.75; g.beginPath(); g.moveTo(...t0);
+      g.quadraticCurveTo(t0[0] - L * (0.5 + 0.4 * Math.max(0, -drag)), t0[1] + L * 0.2 + 3 * sway, t0[0] - L * (0.8 + 0.4 * Math.max(0, -drag)), t0[1] + L * (0.7 - 0.5 * Math.abs(drag) - 0.3 * lift)); g.stroke();
+    }
     if (st.acc.includes("bun")) { const hb = [J.head[0] - B.headR * H * 0.55, J.head[1] - B.headR * H * 0.95]; g.beginPath(); g.arc(hb[0], hb[1], B.headR * H * 0.5, 0, 7); g.fill(); }
     stroke(g, [J.hip, J.knee1, J.foot1], w, body);
     if (!o.noProp) drawProp(g, rig, J, q, w);
@@ -362,6 +376,12 @@
     rapier: { len: 0.9, base: 0.05, w0: 0.02, w1: 0.012, bend: 0, metal: "#c9a24a", grip: "#5a0d1f" },
     // a shamshir: a deep curve that widens toward the point, drooping quillons
     shamshir: { len: 0.78, base: 0.05, w0: 0.026, w1: 0.04, bend: 0.11, metal: "#e0a640", grip: "#1f5a43" },
+    // twin daggers: short and broad, one in each hand
+    dagger: { len: 0.38, base: 0.04, w0: 0.026, w1: 0.018, bend: 0, metal: "#d9b25a", grip: "#5a1430" },
+    // a spear: a long blue-steel shaft held a third of the way up, a leaf-shaped head
+    spear: { len: 1.0, base: 0.8, w0: 0.03, w1: 0.04, bend: 0, metal: "#c8a24a", grip: "#24407a", butt: 0.42 },
+    // a war fan: iron ribs that fold into a baton and open into a half disc
+    fan: { len: 0.44, base: 0.0, w0: 0, w1: 0, bend: 0, metal: "#e0a640", grip: "#0f3b44" },
   };
   // the blade's centre line in local space: points from the guard to the point, along the hand
   function bladeLine(rig, J, q, n = 10) { return bladeFrom(rig, J.hand1, J.handAngle + (q.prop || 0), n); }
@@ -374,10 +394,46 @@
     }
     return { pts, d, nrm, h };
   }
+  // the spear: a blue-steel shaft from the butt cap to the head, a cloth tassel, a two-tone leaf head
+  function drawSpear(g, rig, W, h, deg, w) {
+    const H = rig.H, a = deg * R, d = [Math.sin(a), Math.cos(a)], n = [-d[1], d[0]], at = (t) => [h[0] + d[0] * t * H, h[1] + d[1] * t * H];
+    const off = (p, k) => [p[0] + n[0] * k, p[1] + n[1] * k], b0 = at(-W.butt), b1 = at(W.base);
+    stroke(g, [b0, b1], w * 0.5 + 2.5, STEEL.ink);
+    const gr = g.createLinearGradient(b0[0], b0[1], b1[0], b1[1]); gr.addColorStop(0, "#1b2c5a"); gr.addColorStop(0.6, W.grip); gr.addColorStop(1, "#6f93d6");
+    stroke(g, [b0, b1], w * 0.5, gr);
+    g.fillStyle = W.metal; g.strokeStyle = STEEL.ink; g.lineWidth = 1.2; g.beginPath(); g.arc(b0[0], b0[1], H * 0.02, 0, 7); g.fill(); g.stroke(); // the butt cap
+    const c = at(W.base - 0.02); g.fillStyle = rig.style.color; g.beginPath(); // the tassel
+    g.moveTo(...off(c, H * 0.02)); g.quadraticCurveTo(...off(at(W.base - 0.12), H * 0.06), ...off(at(W.base - 0.2), H * 0.02)); g.lineTo(...off(c, -H * 0.02)); g.closePath(); g.fill(); g.stroke();
+    const tip = at(W.len), mid = at(W.base + (W.len - W.base) * 0.35), hw = H * W.w1;
+    g.beginPath(); g.moveTo(...b1); g.lineTo(...off(mid, hw)); g.lineTo(...tip); g.lineTo(...off(mid, -hw)); g.closePath();
+    g.fillStyle = STEEL.lo; g.fill(); g.lineWidth = 1.6; g.strokeStyle = STEEL.ink; g.stroke();
+    g.beginPath(); g.moveTo(...b1); g.lineTo(...off(mid, hw)); g.lineTo(...tip); g.closePath(); g.fillStyle = STEEL.hi; g.fill();
+    g.fillStyle = W.metal; g.strokeStyle = STEEL.ink; g.lineWidth = 1.2; g.beginPath(); g.arc(b1[0], b1[1], H * 0.018, 0, 7); g.fill(); g.stroke(); // the socket ring
+  }
+  // the war fan: folded, an iron baton; open (in an attack), a half disc of ribs and painted paper
+  function drawFan(g, rig, W, h, deg, w, open) {
+    const H = rig.H, a = deg * R, d = [Math.sin(a), Math.cos(a)], L = W.len * H, k = Math.max(0, Math.min(1, open || 0));
+    if (k < 0.15) {
+      const tip = [h[0] + d[0] * L, h[1] + d[1] * L];
+      stroke(g, [h, tip], w * 0.7 + 2.5, STEEL.ink); stroke(g, [h, tip], w * 0.7, W.grip);
+      stroke(g, [[h[0] + d[0] * L * 0.2, h[1] + d[1] * L * 0.2], [tip[0] - d[0] * 2, tip[1] - d[1] * 2]], 1.2, W.metal);
+    } else {
+      const span = 2.4 * k, a0 = Math.atan2(d[1], d[0]) - span / 2; // the fan opens around its line
+      g.beginPath(); g.moveTo(h[0], h[1]); g.arc(h[0], h[1], L, a0, a0 + span); g.closePath();
+      const pg = g.createRadialGradient(h[0], h[1], L * 0.2, h[0], h[1], L);
+      pg.addColorStop(0, "#f4ecd8"); pg.addColorStop(0.7, "#f4ecd8"); pg.addColorStop(0.71, rig.style.color); pg.addColorStop(1, rig.style.color);
+      g.fillStyle = pg; g.fill(); g.lineWidth = 2; g.strokeStyle = STEEL.ink; g.stroke();
+      g.strokeStyle = "rgba(20,23,29,0.55)"; g.lineWidth = 1;
+      for (let j = 1; j < 9; j++) { const aa = a0 + (span * j) / 9; g.beginPath(); g.moveTo(h[0], h[1]); g.lineTo(h[0] + Math.cos(aa) * L, h[1] + Math.sin(aa) * L); g.stroke(); }
+      g.strokeStyle = W.metal; g.lineWidth = 2.2; g.beginPath(); g.arc(h[0], h[1], L, a0, a0 + span); g.stroke(); // the iron edge
+    }
+    g.fillStyle = W.metal; g.strokeStyle = STEEL.ink; g.lineWidth = 1.2; g.beginPath(); g.arc(h[0], h[1], H * 0.02, 0, 7); g.fill(); g.stroke(); // the rivet
+  }
   // a thrown blade in world space: the point at (x, y), along its flight, or tumbling when knocked loose
   function drawThrown(g, rig, x, y, vx, vy, tumble) {
     const W = WEAPONS[rig.style.prop];
     if (!W) return;
+    if (rig.style.prop === "fan") { const t = (tumble || 0) * 3; drawFan(g, rig, W, [x, y], t, rig.H * 0.075, tumble !== 0 || Math.hypot(vx, vy) > 600 ? 1 : 0.6); return; } // a fan flies open, spinning like a disc
     const deg = tumble ? tumble : Math.atan2(vx, vy) / R, a = deg * R, L = W.len * rig.H;
     drawWeapon(g, rig, [x - Math.sin(a) * L, y - Math.cos(a) * L], deg, rig.H * 0.075);
   }
@@ -388,11 +444,13 @@
     const c = Math.cos((q.rot || 0) * R), sn = Math.sin((q.rot || 0) * R);
     return pts.map(([x, y]) => { x *= sx; const yy = y - cy; return [x * c - yy * sn, x * sn + yy * c + cy]; });
   }
-  function drawProp(g, rig, J, q, w) { drawWeapon(g, rig, J.hand1, J.handAngle + (q.prop || 0), w); }
+  function drawProp(g, rig, J, q, w) { drawWeapon(g, rig, J.hand1, J.handAngle + (q.prop || 0), w, q.open); }
   // a weapon on its own: the grip at `h`, pointing along `deg` (0 is straight down); thrown blades use it too
-  function drawWeapon(g, rig, h, deg, w) {
+  function drawWeapon(g, rig, h, deg, w, open) {
     const W = WEAPONS[rig.style.prop];
     if (!W) return;
+    if (rig.style.prop === "spear") return drawSpear(g, rig, W, h, deg, w);
+    if (rig.style.prop === "fan") return drawFan(g, rig, W, h, deg, w, open);
     const H = rig.H, { pts, d, nrm } = bladeFrom(rig, h, deg), at = (t) => [h[0] + d[0] * t * H, h[1] + d[1] * t * H];
     const off = (p, k) => [p[0] + nrm[0] * k, p[1] + nrm[1] * k];
     // grip and pommel behind the hand
