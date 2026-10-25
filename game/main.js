@@ -430,7 +430,7 @@
         const w = body * (0.42 + Math.min(0.3, p.launch / 12000));
         fx.puff(x - (p.vx / S) * 0.3, y - body / 2 - (p.vy / S) * 0.3, w, { s0: 0.9, s1: 1.25, pop: 8, life: 50, under: 1 });
       }
-      if (p.st === ST.ATK && p.t === M.mv[i][p.mv].su && p.mv <= 4 && !style(i).trail) { // a white swing crescent on every light, hit or miss
+      if (p.st === ST.ATK && p.t === M.mv[i][p.mv].su && p.mv <= 4 && !style(i).trail && !gfx[i].stick) { // a white swing crescent on every light, hit or miss
         const b = M.box(p, M.mv[i][p.mv]).map((v) => v / S);
         const sm = `smear${1 + Math.floor(rnd() * 3)}`;
         fx.add(sm, (b[0] + b[1]) / 2, (b[2] + b[3]) / 2, { w: Math.max(18, (b[1] - b[0]) * 0.55), flip: -p.face, rot: (rnd() - 0.5) * 0.4, s0: 0.85, s1: 1, pop: 1, life: 7, alpha: 0.9, im: style(i).smear && tintedVfx(sm, style(i).smear) });
@@ -555,6 +555,10 @@
     }
   }
   const tintBuf = document.createElement("canvas"), tg = tintBuf.getContext("2d");
+  const mixHex = (a, b, k) => { // blend two "#rrggbb" colours
+    const p = (h) => [1, 3, 5].map((j) => parseInt(h.slice(j, j + 2), 16)), x = p(a), y = p(b);
+    return `rgb(${x.map((v, j) => Math.round(v + (y[j] - v) * k)).join(",")})`;
+  };
   function drawSprite(i, p, f, alpha, tint, halo, tintColor = "#fff") {
     const win = p.winPose !== undefined ? p.winPose : st && st.over === i + 1 && st.overT > 20 ? st.overT - 20 : -1;
     const F = gfx[i], x = p.x / S, y = p.y / S;
@@ -588,10 +592,25 @@
       }
       g.save(); g.translate(Math.round(x), Math.round(y)); g.scale(p.face, 1);
       if (p.juice) { g.rotate(p.juice.rot); g.scale(p.juice.sx, p.juice.sy); }
-      // smear frames: the two poses before the strike linger as fading ghosts, like drawn animation
-      if (atk && p.t >= m.su && p.t < m.su + 3 && alpha === 1) {
-        for (const [back, al] of [[2, 0.18], [1, 0.32]]) {
-          g.globalAlpha = al; Stick.draw(g, F, Stick.pose(F, { ...p, t: p.t - back }, f, M.mv[i], Sim, win), { tint: 1, tintColor: "#ffffff", f });
+      // the blade's path: a ribbon swept through where the steel was over the last frames, bright at the edge
+      if (atk && alpha === 1 && p.t >= m.su - 1 && p.t < m.su + m.ac + 3) {
+        const path = [];
+        for (let back = 0; back <= 4; back++) {
+          const t = p.t - back;
+          if (t < m.su - 1) break;
+          const b = Stick.blade(F, Stick.pose(F, { ...pp, t }, f, M.mv[i], Sim, win));
+          if (b) path.push(b);
+        }
+        if (path.length > 1) {
+          const n = path[0].length - 1, at = (bl, u) => bl[Math.round(u * n)];
+          for (let k = path.length - 2; k >= 0; k--) {
+            const a0 = path[k], a1 = path[k + 1], fade = 1 - k / (path.length - 1);
+            g.globalAlpha = 0.55 * fade + 0.15;
+            g.fillStyle = k === 0 ? "#ffffff" : mixHex(F.style.color, "#ffffff", 0.55);
+            g.beginPath(); g.moveTo(...at(a0, 1)); g.lineTo(...at(a1, 1)); g.lineTo(...at(a1, 0.7)); g.lineTo(...at(a0, 0.7)); g.closePath(); g.fill();
+          }
+          g.globalAlpha = 0.9; g.strokeStyle = "#ffffff"; g.lineWidth = 2; g.lineCap = "round";
+          g.beginPath(); g.moveTo(...at(path[0], 1)); for (const bl of path.slice(1)) g.lineTo(...at(bl, 1)); g.stroke(); // the edge of the swing
         }
       }
       g.globalAlpha = alpha;
@@ -799,6 +818,10 @@
           g.globalAlpha = 0.55 + 0.3 * Math.sin(st.f * 1.5); g.lineCap = "round";
           g.lineWidth = 5; g.strokeStyle = "#14060f"; g.beginPath(); g.arc(-body * 0.1, 0, body * 0.5, -1.1, 1.1); g.stroke();
           g.lineWidth = 3; g.strokeStyle = "#ff3d64"; g.beginPath(); g.arc(-body * 0.1, 0, body * 0.5, -1.1, 1.1); g.stroke();
+        } else if (gfx[m.i].stick) { // a stick fighter parries with the blade: a bright arc swept across the guard
+          g.globalAlpha = Math.min(1, fade * 1.6); g.lineCap = "round"; const r = body * (0.45 + 0.15 * Math.min(1, m.t / 4));
+          g.lineWidth = 7; g.strokeStyle = "#14060f"; g.beginPath(); g.arc(-body * 0.1, 0, r, -1.2, 1.2); g.stroke();
+          g.lineWidth = 4; g.strokeStyle = "#ffffff"; g.stroke(); g.lineWidth = 2; g.strokeStyle = gfx[m.i].style.color; g.beginPath(); g.arc(-body * 0.1, 0, r - 4, -1.1, 1.1); g.stroke();
         } else Flair.canopy(g, -body * 0.08, 0, body * (0.45 + 0.2 * Math.min(1, m.t / 4)), Math.min(1, fade * 1.6), "#ff3d64");
       }
       g.restore();

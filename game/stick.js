@@ -74,6 +74,30 @@
     // down air: a corkscrew plunge, straight as a drill, the blade leading
     8: { wind: P([ 10,  0, 160,  20,-140,   20,  70,-120,  60,-120]), strike: P([ 10, 15,  10,   0, -10,    0,   5,   0,  -5,   0,  0, 0, 0, 0.1]), spin: 1080, flip: 1 },
   };
+  // more ways to throw each step: the sim's roll (p.vr) picks one, so a string rarely repeats
+  //                                     lean head  a1   e1   a2    e2   l1   k1    l2   k2  prop open dx    dy   rot spin
+  const KICKS_ALT = {
+    0: [{ wind: P([ -5,  0,  60,  80, -60,  -60,  60, -90, -20, -10]), strike: P([-48,-10, 120,  60, 150,  -60, 128,  -5, -12,  -5,  0, 0, 0.08]) }, // a high roundhouse to the head
+        { wind: P([ 15,  5,  80,  60, -40,  -90,  40, -60, -20, -10]), strike: P([ 20,  5,  60, 100,  70,  -90,  95,-140, -25, -10,  0, 0, 0.08]) }], // a knee and an elbow
+    1: [{ wind: P([ -5,  0,  60,  80, -60,  -60,  60, -90, -20, -10]), strike: P([-48,-10, 120,  60, 150,  -60, 128,  -5, -12,  -5,  0, 0, 0.12]) },
+        { wind: P([ 15,  5,  80,  60, -40,  -90,  40, -60, -20, -10]), strike: P([ 20,  5,  60, 100,  70,  -90,  95,-140, -25, -10,  0, 0, 0.12]) }],
+    2: [{ wind: P([ 30,  5, -40,  40, -60,  -60,  75,-150, -10,-120]), strike: P([ 35,  5,  95,   0, -70,  -40,  75,-150, -10,-120,  0, 0, 0.1]), turn: 360 }], // a spinning low cut
+    3: [{ wind: P([ 10,  0,  40,  40, -60,  -60,  60,-100, -15, -60]), strike: P([-10, -10, 150,  20,-160,   20, 110,-140, -15, -10,  0, 0, 0, -0.12]) }], // a rising knee
+    4: [{ wind: P([ 10,  0, 130,  20,-120,   20,  70,-110,  30,-100]), strike: P([ -5,  0,  60,  90,-140,   20,  95,   0, -30, -60]), spin: 360, flip: 1 }], // a spinning heel
+    8: [{ wind: P([  0,  0, 140,  30,-140,  -30,  80,-130,  70,-130]), strike: P([ 20, 10,  90,  60, -90,   30,  80,-140, -10, -10]) }], // a knee drop
+  };
+  const FINISH_ALT = {
+    0: [{ wind: P([ 22,  8,  70,  80, -60,  -60,  75,-140, -10,-120]), strike: P([-30, -5,  50, 100,-140,   20,  95,  -5, -40, -90,  0, 0, 0.3, -0.25]), spin: 720, flip: 1 }, // a tornado kick
+        { wind: P([ 30,  8, -60,  40, -60,  -60,  75,-150, -10,-120]), strike: P([ -8,-15, 178,   0, -40,  -20,  10, -10, -30, -60,  0, 0, 0.1, -0.3]) }], // a rising dragon slash
+    1: [{ wind: P([ 22,  8,  70,  80, -60,  -60,  75,-140, -10,-120]), strike: P([-30, -5,  50, 100,-140,   20,  95,  -5, -40, -90,  0, 0, 0.36, -0.25]), spin: 720, flip: 1 },
+        { wind: P([ 30,  8, -60,  40, -60,  -60,  75,-150, -10,-120]), strike: P([ -8,-15, 178,   0, -40,  -20,  10, -10, -30, -60,  0, 0, 0.15, -0.3]) }],
+    2: [{ wind: P([ 35,  5, -50,  30, -60,  -60,  75,-150, -10,-120]), strike: P([ -5,-10, 170,   0, -60,  -20,  20, -20, -20, -40,  0, 0, 0.05, -0.12]) }], // a launcher: blade from the floor to the sky
+    3: [{ wind: P([ 22,  0,  40,  40, -60,  -60,  75,-140, -10,-120]), strike: P([  0,  0, 100,   0,-100,    0,  10,   0, -10,   0,  0, 0, 0, -0.3]), spin: 1080, flip: 1 }], // a helicopter
+    4: [{ wind: P([ 10,  0, 130,  20,-120,   20,  70,-110,  30,-100]), strike: P([ 25, 10,  80,  60, -90,   30,  95,   0, -15, -60]), spin: 0 }], // an axe dive
+    8: [{ wind: P([ 10,  0, 160,  20,-140,   20,  70,-120,  60,-120]), strike: P([ 20, 10,  90,  60, -90,   30,  10,   0, -10,   0,  0, 0, 0, 0.15]) }], // a meteor stomp
+  };
+  // hit 1 of a jab or side light, sometimes: a reverse rising slash instead of the usual cut
+  const rising = (k) => ({ wind: add(k.wind, { a1: -150, e1: 30, lean: -10 }), strike: add(k.strike, { a1: 55, e1: -10, lean: 12, head: -8 }) });
   const backhand = (k) => ({ wind: add(k.strike, { a1: 60, lean: -12 }), strike: add(k.strike, { a1: -25, e1: 20, lean: 10 }), spin: 360, flip: 1 });
   const leaping = (k) => ({ wind: add(BASE.deep, { a1: 100, e1: 40 }), strike: add(k.strike, { lean: 22, dx: 0.25, dy: -0.16, k1: -45, k2: -70, l2: -15 }) });
   // the generic moveset: [wind-up, strike], plus spin degrees over the active frames when it whirls
@@ -94,7 +118,7 @@
   const STYLES = {
     // the countess: a parasol whose tip is a rapier, opened as a shield and for her spin
     "stick-vespera": {
-      color: "#d0173f", prop: "parasol", acc: ["bun", "cape"], batForm: 6, moves: {
+      color: "#d0173f", prop: "rapier", acc: ["bun", "cape"], batForm: 6, moves: {
         0: { wind: P([  0, -4,  60,  60, -60,  -60,  20, -30, -20, -10]), strike: P([ 20, -4,  92,   0, -60,  -60,  35, -35, -35,  -5,  0, 0, 0.05]) },
         1: { wind: P([ -5, -4,  70,  70, -60,  -60,  15, -40, -15, -40]), strike: P([ 40, -4,  92,   0,-100,    0,  75, -75, -60,   0,  0, 0, 0.25]) },
         2: { wind: P([  0, -4,  60,  70, -60,  -60,  45, -90, -15, -70,  0, 0.3]), strike: P([ -8, -8,  88,  -5, -50,  -60,  50, -90, -20, -70,   0, 1]) },
@@ -115,8 +139,41 @@
       },
     },
     // the djinn swordsman: a scimitar and a long scarf
-    "stick-saif": { color: "#1f5a43", prop: "scimitar", acc: ["scarf"], moves: {}, victory: P([-5, -10, 175, -10, -60, 90, 20, -20, -15, 0, 0]) },
+    "stick-saif": { color: "#1f5a43", prop: "shamshir", acc: ["scarf"], moves: {}, victory: P([-5, -10, 175, -10, -60, 90, 20, -20, -15, 0, 0]) },
   };
+
+  // ---------- movement variety: the sim rolls p.jv at each jump, so every jump can look different ----------
+  //                    lean head  a1   e1   a2    e2   l1   k1    l2   k2  prop open dx    dy   rot spin
+  const VARY = {
+    ninja:     P([  30,  10,-120,  20,-140,   10,  85,-125, -35, -50]), // knee up, arms and blade swept back
+    split:     P([   0,   0, 150,   0,-150,    0,  85,   0, -85,   0]), // legs flat out like a scissor
+    cork:      P([   0,   0,  30, 140, -30, -140,   5,   0,  -5,   0]), // arms crossed, straight as a drill
+    layout:    P([   0,   0, 100,   0,-100,    0,  10,   0, -10,   0]), // a straight-bodied backflip
+    reach:     P([   5,  -15, 60,  30,-175,    0,  10,  -5, -20, -10]), // one hand up for the ledge
+    tuck:      BASE.tuck,
+    landReady: P([  15,   5,  60,  40, -60,  -40,  60,-100,  40, -90]),
+    landNinja: P([  35,  10,-110,  20,  15,    0,  70,-130, -30, -80,   0,   0,  0,  0.02]),
+  };
+  const FALLS = [BASE.fall, P([20, 10, -100, 30, -130, 20, 70, -110, -20, -60]), P([0, 0, 110, -10, -110, 10, 30, -30, -20, -20]), P([20, 10, -100, 30, -130, 20, 70, -110, -20, -60])];
+  FALLS[9] = VARY.landReady;
+  // a jump's look by variant, u: 0 at takeoff, 1 at the top of the rise
+  function airVariant(air, jv, u, f) {
+    const e = eio(u);
+    if (jv === 9) { // the vault: reach up for the platform, then tuck and flip over onto it, feet ready
+      if (u < 0.35) return lerp(BASE.launch, VARY.reach, eo(u / 0.35));
+      const k = (u - 0.35) / 0.65;
+      return { ...lerp(VARY.tuck, VARY.landReady, Math.max(0, k * 2 - 1)), rot: 360 * eio(Math.min(1, k * 1.15)) };
+    }
+    if (air) {
+      if (jv === 1) return { ...lerp(BASE.jump, VARY.layout, Math.min(1, u * 2)), rot: -360 * e }; // a backflip layout
+      if (jv === 2) return lerp(BASE.jump, VARY.split, eo(Math.min(1, u * 1.6))); // a scissor kick in the air
+      return { ...lerp(BASE.jump, VARY.tuck, Math.min(1, u * 2)), rot: 360 * e }; // a tucked front flip
+    }
+    if (jv === 1) return lerp(BASE.launch, VARY.ninja, eo(Math.min(1, u * 1.4)));
+    if (jv === 2) return { ...lerp(BASE.launch, VARY.split, eo(Math.min(1, u * 1.5))), rot: 360 * e }; // an aerial, legs split
+    if (jv === 3) return { ...lerp(BASE.launch, VARY.cork, Math.min(1, u * 2)), spin: 720 * e }; // a corkscrew
+    return { ...lerp(BASE.launch, VARY.tuck, Math.min(1, u * 2.2)), rot: 360 * e }; // a tucked front flip
+  }
 
   // ---------- pose selection (pure) ----------
   function basePose(rig, p, f, ph, Sim) {
@@ -153,6 +210,12 @@
         return { ...BASE.stance, lean: 10, a1: 40, e1: 30, a2: -70, e2: 50, l1: 55 * s2, k1: -20 - 90 * Math.max(0, c2), l2: -55 * s2, k2: -20 - 90 * Math.max(0, -c2), rot: -80 };
       }
       if (p.wall) return BASE.wall;
+      const wallJump = p.wj < 3 && p.jumps === ph.airJumps;
+      if (ph.kit && !p.sj && !wallJump && !p.ff) { // the stick kit: every jump and fall picks a variant from the sim's roll
+        const air = p.jumps < ph.airJumps;
+        if (p.vy < 0) return airVariant(air, p.jv, Math.max(0, Math.min(1, 1 - p.vy / (air ? ph.airJumpV : ph.jumpV))), f);
+        return FALLS[p.jv] || BASE.fall;
+      }
       if (p.vy < 0) {
         const pose = lerp(p.vy < ph.jumpV * 0.75 ? BASE.launch : BASE.jump, BASE.fall, Math.max(0, Math.min(1, (p.vy + 1600) / 1600)));
         if (p.sj) pose.rot = 720 * Math.max(0, Math.min(1, 1 - p.vy / (ph.jumpV * 1.35))); // a super jump: a double front flip on the way up
@@ -165,9 +228,12 @@
       return p.ff ? BASE.dive : BASE.fall;
     }
     if (p.hero > 0 && Math.abs(p.vx) < 300) return lerp(BASE.stance, BASE.hero, Math.min(1, p.hero * 1.6)); // set by the renderer after a hard landing
-    if (p.land > 0) return lerp(BASE.stance, BASE.crouch, p.land / 6);
+    if (p.land > 0) return lerp(BASE.stance, ph.kit && p.jv % 2 ? VARY.landNinja : BASE.crouch, p.land / 6); // some landings touch down a hand
     if (ph.kit && p.vx * p.face < -350) return BASE.skid; // turning at speed: heels dug in
     if (p.crouch > 0) return p.crouch >= 10 ? add(BASE.deep, { lean: 2 * Math.sin(f * 1.7), a1: 3 * Math.sin(f * 2.3) }) : lerp(BASE.stance, BASE.deep, p.crouch / 10);
+    if (ph.kit && Math.abs(p.vx) > ph.run + 120) { // a ninja sprint: leaning hard, both arms swept straight back, the blade trailing
+      return { ...runPose(BASE.stance, p, H, 1.6), a1: -118, e1: 0, prop: 8, a2: -128, e2: 6, head: -28 };
+    }
     if (Math.abs(p.vx) > 150) return runPose(BASE.stance, p, H, 1);
     // idle: a fencer's bounce on the balls of the feet, the guard bobbing
     const b = Math.sin(f / (ph.kit ? 9 : 22)), bb = Math.abs(b);
@@ -186,7 +252,10 @@
     const base = basePose(rig, p, f, rig.ph, Sim);
     if (p.st !== ST.ATK) return base;
     const m = moves[p.mv], k0 = (st.moves && st.moves[p.mv]) || GENERIC[p.mv];
-    const k = p.cmb === 1 ? (st.kicks && st.kicks[p.mv]) || KICKS[p.mv] || backhand(k0) : p.cmb >= 2 ? (st.finish && st.finish[p.mv]) || FINISH[p.mv] || leaping(k0) : k0;
+    const pick = (opts) => { const o = opts.filter(Boolean); return o.length ? o[((p.vr || 0) >> 2) % o.length] : null; };
+    const k = p.cmb === 1 ? pick([st.kicks && st.kicks[p.mv], KICKS[p.mv], ...(KICKS_ALT[p.mv] || [])]) || backhand(k0)
+      : p.cmb >= 2 ? pick([st.finish && st.finish[p.mv], FINISH[p.mv], ...(FINISH_ALT[p.mv] || [])]) || leaping(k0)
+      : rig.ph && rig.ph.kit && (p.mv === 0 || p.mv === 1) && (p.vr || 0) % 3 === 2 ? rising(k0) : k0;
     const stance = p.ground ? BASE.stance : BASE.fall;
     let out;
     if (p.t < m.su) {
@@ -277,32 +346,64 @@
     g.restore();
     return J;
   }
+  // ---------- weapons: drawn as real steel, two-tone bevel, guard, wrapped grip, pommel ----------
+  const STEEL = { hi: "#f4f8fc", mid: "#b9c3ce", lo: "#6c7786", ink: "#14171d" };
+  const WEAPONS = {
+    // a duelling rapier: long, narrow and straight, a swept gold hilt with a cup and quillons
+    rapier: { len: 0.9, base: 0.05, w0: 0.02, w1: 0.012, bend: 0, metal: "#c9a24a", grip: "#5a0d1f" },
+    // a shamshir: a deep curve that widens toward the point, drooping quillons
+    shamshir: { len: 0.78, base: 0.05, w0: 0.026, w1: 0.04, bend: 0.11, metal: "#e0a640", grip: "#1f5a43" },
+  };
+  // the blade's centre line in local space: points from the guard to the point, along the hand
+  function bladeLine(rig, J, q, n = 10) {
+    const W = WEAPONS[rig.style.prop], H = rig.H, a = (J.handAngle + (q.prop || 0)) * R, d = [Math.sin(a), Math.cos(a)], nrm = [-d[1], d[0]], h = J.hand1;
+    const pts = [];
+    for (let k = 0; k <= n; k++) {
+      const u = k / n, t = W.base + (W.len - W.base) * u, b = W.bend * H * Math.sin(u * Math.PI * 0.85) * u;
+      pts.push([h[0] + d[0] * t * H + nrm[0] * b, h[1] + d[1] * t * H + nrm[1] * b]);
+    }
+    return { pts, d, nrm, h };
+  }
+  // the blade from guard to point, in the same space the body is drawn in (after rot and spin)
+  function blade(rig, q) {
+    if (!WEAPONS[rig.style.prop]) return null;
+    const J = joints(rig, q), { pts } = bladeLine(rig, J, q, 6), cy = -rig.H * 0.5, sx = q.spin ? Math.cos(q.spin * R) || 0.05 : 1;
+    const c = Math.cos((q.rot || 0) * R), sn = Math.sin((q.rot || 0) * R);
+    return pts.map(([x, y]) => { x *= sx; const yy = y - cy; return [x * c - yy * sn, x * sn + yy * c + cy]; });
+  }
   function drawProp(g, rig, J, q, w, body) {
-    const H = rig.H, a = (J.handAngle + (q.prop || 0)) * R, d = [Math.sin(a), Math.cos(a)], h = J.hand1;
-    const at = (t) => [h[0] + d[0] * t * H, h[1] + d[1] * t * H], nrm = [-d[1], d[0]];
-    if (rig.style.prop === "parasol") {
-      const tip = at(0.62), end = at(0.48);
-      stroke(g, [h, end], w * 0.45, "#14060f");
-      g.strokeStyle = "#e9eef5"; g.lineWidth = w * 0.35; g.beginPath(); g.moveTo(end[0], end[1]); g.lineTo(tip[0], tip[1]); g.stroke(); // the rapier tip
-      const open = q.open || 0;
-      if (open < 0.5) { // furled: a slim black spindle along the shaft
-        const m0 = at(0.14), m1 = at(0.46), bw = H * (0.04 + 0.1 * open);
-        g.fillStyle = "#14060f"; g.strokeStyle = "#ff3d64"; g.lineWidth = 1.2; g.beginPath(); g.moveTo(m0[0], m0[1]);
-        g.quadraticCurveTo(at(0.3)[0] + nrm[0] * bw, at(0.3)[1] + nrm[1] * bw, m1[0], m1[1]);
-        g.quadraticCurveTo(at(0.3)[0] - nrm[0] * bw, at(0.3)[1] - nrm[1] * bw, m0[0], m0[1]); g.fill(); g.stroke();
-      } else { // open: a lace dome across the shaft, the canopy facing along it
-        const c = at(0.36), r = H * 0.3 * Math.min(1, open);
-        g.fillStyle = "rgba(20,6,15,0.92)"; g.strokeStyle = "#ff3d64"; g.lineWidth = 2;
-        g.beginPath(); g.moveTo(c[0] + nrm[0] * r, c[1] + nrm[1] * r);
-        g.quadraticCurveTo(c[0] + d[0] * r * 0.9, c[1] + d[1] * r * 0.9, c[0] - nrm[0] * r, c[1] - nrm[1] * r);
-        for (let k = 1; k <= 4; k++) { const t0 = 1 - (k / 4) * 2, tm = t0 + 0.25; g.quadraticCurveTo(c[0] + nrm[0] * r * tm - d[0] * r * 0.12, c[1] + nrm[1] * r * tm - d[1] * r * 0.12, c[0] + nrm[0] * r * t0, c[1] + nrm[1] * r * t0); }
-        g.fill(); g.stroke();
-      }
-    } else if (rig.style.prop === "scimitar") {
-      const L = 0.5, pts = [];
-      for (let k = 0; k <= 8; k++) { const t = 0.08 + (L - 0.08) * (k / 8), bend = Math.sin((k / 8) * Math.PI * 0.9) * H * 0.07; const p = at(t); pts.push([p[0] + nrm[0] * bend, p[1] + nrm[1] * bend]); }
-      stroke(g, pts, w * 0.75 + 2, "rgba(20,20,30,0.9)"); stroke(g, pts, w * 0.75, "#dfe6ee");
-      const gd = at(0.08); stroke(g, [[gd[0] - nrm[0] * H * 0.05, gd[1] - nrm[1] * H * 0.05], [gd[0] + nrm[0] * H * 0.05, gd[1] + nrm[1] * H * 0.05]], w * 0.6, "#e0a640");
+    const W = WEAPONS[rig.style.prop];
+    if (!W) return;
+    const H = rig.H, { pts, d, nrm, h } = bladeLine(rig, J, q), at = (t) => [h[0] + d[0] * t * H, h[1] + d[1] * t * H];
+    const off = (p, k) => [p[0] + nrm[0] * k, p[1] + nrm[1] * k];
+    // grip and pommel behind the hand
+    const pom = at(-0.075);
+    stroke(g, [at(-0.065), at(0.035)], w * 0.62 + 2, STEEL.ink); stroke(g, [at(-0.065), at(0.035)], w * 0.62, W.grip);
+    g.strokeStyle = W.metal; g.lineWidth = 1;
+    for (let k = 0; k < 4; k++) { const a0 = at(-0.055 + k * 0.024), a1 = at(-0.045 + k * 0.024); g.beginPath(); g.moveTo(...off(a0, -w * 0.3)); g.lineTo(...off(a1, w * 0.3)); g.stroke(); }
+    g.fillStyle = W.metal; g.strokeStyle = STEEL.ink; g.lineWidth = 1.2;
+    g.beginPath(); g.arc(pom[0], pom[1], H * 0.022, 0, 7); g.fill(); g.stroke();
+    // the blade: a tapered outline, the edge half bright and the spine half shaded, a glint down the middle
+    const n = pts.length - 1, half = (k) => H * (W.w0 + (W.w1 - W.w0) * (k / n)) * (k === n ? 0 : 1) * (k > n - 2 ? 0.55 : 1);
+    const left = pts.map((p, k) => off(p, half(k))), right = pts.map((p, k) => off(p, -half(k)));
+    g.beginPath(); g.moveTo(...left[0]); for (const p of left) g.lineTo(...p); for (let k = n; k >= 0; k--) g.lineTo(...right[k]); g.closePath();
+    g.fillStyle = STEEL.lo; g.fill(); g.lineWidth = 1.6; g.strokeStyle = STEEL.ink; g.stroke();
+    g.beginPath(); g.moveTo(...left[0]); for (const p of left) g.lineTo(...p); for (let k = n; k >= 0; k--) g.lineTo(...pts[k]); g.closePath();
+    g.fillStyle = STEEL.hi; g.fill();
+    g.strokeStyle = STEEL.mid; g.lineWidth = 1; g.beginPath(); g.moveTo(...pts[1]); for (let k = 2; k < n - 1; k++) g.lineTo(...pts[k]); g.stroke(); // the fuller
+    // the guard over the blade's root
+    const gd = at(0.045);
+    if (rig.style.prop === "rapier") {
+      g.strokeStyle = STEEL.ink; g.lineWidth = w * 0.42 + 2; g.beginPath(); g.moveTo(...off(gd, H * 0.08)); g.lineTo(...off(gd, -H * 0.08)); g.stroke();
+      g.strokeStyle = W.metal; g.lineWidth = w * 0.42; g.stroke();
+      g.lineWidth = 2.2; g.beginPath(); g.moveTo(...off(gd, H * 0.075)); g.quadraticCurveTo(...off(at(0.0), H * 0.12), ...off(pom, H * 0.02)); g.stroke(); // the knuckle bow
+      g.fillStyle = W.metal; g.strokeStyle = STEEL.ink; g.lineWidth = 1.2; g.beginPath(); g.ellipse(gd[0], gd[1], H * 0.03, H * 0.045, Math.atan2(d[1], d[0]), 0, 7); g.fill(); g.stroke(); // the cup
+      for (const k of [1, -1]) { const e = off(gd, k * H * 0.085); g.beginPath(); g.arc(e[0], e[1], H * 0.014, 0, 7); g.fill(); g.stroke(); }
+    } else {
+      const a = off(at(0.07), H * 0.08), b = off(at(0.07), -H * 0.08); // quillons drooping toward the blade
+      g.strokeStyle = STEEL.ink; g.lineWidth = w * 0.45 + 2; g.beginPath(); g.moveTo(...a); g.quadraticCurveTo(...gd, ...b); g.stroke();
+      g.strokeStyle = W.metal; g.lineWidth = w * 0.45; g.stroke();
+      g.fillStyle = W.metal; g.strokeStyle = STEEL.ink; g.lineWidth = 1.2; g.beginPath(); g.arc(gd[0], gd[1], H * 0.022, 0, 7); g.fill(); g.stroke();
     }
   }
 
@@ -318,5 +419,5 @@
     return c;
   }
 
-  root.Stick = { STYLES, create, pose, draw, joints, still, BASE };
+  root.Stick = { STYLES, WEAPONS, create, pose, draw, joints, blade, still, BASE };
 })(this);

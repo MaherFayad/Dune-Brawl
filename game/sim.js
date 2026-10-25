@@ -70,9 +70,10 @@
     // a super jump from a crouch, a wall run, a roll out of hard landings, and a short grace
     // jump after running off a ledge.
     kit: {
-      grav: 125, jumpV: 2040, airJumpV: 1900, jumpCut: 1000, maxFall: 1600, fastFall: 2700,
-      run: 1000, sprint: 1350, sprintAfter: 24, gAcc: 520, airMax: 920, airAcc: 260,
-      dashA: 1850, dashAFrames: 12, dashACd: 30, dashACount: 2, dashADrag: 5,
+      grav: 150, jumpV: 2500, airJumpV: 2150, jumpCut: 1100, maxFall: 1850, fastFall: 3100,
+      run: 1080, sprint: 1550, sprintAfter: 18, gAcc: 720, airMax: 1000, airAcc: 340,
+      dashA: 2100, dashAFrames: 12, dashACd: 30, dashACount: 2, dashADrag: 5, dashStrikeFrom: 3,
+      carryDrag: 4, bounceV: 2200, stompDmg: 2, stompStun: 10, // a running attack keeps its speed; landing on a head bounces
       slideSpeed: 1450, slideFrames: 24, slideDrag: 3,
       coyote: 6, superJump: 135, crouchFor: 10, wallRun: 22, wallRunV: 950, wallKick: 1050, kickLock: 10,
       rollSpeed: 1150, rollFrames: 14, hardLand: 1250,
@@ -141,7 +142,7 @@
       chase: 0, chg: 0, hang: 0,
       dt: 0, dk: 0, ds: 999, chaseT: 0, lock: 0, dlock: 0, squat: 0, lag: 0, sig: 0, dashCd: 0,
       slide: 0, coy: 0, crouch: 0, wr: 0, runT: 0, adash: 0, // stick kit: slide (1) or roll (2), grace jump, crouch, wall run, sprint, air dashes
-      cmb: 0, cmbT: 0, sj: 0, kick: 0, // combo step of the current light (0, 1, 2 = finisher) and the window to continue it
+      cmb: 0, cmbT: 0, sj: 0, kick: 0, carry: 0, hb: 0, vr: 0, jv: 0, // vr: the variation seed of the current jump or attack; jv: the jump's style (9: a vault onto a platform) // combo step of the current light (0, 1, 2 = finisher) and the window to continue it
     };
   }
   const PKEYS = Object.keys(player(0, 1, { airJumps: 2 }));
@@ -193,6 +194,13 @@
       return pressed;
     }
 
+    // a deterministic roll for animation variety: same inputs, same flips, so rollback agrees
+    function vary(s, i, p) { p.vr = (s.f * 37 + i * 101 + p.vr * 13 + Math.abs(div(p.x, S))) % 9973; }
+    // a jump that will carry up onto a platform overhead gets the vault
+    function vaultable(p, P) {
+      const reach = div(P.jumpV * P.jumpV, 2 * P.grav);
+      return STAGE.plats.some((pl) => p.x > pl.x1 - 30 * S && p.x < pl.x2 + 30 * S && pl.y < p.y - 20 * S && p.y - pl.y < reach);
+    }
     function stepPlayer(s, i, input) {
       const p = s.p[i], P = ph[i], M = mv[i];
       const pressed = bufferPress(p, input);
@@ -242,6 +250,7 @@
         const since = p.dt - p.t, atk = p.bufT > 0 && p.buf & (IN.A | IN.B);
         if (atk && p.dk === 4 && since <= FEEL.chaseCancel) { p.st = ST.IDLE; p.t = 0; p.inv = Math.max(p.inv, FEEL.chaseCancelInv); }
         else if (atk && (p.dk === 2 || p.dk === 3) && since <= FEEL.gcWindow) { p.st = ST.IDLE; p.t = 0; gc = 1; }
+        else if (atk && K && p.dk === 1 && since >= K.dashStrikeFrom) { p.st = ST.IDLE; p.t = 0; } // a dash strike: the air dash turns into an attack, keeping its speed
         const drag = K && p.dk === 1 ? K.dashADrag : FEEL.dodgeDragA;
         if (p.ground) p.vx -= div(FEEL.dodgeDragG * p.vx, 100);
         else { p.vx -= div(drag * p.vx, 100); p.vy -= div(drag * p.vy, 100); }
@@ -262,7 +271,7 @@
           if (m.iy) p.vy = m.iy;
           if (m.iy < 0) p.ground = 0;
         }
-        if (p.ground) p.vx -= div(12 * p.vx, 100);
+        if (p.ground) p.vx -= div((p.carry ? K.carryDrag : 12) * p.vx, 100);
         else if (dx) {
           p.vx += dx * div(P.airAcc, 2);
           if (Math.abs(p.vx) > P.airMax) p.vx -= dx * div(P.airAcc, 2);
@@ -313,10 +322,12 @@
             p.sj = p.crouch >= K.crouchFor ? 1 : 0; // a super jump (the renderer flips it twice)
             p.vy = p.sj ? div(P.jumpV * K.superJump, 100) : P.jumpV;
             p.ground = 0; p.cut = 0; p.coy = 0; p.crouch = 0; p.ff = 0;
+            vary(s, i, p); p.jv = p.sj ? 0 : vaultable(p, P) ? 9 : p.vr % 4;
           } else if (p.ground) p.squat = FEEL.jumpSquat;
-          else if (p.wall && p.wj > 0) { p.wj--; p.vy = P.jumpV; p.vx = K ? -p.wall * K.wallKick : 0; p.ff = 0; p.cut = 0; p.face = K ? -p.wall : p.wall; p.adash = 0; if (K) p.kick = K.kickLock; } // p.wall points at the wall; the kit kicks off it
+          else if (p.wall && p.wj > 0) { if (K) { vary(s, i, p); p.jv = 0; } p.wj--; p.vy = P.jumpV; p.vx = K ? -p.wall * K.wallKick : 0; p.ff = 0; p.cut = 0; p.face = K ? -p.wall : p.wall; p.adash = 0; if (K) p.kick = K.kickLock; } // p.wall points at the wall; the kit kicks off it
           else if (p.jumps > 0) {
             p.jumps--; p.vy = P.airJumpV; p.vx = dx * P.airMax; p.ff = 0; p.cut = 0;
+            if (K) { vary(s, i, p); p.jv = vaultable(p, P) ? 9 : p.vr % 3; }
             if (dx) p.face = dx;
           }
         } else {
@@ -329,7 +340,8 @@
             else m = input & IN.U ? 3 : input & IN.D ? (grounded ? 2 : 8) : dx ? 1 : grounded ? 0 : 4;
             if (m >= 0) {
               if (dx) p.face = dx;
-              p.st = ST.ATK; p.t = 0; p.mv = m; p.hit = 0; p.chg = 0;
+              p.st = ST.ATK; p.t = 0; p.mv = m; p.hit = 0; p.chg = 0; if (K) vary(s, i, p);
+              p.carry = K && Math.abs(p.vx) > P.run - 100 ? 1 : 0; // attacking at a run slides into the strike
               const light = kind === 1 && m !== 6; // a light inside the combo window continues the string
               p.cmb = K && light && p.cmbT > 0 ? Math.min(2, p.cmb + 1) : 0; p.cmbT = 0;
               if (K && p.cmb === 1) p.t = div(M[m].su * (100 - K.combo2Speed), 100); // hit 2 skips into its startup
@@ -375,6 +387,13 @@
       const wasGround = p.ground, fallV = p.vy;
       move(p, P, M);
       if (p.ground && !wasGround) land(p, M, P, dx, fallV);
+      if (K && !p.ground && !p.hb && p.vy > 300 && p.st !== ST.HIT) { // landing on a foe's head: a stomp and a big bounce
+        const o = s.p[1 - i], O = ph[1 - i], top = o.y - O.h;
+        if (o.st !== ST.DEAD && o.inv <= 0 && Math.abs(p.x - o.x) < P.hw + O.hw && p.y >= top - 6 * S && p.y <= top + 16 * S) {
+          p.vy = -K.bounceV; p.hb = 1; p.adash = 0; p.ff = 0; p.cut = 1; p.y = top - 6 * S;
+          o.dmg += K.stompDmg; if (o.st !== ST.ATK || !mv[1 - i][o.mv].armor) { o.st = ST.HIT; o.t = K.stompStun; o.launch = 0; o.vx = 0; if (!o.ground) o.vy = Math.max(o.vy, 600); }
+        }
+      }
       if (K && wasGround && !p.ground && p.vy >= 0) p.coy = K.coyote; // ran off a ledge: a short grace jump
     }
 
@@ -424,7 +443,7 @@
 
     function land(p, M, P, dx, fallV) {
       // air jumps are refilled by step(), which knows the owner's physics
-      p.recov = 0; p.ff = 0; p.land = 6; p.wj = FEEL.wallJumps;
+      p.recov = 0; p.ff = 0; p.land = 6; p.wj = FEEL.wallJumps; p.hb = 0;
       if (P.kit) { // the stick kit: no landing lag, air dashes back, and a roll out of a hard landing
         p.adash = 0; p.wr = 0; p.dcd = 0; p.sj = 0;
         if (p.st === ST.IDLE && dx && fallV > FEEL.kit.hardLand) { p.st = ST.DASH; p.t = 0; p.slide = 2; p.vx = dx * FEEL.kit.rollSpeed; p.face = dx; }

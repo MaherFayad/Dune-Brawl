@@ -20,6 +20,24 @@ Every animation problem so far came from generated video clips: soft frames, cut
 
 Stick fighters set `kit: 1` and use `FEEL.kit` (`game/sim.js`): an instant jump that goes higher than the reference jump, a sprint that builds after `sprintAfter` frames of running, a slide (down + dodge on the ground, half height), two air dashes per airtime (a superman pose along the dash), a grace jump for `coyote` frames after running off a ledge, a super jump from a held crouch (a double front flip), a roll out of a hard landing held in a direction, and a wall run: hold toward the island's side to run up it for `wallRun` frames, then jump to kick off. A wall kick carries the fighter away for `kickLock` frames before air steering returns, so holding toward the wall still kicks clear.
 
+## Weapons
+
+Real steel, not icons (`WEAPONS` in `game/stick.js`): a tapered blade with a bright edge half and a shaded spine half, a fuller line, a black outline, a guard, a wrapped grip and a pommel. Vespera carries a duelling rapier (long, straight, a swept gold hilt with a cup and quillons); Saif a shamshir (a deep curve that widens toward the point, drooping quillons). A style picks one with `prop`. Every swing leaves a ribbon traced through where the outer blade actually was over the last four frames (`Stick.blade`), a white edge over a tint of the fighter's colour; the parry is a bright arc across the guard.
+
+## Variety
+
+The sim rolls a deterministic seed (`p.vr`, from the frame, the slot and the position) at every jump and attack, so the same inputs give the same flips and rollback agrees. The renderer reads it:
+
+- **Jumps** (`p.jv`): a tucked front flip, a ninja leap (knee up, arms and blade swept back), an aerial with legs split, or a corkscrew. A jump that will carry onto a platform overhead is a vault: a hand reaches up for the ledge, then a tuck and a flip over onto it, feet ready.
+- **Air jumps:** a front flip, a backflip layout or a scissor kick; a vault when a platform is overhead.
+- **Falls and landings:** the arms-out drop, a ninja descent with the blade back, or a land-ready crouch; some landings touch a hand down.
+- **Sprint:** past running speed, a ninja run with both arms and the blade swept straight back.
+- **Attacks:** a jab or side light is sometimes a reverse rising slash; combo hit 2 picks among a spinning back kick, a high roundhouse and a knee with an elbow (per move, see `KICKS_ALT`); the finisher among the flying side kick, a tornado kick and a rising dragon slash (`FINISH_ALT`), plus the fighter's own finisher.
+
+## Movement extras
+
+A dash strike (an air dash cancels into an attack from its third frame and keeps its speed), running attacks that slide into the strike (`carryDrag`), and a head stomp: landing on a foe's head bounces you high (`bounceV`), gives the air dashes back and makes them flinch for 2 damage, once per airtime. The kit jump clears a platform in one leap.
+
 ## Combos
 
 Lights that hit open a window (`comboWindow`). A light inside it continues the string: hit 1 is the move itself, hit 2 a kick and hit 3 the finisher. The finisher deals `finDmg`% damage and `finKb`% launch, with a short pause and a FINISH! callout. Each follow-up steps in only as far as the gap needs (capped at `comboStep`, and `comboLunge` for the finisher), so short-reach fighters keep their strings in range.

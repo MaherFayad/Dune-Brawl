@@ -208,5 +208,24 @@ const kit = (da, db) => { da.kit = 1; db.kit = 1; };
   }
   ok(hits === 3, `kit: a jab string lands all three hits on its own (${hits})`);
 }
+{ // a dash strike: an air dash cancels into an attack that keeps the dash's speed
+  const { M, s } = setup("djinn-warrior", "djinn-warrior", kit); const p = s.p[0]; s.p[1].x = 1050 * S;
+  p.y = -300 * S; p.ground = 0; p.vy = 0; run(M, s, 2);
+  run(M, s, 1, () => IN.R | IN.X); run(M, s, FEEL.kit.dashStrikeFrom, () => IN.R); run(M, s, 1, () => IN.R | IN.A);
+  ok(p.st === ST.ATK && p.vx > FEEL.kit.airMax, `kit: an air dash cancels into an attack at speed (${p.vx})`);
+}
+{ // a running attack slides into the strike instead of stopping dead
+  const a = setup("djinn-warrior", "djinn-warrior", kit), b = setup("djinn-warrior", "djinn-warrior", kit);
+  for (const g of [a, b]) { g.s.p[1].x = 1050 * S; g.s.p[0].x = 250 * S; }
+  run(a.M, a.s, 30, () => IN.R); const x0 = a.s.p[0].x; run(a.M, a.s, 1, () => IN.A); run(a.M, a.s, 8);
+  const x1 = b.s.p[0].x; run(b.M, b.s, 1, () => IN.A); run(b.M, b.s, 8);
+  ok(a.s.p[0].x - x0 > 60 * S && b.s.p[0].x - x1 < 10 * S, `kit: a running attack carries ${((a.s.p[0].x - x0) / S).toFixed(0)} px, a standing one ${((b.s.p[0].x - x1) / S).toFixed(0)}`);
+}
+{ // landing on a foe's head stomps them and bounces high, once per airtime
+  const { M, s } = setup("djinn-warrior", "djinn-warrior", kit); const p = s.p[0], o = s.p[1];
+  o.x = 600 * S; Object.assign(p, { x: 600 * S, y: o.y - M.ph[1].h - 60 * S, ground: 0, vy: 800 });
+  let k = 0; while (!p.hb && k++ < 30) M.step(s, [0, 0]);
+  ok(p.hb && p.vy < -1500 && o.st === ST.HIT && o.dmg === FEEL.kit.stompDmg, "kit: landing on a head stomps it and bounces high");
+}
 console.log(fails ? `${fails} failed` : "all mechanics ok");
 process.exit(fails ? 1 : 0);
